@@ -20,7 +20,7 @@ from plot_spin import (BAND, capitalize_labels, GRID, INK, INK2, SURFACE,  # noq
 
 CLASS_LABEL = {'stopped': 'Stopped', 'turning': 'Turning', 'straight': 'Straight', 'curve': 'Curve'}
 C_OMEGA, C_V, C_YAW, C_X, C_Y = '#2a78d6', '#eb6834', '#4a3aa7', '#1baf7a', '#eda100'
-C_EST, C_STOP, C_TRUTH = '#2a78d6', '#1baf7a', '#eb6834'
+C_EST, C_EFF, C_STOP, C_TRUTH = '#2a78d6', '#4a3aa7', '#1baf7a', '#eb6834'
 
 
 def setup():
@@ -83,19 +83,22 @@ def plot_segments(path, ot, ov, ow, nt, used, odom_rows, ndt_rows, segs, half):
     print(f'saved {path}')
 
 
-def plot_summary(path, est_odom, est_ndt, tru_odom, tru_ndt):
+def plot_summary(path, est_odom, est_ndt, tru_odom, tru_ndt, tau=None):
     setup()
-    groups = [('Odometry linear velocity [m/s]', est_odom, tru_odom, [('v', 'V')], 1.0),
-              ('Odometry angular velocity [rad/s]', est_odom, tru_odom, [('omega', 'Omega')], 1.0),
+    groups = [('Odometry v [m/s]', est_odom, tru_odom, [('v', 'V')], 1.0),
+              ('Odometry omega [rad/s]', est_odom, tru_odom, [('omega', 'Omega')], 1.0),
               ('NDT position (map frame) [mm]', est_ndt, tru_ndt, [('x', 'X'), ('y', 'Y'), ('z', 'Z')], 1e3),
               ('NDT angle [deg]', est_ndt, tru_ndt, [('roll', 'Roll'), ('pitch', 'Pitch'), ('yaw', 'Yaw')],
                math.degrees(1.0))]
-    bars = [('No truth: moving (used as R)', C_EST, lambda e, t, k: e['moving'][k][0]),
+    bars = [('No truth: moving', C_EST, lambda e, t, k: e['moving'][k][0]),
             ('No truth: stopped', C_STOP, lambda e, t, k: e['stopped'][k][0])]
+    if tau is not None:   # 時間的なつながりの補正をした R_eff（分散 x tau_int）
+        bars.insert(1, ('No truth: moving x correlation time (R_eff)', C_EFF,
+                        lambda e, t, k: e['moving'][k][0] * tau[k]))
     if tru_odom is not None:
         bars.append(('Truth check: moving (Gazebo only)', C_TRUTH, lambda e, t, k: t['moving'][k][0]))
-    fig, axes = plt.subplots(1, 4, figsize=(15, 4.6), facecolor=SURFACE,
-                             gridspec_kw={'width_ratios': [1, 1, 2.2, 2.2]})
+    fig, axes = plt.subplots(1, 4, figsize=(18, 4.8), facecolor=SURFACE,
+                             gridspec_kw={'width_ratios': [1.3, 1.3, 2.4, 2.4]})
     width = 0.8 / len(bars)
     for ax, (title, est, tru, keys, f) in zip(axes, groups):
         style(ax)
@@ -106,7 +109,7 @@ def plot_summary(path, est_odom, est_ndt, tru_odom, tru_ndt):
                 s = math.sqrt(var) * f if np.isfinite(var) else 0.0
                 x = i + (j - (len(bars) - 1) / 2) * width
                 ax.bar(x, s, width * 0.92, color=color, zorder=3, label=label if i == 0 else None)
-                ax.text(x, s, f'{s:.3g}', ha='center', va='bottom', fontsize=7.5, color=INK)
+                ax.text(x, s, f'{s:.2g}', ha='center', va='bottom', fontsize=7.5, color=INK)
                 top = max(top, s)
         ax.set_ylim(0, top * 1.18 if top > 0 else 1)
         ax.set_xticks(range(len(keys)))
@@ -114,7 +117,7 @@ def plot_summary(path, est_odom, est_ndt, tru_odom, tru_ndt):
         ax.set_title(title, fontsize=9.5)
     axes[0].set_ylabel('Standard deviation')
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.02, 0.93), ncol=3, frameon=False)
+    fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.02, 0.93), ncol=4, frameon=False)
     fig.suptitle('Observation noise (standard deviation) estimated without the truth', x=0.02, ha='left',
                  fontsize=12, fontweight='bold', color=INK, y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.84))

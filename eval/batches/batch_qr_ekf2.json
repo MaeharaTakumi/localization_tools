@@ -1,0 +1,386 @@
+[
+ {
+  "name": "qr2_ekf_A_xy5e-3_yaw5e-5",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
+    ]
+   },
+   "ekf_localizer": {
+    "R_ndt": [
+     1.57e-05,
+     6.69e-05,
+     2.35e-05,
+     4.7e-07,
+     4.64e-07,
+     1.6e-05
+    ],
+    "Q": [
+     0.005,
+     0.005,
+     0.005,
+     0.05,
+     0.05,
+     5e-05,
+     0.05,
+     10.0
+    ]
+   }
+  }
+ },
+ {
+  "name": "qr2_ekf_B_xy5e-3_yaw5e-4",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
+    ]
+   },
+   "ekf_localizer": {
+    "R_ndt": [
+     1.57e-05,
+     6.69e-05,
+     2.35e-05,
+     4.7e-07,
+     4.64e-07,
+     1.6e-05
+    ],
+    "Q": [
+     0.005,
+     0.005,
+     0.005,
+     0.05,
+     0.05,
+     0.0005,
+     0.05,
+     10.0
+    ]
+   }
+  }
+ },
+ {
+  "name": "qr2_ekf_C_A_w1",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
+    ]
+   },
+   "ekf_localizer": {
+    "R_ndt": [
+     1.57e-05,
+     6.69e-05,
+     2.35e-05,
+     4.7e-07,
+     4.64e-07,
+     1.6e-05
+    ],
+    "Q": [
+     0.005,
+     0.005,
+     0.005,
+     0.05,
+     0.05,
+     5e-05,
+     0.05,
+     1.0
+    ]
+   }
+  }
+ },
+ {
+  "name": "qr2_ekf_D_A_w0.1",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
+    ]
+   },
+   "ekf_localizer": {
+    "R_ndt": [
+     1.57e-05,
+     6.69e-05,
+     2.35e-05,
+     4.7e-07,
+     4.64e-07,
+     1.6e-05
+    ],
+    "Q": [
+     0.005,
+     0.005,
+     0.005,
+     0.05,
+     0.05,
+     5e-05,
+     0.05,
+     0.1
+    ]
+   }
+  }
+ },
+ {
+  "name": "qr2_ekf_E_A_v0.5",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
+    ]
+   },
+   "ekf_localizer": {
+    "R_ndt": [
+     1.57e-05,
+     6.69e-05,
+     2.35e-05,
+     4.7e-07,
+     4.64e-07,
+     1.6e-05
+    ],
+    "Q": [
+     0.005,
+     0.005,
+     0.005,
+     0.05,
+     0.05,
+     5e-05,
+     0.5,
+     10.0
+    ]
+   }
+  }
+ },
+ {
+  "name": "qr2_ekf_F_A_zrp",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
+    ]
+   },
+   "ekf_localizer": {
+    "R_ndt": [
+     1.57e-05,
+     6.69e-05,
+     2.35e-05,
+     4.7e-07,
+     4.64e-07,
+     1.6e-05
+    ],
+    "Q": [
+     0.005,
+     0.005,
+     0.0005,
+     0.005,
+     0.005,
+     5e-05,
+     0.05,
+     10.0
+    ]
+   }
+  }
+ },
+ {
+  "name": "qr2_ekf_G_xy1.5e-3_yaw5e-5",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
+    ]
+   },
+   "ekf_localizer": {
+    "R_ndt": [
+     1.57e-05,
+     6.69e-05,
+     2.35e-05,
+     4.7e-07,
+     4.64e-07,
+     1.6e-05
+    ],
+    "Q": [
+     0.0015,
+     0.0015,
+     0.005,
+     0.05,
+     0.05,
+     5e-05,
+     0.05,
+     10.0
+    ]
+   }
+  }
+ },
+ {
+  "name": "qr2_ekf_H_xy5e-3_yaw5e-6",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
+    ]
+   },
+   "ekf_localizer": {
+    "R_ndt": [
+     1.57e-05,
+     6.69e-05,
+     2.35e-05,
+     4.7e-07,
+     4.64e-07,
+     1.6e-05
+    ],
+    "Q": [
+     0.005,
+     0.005,
+     0.005,
+     0.05,
+     0.05,
+     5e-06,
+     0.05,
+     10.0
+    ]
+   }
+  }
+ },
+ {
+  "name": "qr2_ekf_I_all_div10",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
+    ]
+   },
+   "ekf_localizer": {
+    "R_ndt": [
+     1.57e-05,
+     6.69e-05,
+     2.35e-05,
+     4.7e-07,
+     4.64e-07,
+     1.6e-05
+    ],
+    "Q": [
+     0.005,
+     0.005,
+     0.0005,
+     0.005,
+     0.005,
+     0.005,
+     0.005,
+     1.0
+    ]
+   }
+  }
+ },
+ {
+  "name": "qr2_ekf_J_all_div100",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
+    ]
+   },
+   "ekf_localizer": {
+    "R_ndt": [
+     1.57e-05,
+     6.69e-05,
+     2.35e-05,
+     4.7e-07,
+     4.64e-07,
+     1.6e-05
+    ],
+    "Q": [
+     0.0005,
+     0.0005,
+     5e-05,
+     0.0005,
+     0.0005,
+     0.0005,
+     0.0005,
+     0.1
+    ]
+   }
+  }
+ },
+ {
+  "name": "qr2_ekf_K_A_w1_v0.5",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
+    ]
+   },
+   "ekf_localizer": {
+    "R_ndt": [
+     1.57e-05,
+     6.69e-05,
+     2.35e-05,
+     4.7e-07,
+     4.64e-07,
+     1.6e-05
+    ],
+    "Q": [
+     0.005,
+     0.005,
+     0.005,
+     0.05,
+     0.05,
+     5e-05,
+     0.5,
+     1.0
+    ]
+   }
+  }
+ },
+ {
+  "name": "qr2_ekf_L_xy1.5e-2_yaw5e-5",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
+    ]
+   },
+   "ekf_localizer": {
+    "R_ndt": [
+     1.57e-05,
+     6.69e-05,
+     2.35e-05,
+     4.7e-07,
+     4.64e-07,
+     1.6e-05
+    ],
+    "Q": [
+     0.015,
+     0.015,
+     0.005,
+     0.05,
+     0.05,
+     5e-05,
+     0.05,
+     10.0
+    ]
+   }
+  }
+ }
+]

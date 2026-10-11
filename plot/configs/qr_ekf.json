@@ -1,0 +1,36 @@
+{
+ "before": [
+  "EKF, previous R and Q",
+  "qrv_ekf_oldR_1",
+  "#eb6834"
+ ],
+ "after": [
+  "EKF, R from data (no truth) + tuned Q",
+  "qrv_ekf_tuned_1",
+  "#2a78d6"
+ ],
+ "conditions": [
+  [
+   "qrv_ekf_oldR_",
+   "EKF, previous R and Q",
+   "#eb6834"
+  ],
+  [
+   "qrv_ekf_newR_",
+   "EKF, R from data, previous Q",
+   "#1baf7a"
+  ],
+  [
+   "qrv_ekf_tuned_",
+   "EKF, R from data + tuned Q",
+   "#2a78d6"
+  ],
+  [
+   "qrv_ndt_only",
+   "NDT only",
+   "#eda100"
+  ]
+ ],
+ "title": "  [held-out recording spin360_w1_ekf2]",
+ "runs": "bar = mean of 2-3 runs, line = range; NDT only: 1 run"
+}

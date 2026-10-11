@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Gazebo のオドメトリの移動平均を変えたときの ekf_localizer の比較の図（localizer_rl 内で実行）.
 
-  python3 plot_ekf_compare.py <出力の接頭辞> <results の jsonl>
+  python3 plot_ekf_compare.py <出力の接頭辞> <results の jsonl> [<条件の JSON>]
 
-同じ録画（spin360_w1_ekf）を再生した結果を比べる（tune_run.py の bag は /root/bags/tune/<試行名>）。
+同じ録画を再生した結果を比べる（tune_run.py の bag は /root/bags/tune/<試行名>）。
+条件の JSON（省略時は下の移動平均の比較）：
+  {"before": [ラベル, 試行名, 色], "after": [ラベル, 試行名, 色],
+   "conditions": [[試行名の接頭辞, ラベル, 色], ...], "title": 図の題の補足, "runs": 棒グラフの題の補足}
+省略時（spin360_w1_ekf）：
   w1cmp_ekf_w10_*  移動平均 10（変更前。make_window_bag.py で同じ走行から作った入力）
   w1cmp_ekf_js_*   車輪の角速度（/wheelchair/joint_states、joint_state_odometry）
   w1cmp_ekf_w1_*   移動平均 1（変更後。/wheelchair/odom そのもの）
@@ -44,6 +48,8 @@ METRICS = [('start_max', 'Yaw error peak: rotation start [deg]'),
            ('stop_max', 'Yaw error peak: stop [deg]'),
            ('steady_mean', 'Yaw error while turning steadily [deg]'),
            ('ang_mean', 'NDT angle_diff, mean [deg]')]
+TITLE = ''   # 図の題の補足
+RUNS = 'bar = mean of 2 runs, line = range; NDT only: 1 run'
 TRANSITIONS = [('Rotation start (0 -> +1 rad/s)', 'left turn'), ('Reverse (+1 -> -1 rad/s)', 'right turn'),
                ('Rotation -> forward', 'forward'), ('Stop (1.5 -> 0 m/s)', 'stop')]
 
@@ -61,6 +67,17 @@ def style(ax):
     ax.set_axisbelow(True)
     for spine in ('top', 'right'):
         ax.spines[spine].set_visible(False)
+
+
+def configure(path):
+    """条件の JSON で BEFORE・AFTER・CONDITIONS などを置き換える."""
+    global BEFORE, AFTER, CONDITIONS, TITLE, RUNS
+    with open(path) as f:
+        c = json.load(f)
+    BEFORE, AFTER = tuple(c['before']), tuple(c['after'])
+    CONDITIONS = [tuple(x) for x in c['conditions']]
+    TITLE = c.get('title', TITLE)
+    RUNS = c.get('runs', RUNS)
 
 
 def fig_timeseries(prefix):
@@ -107,7 +124,8 @@ def fig_transitions(prefix):
     axes[1][0].set_ylabel('Angular velocity [rad/s]')
     handles, labels = axes[1][0].get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.03, 0.95), ncol=3, frameon=False)
-    fig.suptitle('EKF (ekf_localizer) at each velocity change: yaw error (top) and estimated angular velocity (bottom)',
+    fig.suptitle('EKF (ekf_localizer) at each velocity change: yaw error (top) and estimated angular velocity (bottom)'
+                 + TITLE,
                  x=0.03, ha='left', fontsize=12, fontweight='bold', color=INK, y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.91))
     capitalize_labels(fig)   # 頭文字を大文字に（識別子はそのまま）
@@ -136,7 +154,7 @@ def fig_summary(prefix, results):
         ax.set_title(title, fontsize=9.5)
     handles = [plt.Rectangle((0, 0), 1, 1, color=c, label=lab) for _, lab, c in CONDITIONS]
     fig.legend(handles=handles, loc='upper left', bbox_to_anchor=(0.03, 0.95), ncol=4, frameon=False)
-    fig.suptitle('Same recording replayed (bar = mean of 2 runs, line = range; NDT only: 1 run)', x=0.03,
+    fig.suptitle(f'Same recording replayed ({RUNS}){TITLE}', x=0.03,
                  ha='left', fontsize=12, fontweight='bold', color=INK, y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.88))
     capitalize_labels(fig)   # 頭文字を大文字に（識別子はそのまま）
@@ -147,6 +165,8 @@ def fig_summary(prefix, results):
 
 def main():
     prefix, results_path = sys.argv[1:3]
+    if len(sys.argv) > 3:
+        configure(sys.argv[3])
     results = {}
     for line in open(results_path):
         if line.strip():

@@ -1,0 +1,157 @@
+[
+ {
+  "name": "qrv_ekf_oldR_1",
+  "estimator": "ekf_localizer",
+  "params": {}
+ },
+ {
+  "name": "qrv_ekf_tuned_1",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
+    ]
+   },
+   "ekf_localizer": {
+    "R_ndt": [
+     1.57e-05,
+     6.69e-05,
+     2.35e-05,
+     4.7e-07,
+     4.64e-07,
+     1.6e-05
+    ],
+    "Q": [
+     0.005,
+     0.005,
+     0.0005,
+     0.005,
+     0.005,
+     0.0005,
+     0.05,
+     10.0
+    ]
+   }
+  }
+ },
+ {
+  "name": "qrv_ekf_newR_1",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
+    ]
+   },
+   "ekf_localizer": {
+    "R_ndt": [
+     1.57e-05,
+     6.69e-05,
+     2.35e-05,
+     4.7e-07,
+     4.64e-07,
+     1.6e-05
+    ]
+   }
+  }
+ },
+ {
+  "name": "qrv_ekf_oldR_2",
+  "estimator": "ekf_localizer",
+  "params": {}
+ },
+ {
+  "name": "qrv_ekf_tuned_2",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
+    ]
+   },
+   "ekf_localizer": {
+    "R_ndt": [
+     1.57e-05,
+     6.69e-05,
+     2.35e-05,
+     4.7e-07,
+     4.64e-07,
+     1.6e-05
+    ],
+    "Q": [
+     0.005,
+     0.005,
+     0.0005,
+     0.005,
+     0.005,
+     0.0005,
+     0.05,
+     10.0
+    ]
+   }
+  }
+ },
+ {
+  "name": "qrv_ekf_newR_2",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
+    ]
+   },
+   "ekf_localizer": {
+    "R_ndt": [
+     1.57e-05,
+     6.69e-05,
+     2.35e-05,
+     4.7e-07,
+     4.64e-07,
+     1.6e-05
+    ]
+   }
+  }
+ },
+ {
+  "name": "qrv_ekf_oldR_3",
+  "estimator": "ekf_localizer",
+  "params": {}
+ },
+ {
+  "name": "qrv_ekf_tuned_3",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
+    ]
+   },
+   "ekf_localizer": {
+    "R_ndt": [
+     1.57e-05,
+     6.69e-05,
+     2.35e-05,
+     4.7e-07,
+     4.64e-07,
+     1.6e-05
+    ],
+    "Q": [
+     0.005,
+     0.005,
+     0.0005,
+     0.005,
+     0.005,
+     0.0005,
+     0.05,
+     10.0
+    ]
+   }
+  }
+ }
+]

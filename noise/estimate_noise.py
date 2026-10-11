@@ -11,6 +11,9 @@
 - NDT：LiDAR の姿勢を取付（/tf_static か --mount）で車体の姿勢に直して局所 1 次式を当て、それを LiDAR に戻した姿勢との差
   （map 座標の x, y, z と roll, pitch, yaw）→ R_ndt [x, y, z, roll, pitch, yaw]（ekf_localizer・robot_localization_adapter の並び）
 - 区間は 停止 / 旋回 / 直進 に分ける。R の推奨値は「動いている区間（旋回 + 直進）」をまとめた分散（停止は参考）
+- 時間的なつながりの補正（既定で有効、--no-correlation で無効）：EKF は観測ノイズを毎回独立とみなすが、実際の誤差は
+  つながっている（同じ情報が何度も来るのと同じ）。長めの窓（--corr-window）の残差の自己相関 rho_k から
+  積分相関時間 tau_int = 1 + 2 sum rho_k（rho_k が正の間、--max-lag 秒まで）を求め、R_eff = 分散 x tau_int を推奨値にする
 - --truth（Gazebo だけ）：同じ区間で真値（/wheelchair/pose）との差の分散も出して比べる。R の決定には使わない
 
 出力：表（標準出力）、<接頭辞>.yaml（env の parameters に貼れる形）、<接頭辞>.json、
@@ -163,6 +166,37 @@ def truth_errors(d, to_sim, ot, ov, ow, nt, mats, mount):
     return odom, {key: ndt[:, i] for i, key in enumerate(NDT_KEYS)}
 
 
+def correlation_time(rows, keys, rate, max_lag):
+    """残差の自己相関から積分相関時間 tau_int（サンプル数）と rho_1..（各成分）を求める.
+
+    rows は区間ごとの残差（dict）。区間をまたがない組だけで自己共分散を取り、全体の分散で割る。
+    rho_k が 0 以下になったところで打ち切って足す（initial positive sequence）.
+    """
+    out = {}
+    nlag = max(1, int(round(max_lag * rate)))
+    for k in keys:
+        rs = [r[k][np.isfinite(r[k])] for r in rows]
+        rs = [r for r in rs if len(r) > 2]
+        if not rs:
+            out[k] = (float('nan'), [])
+            continue
+        var = np.mean(np.concatenate(rs) ** 2)
+        rho = []
+        for lag in range(1, nlag + 1):
+            pairs = [(r[:-lag] * r[lag:]).sum() for r in rs if len(r) > lag]
+            count = sum(len(r) - lag for r in rs if len(r) > lag)
+            if count < 10:
+                break
+            rho.append(sum(pairs) / count / var)
+        total = 0.0
+        for x in rho:
+            if x <= 0:
+                break
+            total += x
+        out[k] = (1.0 + 2.0 * total, rho)
+    return out
+
+
 def pooled(rows, keys, classes):
     """区間ごとの残差（平均は引かない）を class ごとにまとめた分散と標本数."""
     out = {}
@@ -189,6 +223,9 @@ def main():
     ap.add_argument('--min-len', type=float, default=1.0, help='使う区間の最短 [s]')
     ap.add_argument('--window', type=float, default=1.0, help='局所 1 次式の窓 [s]')
     ap.add_argument('--cmd-timeout', type=float, default=0.5)
+    ap.add_argument('--corr-window', type=float, default=3.0, help='時間的なつながりを測るときの局所 1 次式の窓 [s]')
+    ap.add_argument('--max-lag', type=float, default=2.0, help='自己相関を足す最大の遅れ [s]')
+    ap.add_argument('--no-correlation', action='store_true', help='時間的なつながりの補正をしない（R = 分散）')
     ap.add_argument('--truth', action='store_true', help='Gazebo の真値との差も出す（比較だけ）')
     args = ap.parse_args()
     sv, sw = (float(x) for x in args.scale.split(','))
@@ -221,6 +258,8 @@ def main():
         terr_odom, terr_ndt = truth_errors(d, to_sim, ot, ov, ow, nt, mats, mount)
 
     odom_rows, ndt_rows, truth_odom_rows, truth_ndt_rows, used = [], [], [], [], []
+    corr_odom, corr_ndt = [], []   # 時間的なつながりを測る残差（動いている区間、長めの窓）
+    half_c = args.corr_window / 2.0
     for t0, t1, v, w in segs:
         a, b = t0 + args.settle, t1 - args.margin
         if b - a < args.min_len:
@@ -231,6 +270,9 @@ def main():
         mn = (nt >= a) & (nt <= b)
         odom_rows.append((cls, {**odom_residuals(ot[mo], ov[mo], ow[mo], half), '_t': ot[mo]}))
         ndt_rows.append((cls, {**ndt_residuals(nt[mn], [mats[i] for i in np.where(mn)[0]], mount, half), '_t': nt[mn]}))
+        if cls != 'stopped':
+            corr_odom.append(odom_residuals(ot[mo], ov[mo], ow[mo], half_c))
+            corr_ndt.append(ndt_residuals(nt[mn], [mats[i] for i in np.where(mn)[0]], mount, half_c))
         if args.truth:   # 区間ごとの平均（一定のずれ）を引いた真値との差
             truth_odom_rows.append((cls, {k: terr_odom[k][mo] - np.nanmean(terr_odom[k][mo]) for k in ODOM_KEYS}))
             truth_ndt_rows.append((cls, {k: terr_ndt[k][mn] - np.nanmean(terr_ndt[k][mn]) for k in NDT_KEYS}))
@@ -259,26 +301,41 @@ def main():
     print('  (n = ' + ', '.join(f'{c} {est_odom[c]["v"][1]}/{est_ndt[c]["x"][1]}' for c in classes)
           + '  [odom/ndt samples])')
 
-    r_odom = [est_odom['moving'][k][0] for k in ODOM_KEYS]
-    r_ndt = [est_ndt['moving'][k][0] for k in NDT_KEYS]
+    r_odom_white = [est_odom['moving'][k][0] for k in ODOM_KEYS]
+    r_ndt_white = [est_ndt['moving'][k][0] for k in NDT_KEYS]
+    tau_odom = correlation_time(corr_odom, ODOM_KEYS, 1.0 / np.median(np.diff(ot)), args.max_lag)
+    tau_ndt = correlation_time(corr_ndt, NDT_KEYS, 1.0 / np.median(np.diff(nt)), args.max_lag)
+    print(f'\ncorrelation (moving, window {args.corr_window} s): tau_int and rho_1..3')
+    for k, (tau, rho) in list(tau_odom.items()) + list(tau_ndt.items()):
+        print(f'  {k:<6} tau_int {tau:6.2f}   rho ' + ' '.join(f'{x:+.2f}' for x in rho[:3]))
+    if args.no_correlation:
+        r_odom, r_ndt = r_odom_white, r_ndt_white
+    else:
+        r_odom = [r * tau_odom[k][0] for r, k in zip(r_odom_white, ODOM_KEYS)]
+        r_ndt = [r * tau_ndt[k][0] for r, k in zip(r_ndt_white, NDT_KEYS)]
     snippet = {
         'odom_covariance': {'R_odom': [float(f'{x:.3g}') for x in r_odom]},
         'ekf_localizer': {'R_ndt': [float(f'{x:.3g}') for x in r_ndt]},
         'robot_localization_adapter': {'R_ndt': [float(f'{x:.3g}') for x in r_ndt]},
     }
-    print('\n# R（動いている区間の残差の分散）。env の parameters に入れる\n' + yaml.safe_dump(snippet, sort_keys=False))
+    print('\n# R（動いている区間の残差の分散' + ('' if args.no_correlation else ' x 積分相関時間') + '）。env の parameters に入れる\n' + yaml.safe_dump(snippet, sort_keys=False))
     os.makedirs(os.path.dirname(args.out) or '.', exist_ok=True)
     with open(args.out + '.yaml', 'w') as f:
-        f.write(f'# estimate_noise.py {args.bag}（真値なし。動いている区間の残差の分散）\n')
+        how = '分散' if args.no_correlation else '分散 x 積分相関時間'
+        f.write(f'# estimate_noise.py {args.bag}（真値なし。動いている区間の残差の{how}）\n')
         yaml.safe_dump(snippet, f, sort_keys=False)
     with open(args.out + '.json', 'w') as f:
         json.dump({'bag': args.bag, 'segments': used, 'odom': est_odom, 'ndt': est_ndt,
-                   'truth_odom': tru_odom, 'truth_ndt': tru_ndt, 'R_odom': r_odom, 'R_ndt': r_ndt}, f, indent=1)
+                   'truth_odom': tru_odom, 'truth_ndt': tru_ndt, 'R_odom': r_odom, 'R_ndt': r_ndt,
+                   'R_odom_white': r_odom_white, 'R_ndt_white': r_ndt_white,
+                   'tau_odom': {k: v[0] for k, v in tau_odom.items()},
+                   'tau_ndt': {k: v[0] for k, v in tau_ndt.items()}}, f, indent=1)
     print(f'saved {args.out}.yaml, {args.out}.json')
 
     from plot_noise import plot_segments, plot_summary
     plot_segments(args.out + '_segments.png', ot, ov, ow, nt, used, odom_rows, ndt_rows, segs, half)
-    plot_summary(args.out + '_summary.png', est_odom, est_ndt, tru_odom, tru_ndt)
+    tau = None if args.no_correlation else {k: v[0] for k, v in list(tau_odom.items()) + list(tau_ndt.items())}
+    plot_summary(args.out + '_summary.png', est_odom, est_ndt, tru_odom, tru_ndt, tau)
 
 
 if __name__ == '__main__':
