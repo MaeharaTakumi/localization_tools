@@ -1,0 +1,10 @@
+{
+ "before": ["EKF (ekf_localizer), previous R_ndt", "qrv_ekf_oldR_2", "#eb6834"],
+ "after": ["EKF (ekf_localizer), R_ndt from noisy initial guesses (gazebo.yaml)", "qg_ekf_5", "#2a78d6"],
+ "conditions": [["^(qrv_ekf_oldR_|qg_ekf_oldR_)", "ekf_localizer, previous R_ndt (5 runs)", "#eb6834"],
+                ["^(qi_ekf_initR_\\d+$|qg_ekf_\\d+$)", "ekf_localizer, new R_ndt (8 runs)", "#2a78d6"],
+                ["^qg_rl_oldR_", "robot_localization, previous R_ndt (2 runs)", "#1baf7a"],
+                ["^qg_rl_\\d+$", "robot_localization, new R_ndt (2 runs)", "#4a3aa7"]],
+ "title": "  [held-out recording spin360_w1_ekf2]",
+ "runs": "bar = mean, line = range of runs"
+}

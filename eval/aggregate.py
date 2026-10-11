@@ -5,6 +5,7 @@
 
 スコア = SCORE_KEYS（既定 trans_max_mean,steady_mean,ang_mean,xy_mean）の、基準（接頭辞で始まる試行の平均）との比の平均。
 小さいほど良い。n は回数、min・max は 1 回ごとのスコアの幅（同じ設定でも ±0.03〜0.05 ばらつく）。
+環境変数 SHOW_RUNS=1 で 1 回ごとのスコアも出す。
 """
 import collections
 import json
@@ -37,6 +38,10 @@ def main():
     print(header)
     for score, name, n, lo, hi, mean in sorted(table):
         print(f'{name:<30}{n:>3}{score:7.3f}{lo:7.3f}{hi:7.3f}' + ''.join(f'{mean[k]:13.3f}' for k in SHOW))
+        if os.environ.get('SHOW_RUNS'):   # 1 回ごとのスコアも出す
+            for r in groups[name]:
+                sc = sum(r[k] / ref[k] for k in KEYS) / len(KEYS)
+                print(f"    {r['name']:<26}   {sc:7.3f}" + ' ' * 14 + ''.join(f'{r[k]:13.3f}' for k in SHOW))
     print(f'score = mean ratio to {base_prefix}* over ' + ', '.join(KEYS) + ' (smaller is better). units: deg, m')
 
 
