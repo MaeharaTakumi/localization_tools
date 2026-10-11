@@ -6,7 +6,7 @@
 同じ録画を再生した結果を比べる（tune_run.py の bag は /root/bags/tune/<試行名>）。
 条件の JSON（省略時は下の移動平均の比較）：
   {"before": [ラベル, 試行名, 色], "after": [ラベル, 試行名, 色],
-   "conditions": [[試行名の接頭辞, ラベル, 色], ...], "title": 図の題の補足, "runs": 棒グラフの題の補足}
+   "conditions": [[試行名の接頭辞（正規表現）, ラベル, 色], ...], "title": 図の題の補足, "runs": 棒グラフの題の補足}
 省略時（spin360_w1_ekf）：
   w1cmp_ekf_w10_*  移動平均 10（変更前。make_window_bag.py で同じ走行から作った入力）
   w1cmp_ekf_js_*   車輪の角速度（/wheelchair/joint_states、joint_state_odometry）
@@ -21,6 +21,7 @@
 """
 import json
 import os
+import re
 import sys
 
 import matplotlib
@@ -140,7 +141,7 @@ def fig_summary(prefix, results):
         style(ax)
         bars = []
         for i, (pre, _, color) in enumerate(CONDITIONS):
-            vals = [r[key] for name, r in results.items() if name.startswith(pre)]
+            vals = [r[key] for name, r in results.items() if re.match(pre, name)]   # 接頭辞か正規表現
             mean = float(np.mean(vals))
             ax.bar(i, mean, 0.8, color=color, zorder=3)
             if len(vals) > 1:

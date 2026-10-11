@@ -2,6 +2,7 @@
 # Gazebo を起動し直して（車椅子を初期位置に戻す）、指定の推定器で drive_spin.py を走らせ、bag に録る（ホストで実行）
 #   localization_tools/gazebo/run_gazebo_test.sh <estimator> <bag 名> [launch の追加引数（例: use_ekf:=false）]
 #   bag は localizer_rl:/root/bags/<bag 名>、動作の開始時刻は同じ場所の <bag 名>_phases.txt
+#   走り方は環境変数 DRIVE（既定 drive_spin.py。止まった状態を測るときは DRIVE=drive_stops.py）
 set -u
 est=$1; bag=$2; extra=${3:-}
 here=$(cd "$(dirname "$0")" && pwd)
@@ -36,7 +37,7 @@ docker exec -d $LOC bash -ic "ros2 launch localization_bringup localization.laun
 sleep 25   # 地図の読み込みと NDT の収束を待つ
 
 echo "== drive"
-docker exec $LOC bash -ic 'python3 /root/localization_tools/gazebo/drive_spin.py' 2>&1 | grep -v "terminal process group\|no job control"
+docker exec $LOC bash -ic "python3 /root/localization_tools/gazebo/${DRIVE:-drive_spin.py}" 2>&1 | grep -v "terminal process group\|no job control"
 docker exec $LOC bash -c "cp /tmp/drive_phases.txt /root/bags/${bag}_phases.txt"
 sleep 5
 

@@ -125,3 +125,60 @@ def plot_summary(path, est_odom, est_ndt, tru_odom, tru_ndt, tau=None):
     fig.savefig(path, dpi=120, facecolor=SURFACE)
     plt.close(fig)
     print(f'saved {path}')
+
+
+def plot_init_noise(path, stats, sigma, old):
+    """ndt_init_noise.py の図：初期値のずれと NDT の誤差の散布図（6 成分）と、標準偏差の比較."""
+    setup()
+    names = ['X', 'Y', 'Z', 'Roll', 'Pitch', 'Yaw']
+    scale = [1e3] * 3 + [math.degrees(1.0)] * 3
+    units = ['mm'] * 3 + ['deg'] * 3
+    st = stats['noise']
+    res, noise, stop = np.array(st['res']), np.array(st['noise']), np.array(st['stop'])
+    fig = plt.figure(figsize=(18, 8.6), facecolor=SURFACE)
+    gs = fig.add_gridspec(2, 6, height_ratios=[1, 1.05], hspace=0.45, wspace=0.35)
+    for i in range(6):
+        ax = fig.add_subplot(gs[0, i])
+        style(ax)
+        x, y = noise[:, i] * scale[i], res[:, i] * scale[i]
+        ax.scatter(x, y, s=7, color=C_EST, alpha=0.55, lw=0, zorder=3)
+        lim = np.abs(x).max() * 1.05
+        k = st['slope'][i]
+        ax.plot([-lim, lim], [-k * lim, k * lim], color=INK2, lw=1.0, zorder=4)
+        ax.axhline(0, color=GRID, lw=0.8, zorder=2)
+        ax.set_title(f'{names[i]}  (slope {k:.2f})', fontsize=9.5)
+        ax.set_xlabel(f'Initial guess error [{units[i]}]')
+        if i == 0:
+            ax.set_ylabel('NDT error, stop mean removed')
+    groups = [('NDT position error, standard deviation [mm]', range(3)),
+              ('NDT angle error, standard deviation [deg]', range(3, 6))]
+    bars = [('Initial guess = truth (no noise)', C_STOP, lambda i: stats['no_noise']['var'][i] if 'no_noise' in stats else np.nan),
+            ('Initial guess = truth + noise (used as R)', C_EST, lambda i: st['var'][i]),
+            ('Current R (gazebo.yaml)', C_TRUTH, lambda i: old[i])]
+    for g, (title, idx) in enumerate(groups):
+        ax = fig.add_subplot(gs[1, 3 * g:3 * g + 3])
+        style(ax)
+        idx = list(idx)
+        width = 0.8 / len(bars)
+        top = 0.0
+        for j, (label, color, get) in enumerate(bars):
+            for n, i in enumerate(idx):
+                v = math.sqrt(get(i)) * scale[i] if np.isfinite(get(i)) else 0.0
+                x = n + (j - 1) * width
+                ax.bar(x, v, width * 0.92, color=color, zorder=3, label=label if n == 0 else None)
+                ax.text(x, v, f'{v:.2g}', ha='center', va='bottom', fontsize=8, color=INK)
+                top = max(top, v)
+        ax.set_yscale('log')
+        ax.set_ylim(top * 1e-4 if top > 0 else 1e-3, top * 3)
+        ax.set_xticks(range(len(idx)))
+        ax.set_xticklabels([names[i] for i in idx])
+        ax.set_title(title + '  (log scale)', fontsize=9.5)
+        if g == 0:
+            ax.legend(loc='upper left', frameon=False, fontsize=9)
+    sig = ', '.join(f'{n} {s * f:.3g} {u}' for n, s, f, u in zip(names, sigma, scale, units))
+    fig.suptitle(f'NDT error when the initial guess is truth + noise (noise sigma: {sig})', x=0.02, ha='left',
+                 fontsize=12, fontweight='bold', color=INK, y=0.995)
+    capitalize_labels(fig)   # 頭文字を大文字に（識別子はそのまま）
+    fig.savefig(path, dpi=110, facecolor=SURFACE)
+    plt.close(fig)
+    print(f'saved {path}')

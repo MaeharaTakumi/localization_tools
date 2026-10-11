@@ -231,7 +231,8 @@ def main():
     sv, sw = (float(x) for x in args.scale.split(','))
     half = args.window / 2.0
 
-    d = read_bag(args.bag)
+    d = read_bag(args.bag, ['/clock', '/tf_static', args.odom, args.ndt, args.cmd]
+                 + (['/wheelchair/pose'] if args.truth else []))
     if '/clock' in d:
         clk = np.array([(t, m.clock.sec + m.clock.nanosec * 1e-9) for t, m in d['/clock']])
 

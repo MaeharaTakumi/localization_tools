@@ -66,10 +66,13 @@ def widths_back_to_front(n, widest=2.6, thinnest=1.1):
     return [float(w) for w in np.linspace(widest, thinnest, n)]
 
 
-def read_bag(path):
+def read_bag(path, topics=None):
+    """bag を {トピック: [(受信時刻 [s], メッセージ)]} で読む。topics を渡すとそのトピックだけ（点群を読まずに速い）."""
     reader = rosbag2_py.SequentialReader()
     reader.open(rosbag2_py.StorageOptions(uri=path, storage_id='sqlite3'),
                 rosbag2_py.ConverterOptions('cdr', 'cdr'))
+    if topics:
+        reader.set_filter(rosbag2_py.StorageFilter(topics=list(topics)))
     types = {t.name: t.type for t in reader.get_all_topics_and_types()}
     out = {}
     while reader.has_next():

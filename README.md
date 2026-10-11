@@ -13,10 +13,11 @@ bag は `localizer_rl:/root/bags`、再生した結果の bag は `/root/bags/tu
 
 | フォルダ | 内容 |
 |---|---|
-| `noise/` | **観測ノイズ R を真値なしで求める**（`estimate_noise.py`、図は `plot_noise.py`） |
+| `noise/` | **観測ノイズ R を求める**：`estimate_noise.py`（真値なし、走行中の残差）、`ndt_init_noise.py`（NDT の R を「真値 + ノイズ」の初期値で計算し直して求める）。図は `plot_noise.py` |
+| `calib/` | **LiDAR の取付位置とオドメトリの倍率を推定する**（`estimate_calibration.py`、真値なし。図は `plot_calibration.py`） |
 | `eval/` | 録画の再生・評価・パラメータの調整（`tune_run.py`、`tune_batch.py`、`summarize.py`、`transition_eval.py`、`make_window_bag.py`）。候補は `batches/`、結果は `results/` |
 | `plot/` | 図（`plot_*.py`、`check_*.py`）。`plot_spin.py` は bag の読み込みや図の共通部品も持つ。`rerender_results.sh` で `workspace/results` の図を全部描き直す |
-| `gazebo/` | Gazebo での走行と録画（`run_gazebo_test.sh` はホストで実行） |
+| `gazebo/` | Gazebo での走行と録画（`run_gazebo_test.sh` はホストで実行）。走り方は `drive_spin.py`（左右 1 周 + 前進）と `drive_stops.py`（向き・位置を変えて 13 回止まる） |
 | `test/` | Gazebo なしの合成データのテスト（robot_localization の経路） |
 
 ## R を求める（`noise/estimate_noise.py`）
@@ -32,6 +33,31 @@ python3 noise/estimate_noise.py /root/bags/<録画> --out /root/fig/noise_<名�
 - 推奨値は動いている区間（旋回・直進）の分散。env の `parameters` に貼れる yaml を出す。
 - 真値は使わないので実機の録画にも使える（オドメトリ・NDT・指令・`/tf_static` を録っておく。トピック名はオプションで変える）。
   `--truth` は Gazebo だけで、真値との差の分散を並べて出す（比較用。R には使わない）。
+
+## NDT の R を「真値 + ノイズ」の初期値で求める（`noise/ndt_init_noise.py`）
+
+```bash
+DRIVE=drive_stops.py localization_tools/gazebo/run_gazebo_test.sh ekf_localizer stops_ekf   # ホスト：止まる走行を録る
+python3 noise/ndt_init_noise.py /root/bags/stops_ekf --out /root/fig/ndt_init_stops         # コンテナ（約 9 分）
+```
+
+- 真値は止まった区間（始めの 1 s を除く）の `/wheelchair/pose` の平均（止まっているので真値の時刻のずれは効かない）。
+- NDT だけを Gazebo の設定で `ROS_DOMAIN_ID=99` に起動し、点群が届くたびに「真値 + ノイズ」を初期値として TF で出す。
+  1 回目はノイズなし、2 回目以降はノイズあり（`--passes`）。ノイズは `--sigma`（既定 x, y 0.02 m、z 0.01 m、roll, pitch 0.3°、
+  yaw 1.0°：運用中の EKF の誤差の rms の 2〜4 倍）。
+- NDT の解と真値の差から、止まった区間ごとの平均（地図と Gazebo の一定のずれ）を引いた分散を R_ndt とする。
+  初期値のずれが解に残る傾きと、図（初期値のずれと解の誤差の散布図）も出す。
+
+## LiDAR の取付位置とオドメトリの倍率（`calib/estimate_calibration.py`）
+
+```bash
+python3 calib/estimate_calibration.py /root/bags/<録画> [...] --out /root/fig/calib [--map <地図の pcd>] [--truth]
+```
+
+真値なしで、NDT の LiDAR の姿勢とオドメトリ（倍率を掛ける前）から求める。その場の旋回と直進が入った録画を使う。
+- omega の倍率：旋回の区間の NDT の yaw の変化 / オドメトリの omega の積分。v の倍率：直進の区間の移動距離 / v の積分
+- 取付の x, y：その場の旋回で LiDAR が回転の中心のまわりを回る円を最小二乗で当てはめる。取付の yaw：直進の向きと LiDAR の yaw の差
+- 取付の roll・pitch（床が水平と仮定）、z（`--map` の地図の床の高さとの差。参考）
 
 ## 録画を再生して評価・調整する（`eval/`）
 

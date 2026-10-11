@@ -1,0 +1,11 @@
+{
+ "before": ["EKF, current R and Q", "qrv_ekf_oldR_1", "#eb6834"],
+ "after": ["EKF, NDT R from truth + noise initial guesses", "qi_ekf_initR_1", "#2a78d6"],
+ "conditions": [["qrv_ekf_oldR_", "EKF, current R and Q", "#eb6834"],
+                ["qrv_ekf_tuned_", "EKF, R from residuals + tuned Q", "#1baf7a"],
+                ["qi_ekf_initR_\\d+$", "EKF, NDT R from noisy initial guesses", "#2a78d6"],
+                ["qi_ekf_initR_odomEff_", "EKF, NDT R from noisy initial guesses + odometry R_eff", "#4a3aa7"],
+                ["qrv_ndt_only", "NDT only", "#eda100"]],
+ "title": "  [held-out recording spin360_w1_ekf2]",
+ "runs": "bar = mean of 2-3 runs, line = range; NDT only: 1 run"
+}
