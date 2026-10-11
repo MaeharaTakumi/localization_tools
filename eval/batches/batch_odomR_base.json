@@ -1,0 +1,58 @@
+[
+ {
+  "name": "ekf_a0",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "odom_noise_alpha": [
+     0,
+     0,
+     0,
+     0
+    ]
+   }
+  }
+ },
+ {
+  "name": "ekf_a0b",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "odom_noise_alpha": [
+     0,
+     0,
+     0,
+     0
+    ]
+   }
+  }
+ },
+ {
+  "name": "rl_a0",
+  "estimator": "robot_localization",
+  "params": {
+   "odom_covariance": {
+    "odom_noise_alpha": [
+     0,
+     0,
+     0,
+     0
+    ]
+   }
+  }
+ },
+ {
+  "name": "rl_a0b",
+  "estimator": "robot_localization",
+  "params": {
+   "odom_covariance": {
+    "odom_noise_alpha": [
+     0,
+     0,
+     0,
+     0
+    ]
+   }
+  }
+ }
+]

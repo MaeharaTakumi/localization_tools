@@ -1,0 +1,4 @@
+[
+ {"name": "w1cmp_ekf_w10_1", "estimator": "ekf_localizer", "params": {"__env__": {"topics": {"points": "/velodyne_points", "odom": "/wheelchair/odom"}, "joint_state_odometry": null}}},
+ {"name": "w1cmp_ekf_w10_2", "estimator": "ekf_localizer", "params": {"__env__": {"topics": {"points": "/velodyne_points", "odom": "/wheelchair/odom"}, "joint_state_odometry": null}}}
+]

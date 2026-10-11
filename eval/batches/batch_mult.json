@@ -1,0 +1,22 @@
+[
+ {
+  "name": "mult_ekf_1",
+  "estimator": "ekf_localizer",
+  "params": {}
+ },
+ {
+  "name": "mult_rl_1",
+  "estimator": "robot_localization",
+  "params": {}
+ },
+ {
+  "name": "mult_ekf_2",
+  "estimator": "ekf_localizer",
+  "params": {}
+ },
+ {
+  "name": "mult_rl_2",
+  "estimator": "robot_localization",
+  "params": {}
+ }
+]

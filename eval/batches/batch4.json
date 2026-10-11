@@ -1,0 +1,247 @@
+[
+ {
+  "name": "best3_repeat",
+  "params": {
+   "ekf_filter_node_map": {
+    "transform_timeout": 0.05,
+    "process_noise_covariance_diag": [
+     0.05,
+     0.05,
+     0.005,
+     0.05,
+     0.05,
+     0.05,
+     0.05,
+     0.025,
+     0.04,
+     0.01,
+     0.01,
+     1.0,
+     0.01,
+     0.01,
+     0.015
+    ]
+   },
+   "ekf_filter_node_odom": {
+    "frequency": 200.0,
+    "process_noise_covariance_diag": [
+     0.05,
+     0.05,
+     0.005,
+     0.05,
+     0.05,
+     0.05,
+     0.05,
+     0.025,
+     0.04,
+     0.01,
+     0.01,
+     1.0,
+     0.01,
+     0.01,
+     0.015
+    ]
+   }
+  }
+ },
+ {
+  "name": "o200+qvyaw0.3",
+  "params": {
+   "ekf_filter_node_map": {
+    "transform_timeout": 0.05,
+    "process_noise_covariance_diag": [
+     0.05,
+     0.05,
+     0.005,
+     0.05,
+     0.05,
+     0.05,
+     0.05,
+     0.025,
+     0.04,
+     0.01,
+     0.01,
+     0.3,
+     0.01,
+     0.01,
+     0.015
+    ]
+   },
+   "ekf_filter_node_odom": {
+    "frequency": 200.0,
+    "process_noise_covariance_diag": [
+     0.05,
+     0.05,
+     0.005,
+     0.05,
+     0.05,
+     0.05,
+     0.05,
+     0.025,
+     0.04,
+     0.01,
+     0.01,
+     0.3,
+     0.01,
+     0.01,
+     0.015
+    ]
+   }
+  }
+ },
+ {
+  "name": "o200+m100+qvyaw1",
+  "params": {
+   "ekf_filter_node_map": {
+    "transform_timeout": 0.05,
+    "frequency": 100.0,
+    "process_noise_covariance_diag": [
+     0.05,
+     0.05,
+     0.005,
+     0.05,
+     0.05,
+     0.05,
+     0.05,
+     0.025,
+     0.04,
+     0.01,
+     0.01,
+     1.0,
+     0.01,
+     0.01,
+     0.015
+    ]
+   },
+   "ekf_filter_node_odom": {
+    "frequency": 200.0,
+    "process_noise_covariance_diag": [
+     0.05,
+     0.05,
+     0.005,
+     0.05,
+     0.05,
+     0.05,
+     0.05,
+     0.025,
+     0.04,
+     0.01,
+     0.01,
+     1.0,
+     0.01,
+     0.01,
+     0.015
+    ]
+   }
+  }
+ },
+ {
+  "name": "o200+m100+qvyaw0.3",
+  "params": {
+   "ekf_filter_node_map": {
+    "transform_timeout": 0.05,
+    "frequency": 100.0,
+    "process_noise_covariance_diag": [
+     0.05,
+     0.05,
+     0.005,
+     0.05,
+     0.05,
+     0.05,
+     0.05,
+     0.025,
+     0.04,
+     0.01,
+     0.01,
+     0.3,
+     0.01,
+     0.01,
+     0.015
+    ]
+   },
+   "ekf_filter_node_odom": {
+    "frequency": 200.0,
+    "process_noise_covariance_diag": [
+     0.05,
+     0.05,
+     0.005,
+     0.05,
+     0.05,
+     0.05,
+     0.05,
+     0.025,
+     0.04,
+     0.01,
+     0.01,
+     0.3,
+     0.01,
+     0.01,
+     0.015
+    ]
+   }
+  }
+ },
+ {
+  "name": "o200+qvyaw1+odomw2e-2",
+  "params": {
+   "ekf_filter_node_map": {
+    "transform_timeout": 0.05,
+    "process_noise_covariance_diag": [
+     0.05,
+     0.05,
+     0.005,
+     0.05,
+     0.05,
+     0.05,
+     0.05,
+     0.025,
+     0.04,
+     0.01,
+     0.01,
+     1.0,
+     0.01,
+     0.01,
+     0.015
+    ]
+   },
+   "ekf_filter_node_odom": {
+    "frequency": 200.0,
+    "process_noise_covariance_diag": [
+     0.05,
+     0.05,
+     0.005,
+     0.05,
+     0.05,
+     0.05,
+     0.05,
+     0.025,
+     0.04,
+     0.01,
+     0.01,
+     1.0,
+     0.01,
+     0.01,
+     0.015
+    ]
+   },
+   "robot_localization_adapter": {
+    "R_odom": [
+     0.0025,
+     0.02
+    ]
+   }
+  }
+ },
+ {
+  "name": "o200+m100",
+  "params": {
+   "ekf_filter_node_map": {
+    "transform_timeout": 0.05,
+    "frequency": 100.0
+   },
+   "ekf_filter_node_odom": {
+    "frequency": 200.0
+   }
+  }
+ }
+]

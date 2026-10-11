@@ -1,0 +1,66 @@
+[
+ {
+  "name": "hv_avg_ekf_1",
+  "estimator": "ekf_localizer",
+  "params": {
+   "__env__": {
+    "topics": {
+     "points": "/velodyne_points",
+     "odom": "/wheelchair/odom"
+    },
+    "joint_state_odometry": null
+   },
+   "odom_covariance": {
+    "odom_delay": 0.09
+   }
+  }
+ },
+ {
+  "name": "hv_avg_rl_1",
+  "estimator": "robot_localization",
+  "params": {
+   "__env__": {
+    "topics": {
+     "points": "/velodyne_points",
+     "odom": "/wheelchair/odom"
+    },
+    "joint_state_odometry": null
+   },
+   "odom_covariance": {
+    "odom_delay": 0.09
+   }
+  }
+ },
+ {
+  "name": "hv_avg_ekf_2",
+  "estimator": "ekf_localizer",
+  "params": {
+   "__env__": {
+    "topics": {
+     "points": "/velodyne_points",
+     "odom": "/wheelchair/odom"
+    },
+    "joint_state_odometry": null
+   },
+   "odom_covariance": {
+    "odom_delay": 0.09
+   }
+  }
+ },
+ {
+  "name": "hv_avg_rl_2",
+  "estimator": "robot_localization",
+  "params": {
+   "__env__": {
+    "topics": {
+     "points": "/velodyne_points",
+     "odom": "/wheelchair/odom"
+    },
+    "joint_state_odometry": null
+   },
+   "odom_covariance": {
+    "odom_delay": 0.09
+   }
+  }
+ }
+]

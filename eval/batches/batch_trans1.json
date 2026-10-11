@@ -1,0 +1,190 @@
+[
+ {
+  "name": "ekf_base",
+  "estimator": "ekf_localizer",
+  "params": {}
+ },
+ {
+  "name": "ekf_baseb",
+  "estimator": "ekf_localizer",
+  "params": {}
+ },
+ {
+  "name": "ekf_d0.05",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "odom_delay": 0.05
+   }
+  }
+ },
+ {
+  "name": "ekf_d0.09",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "odom_delay": 0.09
+   }
+  }
+ },
+ {
+  "name": "ekf_d0.13",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "odom_delay": 0.13
+   }
+  }
+ },
+ {
+  "name": "ekf_acc0.05",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "accel_noise_tau": [
+     0.05,
+     0.05
+    ]
+   }
+  }
+ },
+ {
+  "name": "ekf_acc0.09",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "accel_noise_tau": [
+     0.09,
+     0.09
+    ]
+   }
+  }
+ },
+ {
+  "name": "ekf_acc0.2",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "accel_noise_tau": [
+     0.2,
+     0.2
+    ]
+   }
+  }
+ },
+ {
+  "name": "ekf_d0.09acc0.09",
+  "estimator": "ekf_localizer",
+  "params": {
+   "odom_covariance": {
+    "odom_delay": 0.09,
+    "accel_noise_tau": [
+     0.09,
+     0.09
+    ]
+   }
+  }
+ },
+ {
+  "name": "rl_base",
+  "estimator": "robot_localization",
+  "params": {}
+ },
+ {
+  "name": "rl_baseb",
+  "estimator": "robot_localization",
+  "params": {}
+ },
+ {
+  "name": "rl_d0.05",
+  "estimator": "robot_localization",
+  "params": {
+   "odom_covariance": {
+    "odom_delay": 0.05
+   },
+   "ekf_filter_node_odom": {
+    "smooth_lagged_data": true,
+    "history_length": 1.0
+   }
+  }
+ },
+ {
+  "name": "rl_d0.09",
+  "estimator": "robot_localization",
+  "params": {
+   "odom_covariance": {
+    "odom_delay": 0.09
+   },
+   "ekf_filter_node_odom": {
+    "smooth_lagged_data": true,
+    "history_length": 1.0
+   }
+  }
+ },
+ {
+  "name": "rl_d0.13",
+  "estimator": "robot_localization",
+  "params": {
+   "odom_covariance": {
+    "odom_delay": 0.13
+   },
+   "ekf_filter_node_odom": {
+    "smooth_lagged_data": true,
+    "history_length": 1.0
+   }
+  }
+ },
+ {
+  "name": "rl_acc0.05",
+  "estimator": "robot_localization",
+  "params": {
+   "odom_covariance": {
+    "accel_noise_tau": [
+     0.05,
+     0.05
+    ]
+   }
+  }
+ },
+ {
+  "name": "rl_acc0.09",
+  "estimator": "robot_localization",
+  "params": {
+   "odom_covariance": {
+    "accel_noise_tau": [
+     0.09,
+     0.09
+    ]
+   }
+  }
+ },
+ {
+  "name": "rl_acc0.2",
+  "estimator": "robot_localization",
+  "params": {
+   "odom_covariance": {
+    "accel_noise_tau": [
+     0.2,
+     0.2
+    ]
+   }
+  }
+ },
+ {
+  "name": "rl_d0.09acc0.09",
+  "estimator": "robot_localization",
+  "params": {
+   "odom_covariance": {
+    "odom_delay": 0.09,
+    "accel_noise_tau": [
+     0.09,
+     0.09
+    ]
+   },
+   "ekf_filter_node_odom": {
+    "smooth_lagged_data": true,
+    "history_length": 1.0
+   }
+  }
+ }
+]

@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+"""録画（run_gazebo_test.sh の bag）を再生して、候補のパラメータで推定器を動かし、指標を出す（localizer_rl 内で実行）.
+
+  python3 tune_run.py <入力 bag> <試行名> <estimator> '<parameters の JSON>' ['<launch の追加引数>']
+
+- ROS_DOMAIN_ID=99 で動かす（Gazebo・MATLAB とは混ざらない）
+- 入力 bag は「左回転」の LEAD 秒前から再生する。/tf_static が流れないので、調整用の env にだけ
+  URDF と同じ取付（base_footprint -> base_link -> velodyne_base_link -> velodyne）を static_tfs で書く
+- parameters の JSON は env の parameters にそのまま入れる。キー "__env__" の中身は env の最上位を上書きする
+  （例 {"__env__": {"topics": {...}, "joint_state_odometry": null}}。null の項目は消す）。process_noise_covariance などの 15x15 は
+  "<名前>_diag": [15 個] で書く（launch が行列に直す）
+- 出力：/root/bags/tune/<試行名>（bag）と、指標の 1 行 JSON（標準出力の最後の行）
+"""
+import json
+import os
+import signal
+import subprocess
+import sys
+import time
+
+import numpy as np
+from rclpy.serialization import deserialize_message
+import rosbag2_py
+from rosidl_runtime_py.utilities import get_message
+import yaml
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]   # plot_spin などを import する
+from plot_spin import load_run  # noqa: E402
+from transition_eval import evaluate as transition_metrics  # noqa: E402
+
+LEAD = 8.0
+TAIL = 4.0
+ENV_BASE = '/root/ros2_ws/install/localization_bringup/share/localization_bringup/param/env/gazebo.yaml'
+URDF_TFS = [
+    {'parent': 'base_footprint', 'child': 'base_link', 'xyz': [0.0, 0.0, 0.10], 'rpy': [0.0, 0.0, 0.0]},
+    {'parent': 'base_link', 'child': 'velodyne_base_link', 'xyz': [-0.17, 0.0, 1.0], 'rpy': [0.0, 0.0, 0.0]},
+    {'parent': 'velodyne_base_link', 'child': 'velodyne', 'xyz': [0.0, 0.0, 0.0377], 'rpy': [0.0, 0.0, 0.0]},
+]
+OUT_TOPICS = ['/clock', '/wheelchair/pose', '/ekf_pose', '/ndt_pose', '/localization_debug', '/odometry/global',
+              '/ekf_odom']
+IN_TOPICS = ['/clock', '/velodyne_points', '/wheelchair/odom', '/wheelchair/joint_states', '/wheelchair/pose']
+
+
+def phases_of(bag):
+    out = {}
+    with open(bag.rstrip('/') + '_phases.txt') as f:
+        for line in f:
+            name, t = line.rsplit(' ', 1)
+            out[name] = float(t)
+    return out
+
+
+def play_window(bag, phases):
+    """再生の開始オフセット [s]（bag の先頭から）と長さ [s]."""
+    reader = rosbag2_py.SequentialReader()
+    reader.open(rosbag2_py.StorageOptions(uri=bag, storage_id='sqlite3'),
+                rosbag2_py.ConverterOptions('cdr', 'cdr'))
+    reader.set_filter(rosbag2_py.StorageFilter(topics=['/clock']))
+    msg_type = get_message('rosgraph_msgs/msg/Clock')
+    first = None
+    start = end = None
+    while reader.has_next():
+        _, data, t = reader.read_next()
+        first = t if first is None else first
+        c = deserialize_message(data, msg_type).clock
+        sim = c.sec + c.nanosec * 1e-9
+        if start is None and sim >= phases['left turn'] - LEAD:
+            start = t
+        if sim >= phases['stop'] + TAIL:
+            end = t
+            break
+    return (start - first) * 1e-9, (end - start) * 1e-9
+
+
+def expand(params):
+    # 15x15 の行列の <名前>_diag は launch が行列に直すので、そのまま渡す（gazebo.yaml の同じキーを上書きする）
+    return params
+
+
+def stop(proc):
+    if proc.poll() is not None:
+        return
+    os.killpg(proc.pid, signal.SIGINT)
+    try:
+        proc.wait(timeout=15)
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait()
+
+
+def metrics(bag, pose_topic='/ekf_pose'):
+    r = load_run(bag, pose_topic)
+    ph = r['phases']
+    t, e = r['t'], r['err']
+    at, ang = r['ang_t'], r['ang']
+    sw0, sw1 = ph['right turn'], ph['right turn'] + 1.0       # 回転の切り替えの窓
+    motion = (t >= 0) & (t <= ph['stop'] + 2.0)
+    rot = (t >= 0) & (t < ph['forward']) & ~((t >= sw0) & (t <= sw1))
+    amotion = (at >= 0) & (at <= ph['stop'] + 2.0)
+    aswitch = (at >= sw0 - 0.2) & (at <= sw1)
+    switch = (t >= sw0 - 0.2) & (t <= sw1)
+    return {
+        **transition_metrics(bag, pose_topic),
+        'yaw_rot': float(np.abs(e[rot, 2]).mean()),
+        'ang_mean': float(ang[amotion].mean()),
+        'ang_max': float(ang[amotion].max()),
+        'xy_mean': float(e[motion, 0].mean()),
+        'xy_max': float(e[motion, 0].max()),
+        'spike_yaw': float(np.abs(e[switch, 2]).max()),
+        'spike_ang': float(ang[aswitch].max()),
+        'yaw_max': float(np.abs(e[motion, 2]).max()),
+        'n_pose': int(motion.sum()), 'n_ndt': int(amotion.sum()),
+    }
+
+
+def main():
+    in_bag, name, estimator, params_json = sys.argv[1:5]
+    extra = sys.argv[5].split() if len(sys.argv) > 5 else []
+    params = json.loads(params_json)
+    out_bag = f'/root/bags/tune/{name}'
+    os.makedirs('/root/bags/tune', exist_ok=True)
+    subprocess.run(['rm', '-rf', out_bag])
+    phases = phases_of(in_bag)
+    with open(out_bag + '_phases.txt', 'w') as f:
+        f.writelines(f'{k} {v:.3f}\n' for k, v in phases.items())
+
+    with open(ENV_BASE) as f:
+        env = yaml.safe_load(f)
+    env['static_tfs'] = URDF_TFS
+    env.setdefault('parameters', {})
+    for key, value in (params.pop('__env__', None) or {}).items():
+        if value is None:
+            env.pop(key, None)
+        else:
+            env[key] = value
+    for node, p in expand(params).items():
+        env['parameters'].setdefault(node, {}).update(p)
+    env_path = f'/tmp/tune_env_{name}.yaml'
+    with open(env_path, 'w') as f:
+        yaml.safe_dump(env, f)
+
+    penv = dict(os.environ, ROS_DOMAIN_ID='99')
+    log = open(f'/tmp/tune_{name}.log', 'w')
+    launch = subprocess.Popen(
+        ['ros2', 'launch', 'localization_bringup', 'localization.launch.py', f'env:={env_path}',
+         f'estimator:={estimator}', 'rviz:=false', *extra],
+        env=penv, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    record = subprocess.Popen(['ros2', 'bag', 'record', '-o', out_bag, *OUT_TOPICS],
+                              env=penv, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    try:
+        time.sleep(10.0)   # 地図の読み込み
+        offset, duration = play_window(in_bag, phases)
+        subprocess.run(['ros2', 'bag', 'play', in_bag, '--start-offset', f'{offset:.3f}',
+                        '--topics', *IN_TOPICS], env=penv, stdout=log, stderr=subprocess.STDOUT,
+                       timeout=duration + 30)
+        time.sleep(2.0)
+    finally:
+        stop(launch)
+        stop(record)
+        log.close()
+    pose_topic = '/ndt_pose' if 'use_ekf:=false' in extra else '/ekf_pose'
+    print(json.dumps({'name': name, 'estimator': estimator, **metrics(out_bag, pose_topic)}))
+
+
+if __name__ == '__main__':
+    main()
