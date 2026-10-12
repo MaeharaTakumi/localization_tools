@@ -1,0 +1,22 @@
+[
+ {
+  "name": "legacy_ekf_tune_1",
+  "estimator": "ekf_localizer",
+  "params": {
+   "ekf_localizer": {
+    "time_source": "receipt",
+    "publish_trigger": "update"
+   }
+  }
+ },
+ {
+  "name": "legacy_ekf_tune_2",
+  "estimator": "ekf_localizer",
+  "params": {
+   "ekf_localizer": {
+    "time_source": "receipt",
+    "publish_trigger": "update"
+   }
+  }
+ }
+]

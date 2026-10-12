@@ -1,0 +1,42 @@
+[
+ {
+  "name": "upd_ekf_1",
+  "estimator": "ekf_localizer",
+  "params": {
+   "ekf_localizer": {
+    "time_source": "stamp",
+    "publish_trigger": "update"
+   }
+  }
+ },
+ {
+  "name": "upd_ekf_2",
+  "estimator": "ekf_localizer",
+  "params": {
+   "ekf_localizer": {
+    "time_source": "stamp",
+    "publish_trigger": "update"
+   }
+  }
+ },
+ {
+  "name": "upd_ekf_3",
+  "estimator": "ekf_localizer",
+  "params": {
+   "ekf_localizer": {
+    "time_source": "stamp",
+    "publish_trigger": "update"
+   }
+  }
+ },
+ {
+  "name": "upd_ekf_4",
+  "estimator": "ekf_localizer",
+  "params": {
+   "ekf_localizer": {
+    "time_source": "stamp",
+    "publish_trigger": "update"
+   }
+  }
+ }
+]
