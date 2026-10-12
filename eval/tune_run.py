@@ -4,7 +4,7 @@
   python3 tune_run.py <入力 bag> <試行名> <estimator> '<parameters の JSON>' ['<launch の追加引数>']
 
 - ROS_DOMAIN_ID=99 で動かす（Gazebo・MATLAB とは混ざらない）
-- 入力 bag は「左回転」の LEAD 秒前から再生する。/tf_static が流れないので、調整用の env にだけ
+- 入力 bag は最初の動作（<bag>_phases.txt の最も早い時刻。左右 1 周なら「左回転」）の LEAD 秒前から、最後（stop）の TAIL 秒後まで再生する。/tf_static が流れないので、調整用の env にだけ
   URDF と同じ取付（base_footprint -> base_link -> velodyne_base_link -> velodyne）を static_tfs で書く
 - parameters の JSON は env の parameters にそのまま入れる。キー "__env__" の中身は env の最上位を上書きする
   （例 {"__env__": {"topics": {...}, "joint_state_odometry": null}}。null の項目は消す）。process_noise_covariance などの 15x15 は
@@ -52,7 +52,8 @@ def phases_of(bag):
 
 
 def play_window(bag, phases):
-    """再生の開始オフセット [s]（bag の先頭から）と長さ [s]."""
+    """再生の開始オフセット [s]（bag の先頭から）と長さ [s]。最初の動作の LEAD 秒前から最後の動作の TAIL 秒後まで."""
+    first_phase, last_phase = min(phases.values()), max(phases.values())
     reader = rosbag2_py.SequentialReader()
     reader.open(rosbag2_py.StorageOptions(uri=bag, storage_id='sqlite3'),
                 rosbag2_py.ConverterOptions('cdr', 'cdr'))
@@ -65,9 +66,9 @@ def play_window(bag, phases):
         first = t if first is None else first
         c = deserialize_message(data, msg_type).clock
         sim = c.sec + c.nanosec * 1e-9
-        if start is None and sim >= phases['left turn'] - LEAD:
+        if start is None and sim >= first_phase - LEAD:
             start = t
-        if sim >= phases['stop'] + TAIL:
+        if sim >= last_phase + TAIL:
             end = t
             break
     return (start - first) * 1e-9, (end - start) * 1e-9
@@ -114,10 +115,9 @@ def metrics(bag, pose_topic='/ekf_pose'):
     }
 
 
-def main():
-    in_bag, name, estimator, params_json = sys.argv[1:5]
-    extra = sys.argv[5].split() if len(sys.argv) > 5 else []
-    params = json.loads(params_json)
+def replay(in_bag, name, estimator, params, extra=()):
+    """入力 bag を候補のパラメータで再生して推定器を動かし、出力の bag（/root/bags/tune/<name>）を返す."""
+    params = dict(params)
     out_bag = f'/root/bags/tune/{name}'
     os.makedirs('/root/bags/tune', exist_ok=True)
     subprocess.run(['rm', '-rf', out_bag])
@@ -159,6 +159,13 @@ def main():
         stop(launch)
         stop(record)
         log.close()
+    return out_bag
+
+
+def main():
+    in_bag, name, estimator, params_json = sys.argv[1:5]
+    extra = sys.argv[5].split() if len(sys.argv) > 5 else []
+    out_bag = replay(in_bag, name, estimator, json.loads(params_json), extra)
     pose_topic = '/ndt_pose' if 'use_ekf:=false' in extra else '/ekf_pose'
     print(json.dumps({'name': name, 'estimator': estimator, **metrics(out_bag, pose_topic)}))
 

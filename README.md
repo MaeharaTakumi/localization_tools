@@ -17,7 +17,7 @@ bag は `localizer_rl:/root/bags`、再生した結果の bag は `/root/bags/tu
 | `calib/` | **LiDAR の取付位置とオドメトリの倍率を推定する**（`estimate_calibration.py`、真値なし。図は `plot_calibration.py`） |
 | `eval/` | 録画の再生・評価・パラメータの調整（`tune_run.py`、`tune_batch.py`、`summarize.py`、`transition_eval.py`、`make_window_bag.py`）。候補は `batches/`、結果は `results/` |
 | `plot/` | 図（`plot_*.py`、`check_*.py`）。`plot_spin.py` は bag の読み込みや図の共通部品も持つ。`rerender_results.sh` で `workspace/results` の図を全部描き直す |
-| `gazebo/` | Gazebo での走行と録画（`run_gazebo_test.sh` はホストで実行）。走り方は `drive_spin.py`（左右 1 周 + 前進）と `drive_stops.py`（向き・位置を変えて 13 回止まる） |
+| `gazebo/` | Gazebo での走行と録画（`run_gazebo_test.sh` はホストで実行）。走り方は `drive_spin.py`（左右 1 周 + 前進）、`drive_stops.py`（向き・位置を変えて 13 回止まる）、`drive_profile.py`（推定器の比較用：加減速・8 の字・スラローム・後退） |
 | `test/` | Gazebo なしの合成データのテスト（robot_localization の経路） |
 
 ## R を求める（`noise/estimate_noise.py`）
@@ -69,6 +69,17 @@ SCORE_KEYS=trans_max_mean,steady_mean,ang_mean,xy_mean python3 eval/summarize.py
 
 `ROS_DOMAIN_ID=99` で再生するので Gazebo・MATLAB とは混ざらない。指標（`tune_run.py` の出力）は真値を使う（Gazebo だけ）。
 
+推定器の比較（どの動きの録画にも使える指標。`dev_log.md` の 22）：
+
+```bash
+python3 eval/compare_run.py batch eval/batches/batch_compare.json eval/results/results_compare.jsonl   # 動き x 推定器 x 回数
+RANGE=1 python3 eval/compare_run.py table eval/results/results_compare.jsonl                           # 表
+python3 plot/plot_motion_compare.py report /root/fig/compare eval/results/results_compare.jsonl        # 軌跡・まとめ・時間推移の図
+```
+
+指標は stamp の時刻の 6 軸の誤差、実時間の誤差（100 Hz の各時刻に受信済みの最新の `/ekf_pose` とその時刻の真値の差）、
+切り替え時（指令が変わる瞬間の 0.1 s 前〜1 s 後）の yaw、推定の古さ。xy は地図と Gazebo の座標のずれ（場所で変わる）を含む。
+
 ## Gazebo で走らせて録る（`gazebo/run_gazebo_test.sh`、ホストで実行）
 
 ```bash
@@ -76,6 +87,7 @@ localization_tools/gazebo/run_gazebo_test.sh <estimator> <bag 名> [launch の�
 ```
 
 Gazebo を起動し直して初期位置から、左 1 周 → 右 1 周 → 3 秒前進（1 rad/s、1.5 m/s）。始める前に `sync.sh push` する。
+走り方は `DRIVE` で変える（例 `DRIVE="drive_profile.py curve"`。`python3 gazebo/drive_profile.py curve --simulate` で部屋に収まるか計算できる）。
 
 ## 図
 

@@ -17,4 +17,5 @@ ODOM_SCALE="1,0.922" LABEL_BEFORE="estimate (tuned, no odom_scale)" LABEL_AFTER=
 run python3 check_omega_slope.py $O/omega_slope.png $B/spin360_js_ekf
 run python3 plot_odom_filter.py $B/spin360_w1_ekf $O
 run python3 plot_ekf_compare.py $O/ekf_w1 $R/results_w1cmp.jsonl
+run python3 plot_motion_compare.py report $O/compare $R/results_compare.jsonl
 ls $O
