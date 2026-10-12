@@ -1,0 +1,9 @@
+{
+ "before": ["EKF (ekf_localizer), previous model (arc, pitch decomposition)", "qrv_ekf_oldR_2", "#eb6834"],
+ "after": ["EKF (ekf_localizer), midpoint (RK2), horizontal plane", "rk2_ekf_4", "#2a78d6"],
+ "conditions": [["^(qrv_ekf_oldR_|qg_ekf_oldR_)", "Previous model (5 runs)", "#eb6834"],
+                ["^rk2_ekf_\\d+$", "Midpoint (RK2), horizontal plane (4 runs)", "#2a78d6"],
+                ["^qrv_ndt_only", "NDT only (1 run)", "#eda100"]],
+ "title": "  [held-out recording spin360_w1_ekf2]",
+ "runs": "bar = mean, line = range of runs"
+}

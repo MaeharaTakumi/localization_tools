@@ -1,0 +1,22 @@
+[
+ {
+  "name": "rk2_ekf_1",
+  "estimator": "ekf_localizer",
+  "params": {}
+ },
+ {
+  "name": "rk2_ekf_2",
+  "estimator": "ekf_localizer",
+  "params": {}
+ },
+ {
+  "name": "rk2_ekf_3",
+  "estimator": "ekf_localizer",
+  "params": {}
+ },
+ {
+  "name": "rk2_ekf_4",
+  "estimator": "ekf_localizer",
+  "params": {}
+ }
+]
