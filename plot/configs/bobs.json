@@ -1,0 +1,10 @@
+{
+ "before": ["EKF (ekf_localizer), midpoint, NDT observed as the LiDAR pose", "rk2_ekf_4", "#1baf7a"],
+ "after": ["EKF (ekf_localizer), midpoint, NDT observed as the base pose", "bobs_ekf_3", "#2a78d6"],
+ "conditions": [["^(qrv_ekf_oldR_|qg_ekf_oldR_)", "Previous model, LiDAR pose (5 runs)", "#eb6834"],
+                ["^rk2_ekf_\\d+$", "Midpoint, LiDAR pose (4 runs)", "#1baf7a"],
+                ["^bobs_ekf_\\d+$", "Midpoint, base pose (4 runs)", "#2a78d6"],
+                ["^qrv_ndt_only", "NDT only (1 run)", "#eda100"]],
+ "title": "  [held-out recording spin360_w1_ekf2]",
+ "runs": "bar = mean, line = range of runs"
+}

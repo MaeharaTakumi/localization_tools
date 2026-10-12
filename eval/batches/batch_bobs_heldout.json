@@ -1,0 +1,22 @@
+[
+ {
+  "name": "bobs_ekf_1",
+  "estimator": "ekf_localizer",
+  "params": {}
+ },
+ {
+  "name": "bobs_ekf_2",
+  "estimator": "ekf_localizer",
+  "params": {}
+ },
+ {
+  "name": "bobs_ekf_3",
+  "estimator": "ekf_localizer",
+  "params": {}
+ },
+ {
+  "name": "bobs_ekf_4",
+  "estimator": "ekf_localizer",
+  "params": {}
+ }
+]
