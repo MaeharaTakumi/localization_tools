@@ -1,0 +1,11 @@
+{
+ "before": ["EKF (ekf_localizer), stamp time + timer", "bobs_ekf_3", "#1baf7a"],
+ "after": ["EKF (ekf_localizer), stamp time + update", "upd_ekf_3", "#2a78d6"],
+ "conditions": [["^legacy_ekf_\\d+$", "Receipt (NDT: /ndt_pose receipt) + update (4 runs)", "#eb6834"],
+                ["^bobs_ekf_\\d+$", "Stamp + timer (4 runs)", "#1baf7a"],
+                ["^(upd_ekf_|gz_upd_ekf_)\\d+$", "Stamp + update (6 runs)", "#2a78d6"],
+                ["^rcv_ekf_\\d+$", "Receipt (NDT: point cloud receipt) + update (4 runs)", "#4a3aa7"],
+                ["^qrv_ndt_only", "NDT only (1 run)", "#eda100"]],
+ "title": "  [held-out recording spin360_w1_ekf2]",
+ "runs": "bar = mean, line = range of runs"
+}
