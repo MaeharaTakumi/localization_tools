@@ -17,7 +17,7 @@ import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise', 'drive')]
-from drive_test import config_path, load_yaml, quat_matrix, rpy_matrix  # noqa: E402
+from drive_test import load_config, quat_matrix, rpy_matrix  # noqa: E402
 from plot_spin import BAND, capitalize_labels, GRID, INK, INK2, read_bag, SERIES, SURFACE  # noqa: E402
 from compare_run import phases_of  # noqa: E402
 
@@ -43,7 +43,7 @@ def base_path(bag, topic, mount):
 
 def main():
     out, target = sys.argv[1:3]
-    cfg = load_yaml(config_path(target))
+    cfg = load_config(target)
     area = cfg['area']
     items = [a.split('=', 1) for a in sys.argv[3:]]
     plt.rcParams.update({'font.size': 10, 'axes.edgecolor': GRID, 'axes.labelcolor': INK2, 'xtick.color': INK2,

@@ -10,7 +10,8 @@
 #
 #   <動き> は drive/profiles.yaml（spin・stops・accel・curve・slalom・reverse。drive/drive_test.py <target> --list）。
 #   速さの上限・走ってよい範囲・トピックは drive/config/<target>.yaml。
-#   環境変数：PURPOSE（録画の用途。<bag 名>_info.yaml に書く）、CONFIG（設定の yaml のコンテナ内のパス。既定は target の設定）
+#   環境変数：PURPOSE（録画の用途。<bag 名>_info.yaml に書く）、CONFIG（設定の yaml のコンテナ内のパス。既定は target の設定）、
+#             WHILL（実機の車椅子の色 blue・red・white。既定は設定の whill。自己位置推定の launch の whill:=<色> と合わせる）
 #   録画の隣に <bag 名>_phases.txt（動作の開始時刻）と <bag 名>_info.yaml（eval/bag_info.py）を書く。
 set -u
 target=${1:?gazebo か real}; profile=${2:?動き}; bag=${3:?bag 名}
@@ -19,6 +20,7 @@ root=$(dirname "$here")   # localization_tools
 LOC=localizer_rl; GZ=20261002
 T=/root/localization_tools
 CFG=${CONFIG:-$target}
+DT="python3 $T/drive/drive_test.py $CFG ${WHILL:+--whill $WHILL}"
 BAGS=/root/bags/$target
 case $target in gazebo|real) ;; *) echo "target は gazebo か real"; exit 1;; esac
 
@@ -29,8 +31,8 @@ count_loc() {
 
 # localization_tools 一式をコンテナの /root/localization_tools に置く（走行・描画・評価もそこで行う）
 "$root/sync.sh" push
-dexec "python3 $T/drive/drive_test.py $CFG $profile --simulate" || { echo "動き $profile が範囲に収まらない・設定が読めない"; exit 1; }
-topics=$(dexec "python3 $T/drive/drive_test.py $CFG --record-topics" | tail -1)
+dexec "$DT $profile --simulate" || { echo "動き $profile が範囲に収まらない・設定が読めない"; exit 1; }
+topics=$(dexec "$DT --record-topics" | tail -1)
 
 if [ "$target" = gazebo ]; then
   est=${4:-ekf_localizer}; extra=${5:-}
@@ -55,16 +57,20 @@ if [ "$target" = gazebo ]; then
   docker exec -d $LOC bash -ic "ros2 launch localization_bringup localization.launch.py env:=gazebo estimator:=$est rviz:=false $extra > /tmp/launch_$bag.log 2>&1"
   sleep 25   # 地図の読み込みと NDT の収束を待つ
   echo "== drive"
-  docker exec $LOC bash -ic "python3 $T/drive/drive_test.py $CFG $profile --yes 2>&1 | tee /tmp/drive_$bag.log; exit \${PIPESTATUS[0]}" 2>&1 \
+  docker exec $LOC bash -ic "$DT $profile --yes 2>&1 | tee /tmp/drive_$bag.log; exit \${PIPESTATUS[0]}" 2>&1 \
     | grep -v "terminal process group\|no job control"
   status=${PIPESTATUS[0]}
 else
   echo "== check the real robot"
   if docker exec $LOC test -e $BAGS/$bag; then echo "$BAGS/$bag は既にある（別の名前にする）"; exit 1; fi
   dexec "timeout 5 ros2 topic echo --once /ekf_pose > /dev/null" || { echo "/ekf_pose が来ない（自己位置推定を起動し、初期姿勢を合わせる）"; exit 1; }
-  cmd=$(dexec "python3 -c \"import sys; sys.path.insert(0, '$T/drive'); import drive_test as d; print(d.load_yaml(d.config_path('$CFG'))['command']['topic'])\"" | tail -1)
+  cmd=$(dexec "$DT --command-topic" | tail -1)
   subs=$(dexec "ros2 topic info $cmd" | sed -n 's/Subscription count: //p')
-  [ "${subs:-0}" -ge 1 ] || { echo "$cmd を受けるノード（whill_driver）が無い"; exit 1; }
+  if [ "${subs:-0}" -lt 1 ]; then
+    echo "$cmd を受けるノード（whill_driver）が無い。車椅子の色（WHILL=blue|red|white）を確かめる。見つかった車椅子："
+    dexec "ros2 topic list" | grep "whill_node/cmd_vel" | sed 's/^/  /'
+    exit 1
+  fi
   for t in $topics; do
     dexec "timeout 3 ros2 topic info $t > /dev/null" > /dev/null || echo "  （まだ無いトピック：$t。録画は続ける）"
   done
@@ -73,7 +79,7 @@ else
   docker exec -d $LOC bash -ic "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$bag.log 2>&1"
   sleep 3
   echo "== drive（計画を確かめて yes で走り出す。止めるときは Ctrl-C かジョイスティック）"
-  docker exec -it $LOC bash -ic "python3 $T/drive/drive_test.py $CFG $profile 2>&1 | tee /tmp/drive_$bag.log; exit \${PIPESTATUS[0]}"
+  docker exec -it $LOC bash -ic "$DT $profile 2>&1 | tee /tmp/drive_$bag.log; exit \${PIPESTATUS[0]}"
   status=$?
 fi
 
@@ -89,7 +95,7 @@ if [ "$target" = gazebo ]; then
 else
   sleep 5
 fi
-notes=$(dexec "python3 $T/drive/drive_test.py $CFG $profile --describe" | tail -1)
+notes=$(dexec "$DT $profile --describe" | tail -1)
 [ "$status" = 0 ] || notes="走行を途中で止めた（drive_test.py の終了コード $status、ログ localizer_rl:/tmp/drive_$bag.log）。$notes"
 dexec "python3 $T/eval/bag_info.py write $BAGS/$bag --source $target --drive 'drive/drive_test.py $profile' --purpose '${PURPOSE:-}' --notes '$notes'"
 exit $status
