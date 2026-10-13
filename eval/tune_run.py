@@ -135,7 +135,7 @@ def replay(in_bag, name, estimator, params, extra=()):
         else:
             env[key] = value
     for node, p in expand(params).items():
-        env['parameters'].setdefault(node, {}).update(p)
+        env['parameters'][node] = {**(env['parameters'].get(node) or {}), **p}   # env の節が空（None）でもよい
     env_path = f'/tmp/tune_env_{name}.yaml'
     with open(env_path, 'w') as f:
         yaml.safe_dump(env, f)

@@ -32,12 +32,14 @@ MOTION_LABELS = {
 #   robot_localization  R_ndt は robot_localization.yaml（ekf_localizer と同じ値。launch を直す前に実際に動いていた設定）
 #   rl_rndt_small       R_ndt は gazebo.yaml（止まった状態で測った小さい値。launch を直して効くようになった）
 #   rl_timer            rl_rndt_small の /ekf_pose を timer（50 Hz、現在時刻）で出す（参考）
+#   rl_final            2026-10-13 からの既定（R_ndt は robot_localization.yaml、timer）
 EST_LABELS = {'ekf_localizer': 'EKF (ekf_localizer)',
               'robot_localization': 'RL (robot_localization), R_ndt same as ekf_localizer',
               'rl_rndt_small': 'RL (robot_localization), small R_ndt (gazebo.yaml)',
-              'rl_timer': 'RL, small R_ndt, timer output (reference)'}
+              'rl_timer': 'RL, small R_ndt, timer output (reference)',
+              'rl_final': 'RL (robot_localization), new default: timer output'}
 EST_COLORS = {'ekf_localizer': SERIES[0], 'robot_localization': SERIES[1], 'rl_rndt_small': SERIES[2],
-              'rl_timer': SERIES[3]}
+              'rl_timer': SERIES[3], 'rl_final': '#e87ba4'}   # 参照パレットの slot 5（magenta）
 
 
 def style():
@@ -118,9 +120,13 @@ def load_results(path):
     return [r for r in rows if 'error' not in r]
 
 
-def summary(out, results):
+def summary(out, results, labels=None,
+            title='Comparison of ekf_localizer and robot_localization: replay of the same recordings, 4 runs each'):
+    """labels を渡すとその条件だけ描く."""
     style()
     rows = load_results(results)
+    if labels:
+        rows = [r for r in rows if r.get('label', r['estimator']) in labels]
     motions = [m for m in MOTION_LABELS if any(r['motion'] == m for r in rows)]
     for r in rows:
         r.setdefault('label', r['estimator'])
@@ -128,7 +134,7 @@ def summary(out, results):
     fig, axes = plt.subplots(2, 4, figsize=(15, 7.2), facecolor=SURFACE, sharey=True)
     ypos = {m: i for i, m in enumerate(reversed(motions))}
     offs = {e: 0.26 * ((len(ests) - 1) / 2 - i) for i, e in enumerate(ests)}
-    for ax, (key, scale, title) in zip(axes.flat, SUMMARY_METRICS):
+    for ax, (key, scale, panel_title) in zip(axes.flat, SUMMARY_METRICS):
         ax.set_facecolor(SURFACE)
         for i, m in enumerate(motions):
             if i % 2 == 0:
@@ -142,7 +148,7 @@ def summary(out, results):
                 ax.plot([v.min(), v.max()], [y, y], color=EST_COLORS[e], lw=2.0, solid_capstyle='round', zorder=2)
                 ax.plot(v.mean(), y, 'o', color=EST_COLORS[e], ms=7, mec=SURFACE, mew=1.5, zorder=3,
                         label=EST_LABELS[e] if m == motions[0] else None)
-        ax.set_title(title, loc='left', fontsize=9.5)
+        ax.set_title(panel_title, loc='left', fontsize=9.5)
         ax.set_xlim(left=0)
         ax.grid(axis='x', color=GRID, lw=0.6)
         ax.set_yticks([ypos[m] for m in motions])
@@ -150,8 +156,7 @@ def summary(out, results):
         ax.set_ylim(-0.5, len(motions) - 0.5)
     handles, labels = axes.flat[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper left', ncol=2, bbox_to_anchor=(0.01, 0.955))
-    fig.suptitle('Comparison of ekf_localizer and robot_localization: replay of the same recordings, 4 runs each '
-                 '(dot = mean, line = range)', x=0.01, ha='left', fontsize=12, fontweight='bold')
+    fig.suptitle(title + ' (dot = mean, line = range)', x=0.01, ha='left', fontsize=12, fontweight='bold')
     fig.tight_layout(rect=(0, 0, 1, 0.89))
     capitalize_labels(fig)
     fig.savefig(out, dpi=130, facecolor=SURFACE)
@@ -213,8 +218,12 @@ def report(prefix, results):
     rows = load_results(results)
     traj(f'{prefix}_paths.png', list(REPORT_BAGS.items()))
     print(f'saved {prefix}_paths.png')
-    summary(f'{prefix}_summary.png', results)
+    summary(f'{prefix}_summary.png', results, ['ekf_localizer', 'robot_localization', 'rl_rndt_small', 'rl_timer'])
     print(f'saved {prefix}_summary.png')
+    if any(r.get('label') == 'rl_final' for r in rows):
+        summary(f'{prefix}_final.png', results, ['ekf_localizer', 'rl_final'],
+                'New defaults: ekf_localizer vs robot_localization with timer output, 4 runs each')
+        print(f'saved {prefix}_final.png')
     for m in ('accel', 'curve', 'slalom', 'reverse', 'spin'):   # 止まる走行は区間が多いので描かない
         items = [(text, f'/root/bags/tune/{typical_run(rows, m, label)}') for label, text in REPORT_SERIES]
         series_plot(f'{prefix}_series_{m}.png',
