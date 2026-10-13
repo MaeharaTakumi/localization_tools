@@ -20,4 +20,5 @@ run python3 plot_ekf_compare.py $O/ekf_w1 $R/results_w1cmp.jsonl
 run python3 plot_motion_compare.py report $O/compare $R/results_compare.jsonl
 run python3 plot_motion_compare.py candidates $O/alpha_spin.png $R/results_alpha.jsonl "Odom_noise_alpha for ekf_localizer: spin in place (left, right, forward), 4 runs each" "ekf_a0=Alpha 0 (current)" "ekf_w0.005=Omega² to R_omega 0.005" "ekf_w0.05=Omega² to R_omega 0.05" "ekf_v0.005=V² to R_v 0.005" "ekf_vw0.005=Both 0.005"
 run python3 plot_motion_compare.py candidate-series $O/alpha_spin $R/results_alpha.jsonl spin "Odom_noise_alpha for ekf_localizer, spin in place" "ekf_a0=Alpha 0 (current)" "ekf_w0.005=Omega² to R_omega 0.005" "ekf_w0.05=Omega² to R_omega 0.05" "ekf_v0.005=V² to R_v 0.005" "ekf_vw0.005=Both 0.005"
+run python3 plot_odom_r.py $O/odom_r.png $B/drive_accel $B/drive_curve $B/drive_slalom $B/drive_reverse $B/spin360_w1_ekf2 $B/stops_ekf
 ls $O
