@@ -1,0 +1,124 @@
+[
+ {
+  "motion": "spin",
+  "bag": "/root/bags/spin360_w1_ekf2",
+  "estimator": "ekf_localizer",
+  "label": "ekf_a0_b",
+  "runs": 4,
+  "params": {
+   "odom_covariance": {
+    "odom_noise_alpha": [
+     0,
+     0,
+     0,
+     0
+    ]
+   }
+  }
+ },
+ {
+  "motion": "spin",
+  "bag": "/root/bags/spin360_w1_ekf2",
+  "estimator": "ekf_localizer",
+  "label": "ekf_r0_a0",
+  "runs": 4,
+  "params": {
+   "odom_covariance": {
+    "odom_noise_alpha": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "R_odom": [
+     1e-06,
+     1e-06
+    ]
+   }
+  }
+ },
+ {
+  "motion": "spin",
+  "bag": "/root/bags/spin360_w1_ekf2",
+  "estimator": "ekf_localizer",
+  "label": "ekf_r0_w0.005",
+  "runs": 4,
+  "params": {
+   "odom_covariance": {
+    "odom_noise_alpha": [
+     0,
+     0,
+     0,
+     0.005
+    ],
+    "R_odom": [
+     1e-06,
+     1e-06
+    ]
+   }
+  }
+ },
+ {
+  "motion": "spin",
+  "bag": "/root/bags/spin360_w1_ekf2",
+  "estimator": "ekf_localizer",
+  "label": "ekf_r0_w0.05",
+  "runs": 4,
+  "params": {
+   "odom_covariance": {
+    "odom_noise_alpha": [
+     0,
+     0,
+     0,
+     0.05
+    ],
+    "R_odom": [
+     1e-06,
+     1e-06
+    ]
+   }
+  }
+ },
+ {
+  "motion": "spin",
+  "bag": "/root/bags/spin360_w1_ekf2",
+  "estimator": "ekf_localizer",
+  "label": "ekf_r0_v0.005",
+  "runs": 4,
+  "params": {
+   "odom_covariance": {
+    "odom_noise_alpha": [
+     0.005,
+     0,
+     0,
+     0
+    ],
+    "R_odom": [
+     1e-06,
+     1e-06
+    ]
+   }
+  }
+ },
+ {
+  "motion": "spin",
+  "bag": "/root/bags/spin360_w1_ekf2",
+  "estimator": "ekf_localizer",
+  "label": "ekf_r0_vw0.005",
+  "runs": 4,
+  "params": {
+   "odom_covariance": {
+    "odom_noise_alpha": [
+     0.005,
+     0,
+     0,
+     0.005
+    ],
+    "R_odom": [
+     1e-06,
+     1e-06
+    ]
+   }
+  }
+ }
+]
