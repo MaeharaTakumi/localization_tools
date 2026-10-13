@@ -7,6 +7,8 @@
   python3 plot_motion_compare.py report <出力の接頭辞> <results.jsonl>      上の 3 つをまとめて（dev_log.md の 22. の図）
   python3 plot_motion_compare.py candidates <出力 png> <results.jsonl> <題> <label>=<表示名> ...
                                                                           1 つの動きで候補（label）ごとの指標（dev_log.md の 24.）
+  python3 plot_motion_compare.py candidate-series <出力の接頭辞> <results.jsonl> <動き> <題> <label>=<表示名> ...
+        候補ごとに 4 回のうち中央に近い回の時間推移（<接頭辞>_series.png：全体、<接頭辞>_zoom.png：切り替えの前後）
 
 動きの名前は compare_run.py の motion（accel, curve, slalom, reverse, spin, stops）。
 """
@@ -277,6 +279,119 @@ def candidates(out, results, title, items):
     print(f'saved {out}')
 
 
+CANDIDATE_COLORS = SERIES + ['#e87ba4']   # 参照パレットの slot 1〜5（validate_palette.js で確認）
+ZOOM_PRE, ZOOM_POST = 0.3, 1.5
+
+
+def candidate_series(prefix, results, motion, title, items):
+    """候補（label）ごとの時間推移。omega・v は /ekf_odom（推定）と /wheelchair/pose の微分（真値）."""
+    from compare_run import series
+    from plot_spin import read_bag, TRUTH_COLOR, TRUTH_LW
+    from plot_velocity import odom_series, truth_velocity
+    style()
+    rows = load_results(results)
+    runs = []
+    for label, text in items:
+        name = typical_run(rows, motion, label)
+        bag = f'/root/bags/tune/{name}'
+        d = read_bag(bag, ['/clock', '/wheelchair/pose', '/ekf_odom'])
+        s = series(bag)
+        t0 = min(phases_of_bag(bag).values())
+        et, ev, ew = odom_series(d['/ekf_odom'])
+        runs.append((f'{text} ({name.rsplit("_", 1)[1]})', s, et - t0, ev, ew))
+    tt, tv, tw = truth_velocity(d)
+    tt = tt - t0
+    ph = runs[0][1]['phases']
+    names = sorted(ph, key=ph.get)
+    edges = [ph[n] for n in names] + [ph[names[-1]] + 2.0]
+    colors = CANDIDATE_COLORS[:len(runs)]
+    widths = widths_back_to_front(len(runs))
+
+    def bands(ax):
+        for i in range(len(names)):
+            ax.axvspan(edges[i], edges[i + 1], color=BAND if i % 2 == 0 else '#f6f5f2', lw=0, zorder=0)
+
+    def omega_err(et, ew):
+        return ew - np.interp(et, tt, tw)
+
+    # 全体
+    panels = [
+        ('Angular velocity [rad/s]', None),
+        ('Angular velocity error [rad/s]', lambda r: (r[2], omega_err(r[2], r[4]))),
+        ('Yaw error [deg]', lambda r: (r[1]['t'], r[1]['err'][:, 5])),
+        ('Real-time yaw error [deg]', lambda r: (r[1]['rt_t'], r[1]['rt'][:, 5])),
+    ]
+    fig, axes = plt.subplots(len(panels), 1, figsize=(11, 9.5), sharex=True, facecolor=SURFACE)
+    for ax, (ylabel, fn) in zip(axes, panels):
+        ax.set_facecolor(SURFACE)
+        bands(ax)
+        if fn is None:
+            ax.plot(tt, tw, color=TRUTH_COLOR, lw=TRUTH_LW, label='Truth', zorder=2)
+            for (label, _, et, _, ew), c, lw in zip(runs, colors, widths):
+                ax.plot(et, ew, color=c, lw=lw, label=label, zorder=3)
+        else:
+            ax.axhline(0, color=INK2, lw=0.8, zorder=1)
+            for r, c, lw in zip(runs, colors, widths):
+                x, y = fn(r)
+                ax.plot(x, y, color=c, lw=lw, zorder=3)
+        ax.set_ylabel(ylabel)
+        ax.grid(axis='y', color=GRID, lw=0.6)
+    for n, a in zip(names, edges):
+        axes[0].annotate(n, (a, 1.0), xycoords=('data', 'axes fraction'), xytext=(2, 2),
+                         textcoords='offset points', fontsize=8, color=INK2, ha='left', va='bottom')
+    axes[-1].set_xlabel('Time from the first command [s]')
+    axes[-1].set_xlim(-2.0, edges[-1])
+    axes[0].legend(loc='upper left', bbox_to_anchor=(0.0, 1.62), ncol=3, fontsize=8.5)
+    fig.suptitle(title + ' (one typical run each)', x=0.01, ha='left', fontsize=12, fontweight='bold')
+    fig.tight_layout(rect=(0, 0, 1, 0.97))
+    capitalize_labels(fig)
+    fig.savefig(f'{prefix}_series.png', dpi=130, facecolor=SURFACE)
+    print(f'saved {prefix}_series.png')
+
+    # 切り替えの前後（列 = 切り替え、行 = omega・v・yaw の誤差）
+    zrows = [('Angular velocity [rad/s]', 'w'), ('Linear velocity [m/s]', 'v'), ('Yaw error [deg]', 'yaw')]
+    fig, axes = plt.subplots(len(zrows), len(names), figsize=(15, 8.0), facecolor=SURFACE, squeeze=False)
+    for j, n in enumerate(names):
+        a = ph[n]
+        for i, (ylabel, kind) in enumerate(zrows):
+            ax = axes[i][j]
+            ax.set_facecolor(SURFACE)
+            ax.axvline(0, color=INK2, lw=0.8, zorder=1)
+            if kind in ('w', 'v'):
+                tm = (tt >= a - ZOOM_PRE) & (tt <= a + ZOOM_POST)
+                ax.plot(tt[tm] - a, (tw if kind == 'w' else tv)[tm], color=TRUTH_COLOR, lw=TRUTH_LW,
+                        label='Truth', zorder=2)
+                for (label, _, et, ev, ew), c, lw in zip(runs, colors, widths):
+                    m = (et >= a - ZOOM_PRE) & (et <= a + ZOOM_POST)
+                    ax.plot(et[m] - a, (ew if kind == 'w' else ev)[m], color=c, lw=lw, label=label, zorder=3)
+            else:
+                ax.axhline(0, color=INK2, lw=0.8, zorder=1)
+                for (label, s, *_), c, lw in zip(runs, colors, widths):
+                    m = (s['t'] >= a - ZOOM_PRE) & (s['t'] <= a + ZOOM_POST)
+                    ax.plot(s['t'][m] - a, s['err'][m, 5], color=c, lw=lw, zorder=3)
+            ax.set_xlim(-ZOOM_PRE, ZOOM_POST)
+            ax.grid(color=GRID, lw=0.6)
+            if j == 0:
+                ax.set_ylabel(ylabel)
+            if i == 0:
+                ax.set_title(f'{n.capitalize()} (t = {a:.1f} s)', loc='left')
+            if i == len(zrows) - 1:
+                ax.set_xlabel('Time from the command change [s]')
+    handles, labels = axes[0][0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper left', ncol=3, bbox_to_anchor=(0.01, 0.955), fontsize=8.5)
+    fig.suptitle(title + ': around the command changes (one typical run each)', x=0.01, ha='left',
+                 fontsize=12, fontweight='bold')
+    fig.tight_layout(rect=(0, 0, 1, 0.86))
+    capitalize_labels(fig)
+    fig.savefig(f'{prefix}_zoom.png', dpi=130, facecolor=SURFACE)
+    print(f'saved {prefix}_zoom.png')
+
+
+def phases_of_bag(bag):
+    from compare_run import phases_of
+    return phases_of(bag)
+
+
 def main():
     cmd, out = sys.argv[1:3]
     if cmd == 'traj':
@@ -289,6 +404,8 @@ def main():
         report(out, sys.argv[3])
     elif cmd == 'candidates':
         candidates(out, sys.argv[3], sys.argv[4], [a.split('=', 1) for a in sys.argv[5:]])
+    elif cmd == 'candidate-series':
+        candidate_series(out, sys.argv[3], sys.argv[4], sys.argv[5], [a.split('=', 1) for a in sys.argv[6:]])
     else:
         raise SystemExit(__doc__)
 
