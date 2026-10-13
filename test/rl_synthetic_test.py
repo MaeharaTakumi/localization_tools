@@ -154,8 +154,10 @@ def main():
          if T0 + settle < t < rs or t > rs + settle]
     summarize('/ekf_pose vs truth (LiDAR)', e)
     on_cloud = sum(1 for _, s, _, _ in node.ekf_pose_log if s in node.cloud_stamps)
+    # adapter の publish_trigger が cloud なら全部、timer（既定）なら 0 になる
+    rate = len(node.ekf_pose_log) / max(1e-9, node.ekf_pose_log[-1][0] - node.ekf_pose_log[0][0]) if len(node.ekf_pose_log) > 1 else 0
     print(f'/ekf_pose stamps equal to cloud stamps: {on_cloud}/{len(node.ekf_pose_log)}'
-          f' (clouds sent: {len(node.cloud_stamps)})')
+          f' (clouds sent: {len(node.cloud_stamps)}; all for publish_trigger cloud, none for timer), {rate:.0f} Hz')
     if node.ekf_pose_log:
         c = node.ekf_pose_log[-1][3]
         print('/ekf_pose last covariance diag:', np.round(np.diag(c), 5))
