@@ -19,7 +19,7 @@
 
 録画の情報（`eval/bag_info.py`）：Gazebo か実機か、録画日時、長さ、走らせ方、用途、録画したときの推定器、
 Gazebo のオドメトリの移動平均（車輪の角速度から判定）、オドメトリの omega と真値の比（`wheel_separation_multiplier` を
-試した録画は約 1、普段は約 1.06〜1.10）。`run_gazebo_test.sh` は録画のあとに自動で書く（用途は環境変数 `PURPOSE`）。
+試した録画は約 1、普段は約 1.06〜1.10）。`drive/run_test.sh` は録画のあとに自動で書く（用途は環境変数 `PURPOSE`）。
 
 ```bash
 python3 eval/bag_info.py list                         # 録画の一覧
