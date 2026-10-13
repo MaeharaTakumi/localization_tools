@@ -11,7 +11,7 @@ pkill -INT -f "ros2 launch localization_bringup"; pkill -INT -f "ros2 bag record
 setsid python3 -c "import os, signal, sys; signal.signal(signal.SIGINT, signal.SIG_DFL); os.execvp(sys.argv[1], sys.argv[1:])" bash -ic "export ROS_DOMAIN_ID=99; exec ros2 launch localization_bringup localization.launch.py env:=gazebo estimator:=$est rviz:=false" > /tmp/replay_launch_$est.log 2>&1 < /dev/null &
 setsid python3 -c "import os, signal, sys; signal.signal(signal.SIGINT, signal.SIG_DFL); os.execvp(sys.argv[1], sys.argv[1:])" bash -ic "export ROS_DOMAIN_ID=99; exec ros2 bag record -o $out /clock /wheelchair/pose /ekf_pose /odometry/global /ekf_odom" > /tmp/replay_record_$est.log 2>&1 < /dev/null &
 sleep 12
-ros2 bag play /root/bags/live_rl --topics /clock /velodyne_points /wheelchair/odom /wheelchair/pose /tf_static \
+ros2 bag play /root/bags/gazebo/live_rl --topics /clock /velodyne_points /wheelchair/odom /wheelchair/pose /tf_static \
   --qos-profile-overrides-path "$here/qos_tf_static.yaml" > /tmp/replay_play_$est.log 2>&1
 sleep 2
 pkill -INT -f "ros2 launch localization_bringup"; pkill -INT -f "ros2 bag record"; sleep 6

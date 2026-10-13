@@ -9,7 +9,24 @@
 ```
 
 コンテナ内のコマンドは ROS の環境が要るので `docker exec localizer_rl bash -ic '...'` で実行する。
-bag は `localizer_rl:/root/bags`、再生した結果の bag は `/root/bags/tune/<試行名>`、図は `/root/fig`。
+録画（bag）は `localizer_rl:/root/bags` の下に、**Gazebo と実機で分けて**置く（`eval/bag_paths.py`）。図は `/root/fig`。
+
+| 場所 | 中身 |
+|---|---|
+| `/root/bags/gazebo/<名前>` | Gazebo の録画。隣に `<名前>_phases.txt`（動作の開始時刻）と `<名前>_info.yaml`（録画の情報） |
+| `/root/bags/gazebo/tune/<試行名>` | その再生の出力（`tune_run.py`・`compare_run.py`。結果の行の `out_bag`） |
+| `/root/bags/real/<名前>`、`/root/bags/real/tune/` | 実機の録画とその再生の出力（同じく `_info.yaml` を付ける） |
+
+録画の情報（`eval/bag_info.py`）：Gazebo か実機か、録画日時、長さ、走らせ方、用途、録画したときの推定器、
+Gazebo のオドメトリの移動平均（車輪の角速度から判定）、オドメトリの omega と真値の比（`wheel_separation_multiplier` を
+試した録画は約 1、普段は約 1.06〜1.10）。`run_gazebo_test.sh` は録画のあとに自動で書く（用途は環境変数 `PURPOSE`）。
+
+```bash
+python3 eval/bag_info.py list                         # 録画の一覧
+python3 eval/bag_info.py write <bag> --source gazebo|real --drive '...' --purpose '...' [--notes '...']
+```
+
+**`localizer_rl` には `/root/bags` のボリュームが無いので、コンテナを作り直すと録画は消える**（`docker stop`・`start` では残る）。
 
 | フォルダ | 内容 |
 |---|---|
@@ -23,7 +40,7 @@ bag は `localizer_rl:/root/bags`、再生した結果の bag は `/root/bags/tu
 ## R を求める（`noise/estimate_noise.py`）
 
 ```bash
-python3 noise/estimate_noise.py /root/bags/<録画> --out /root/fig/noise_<名前> [--truth]
+python3 noise/estimate_noise.py /root/bags/gazebo/<録画> --out /root/fig/noise_<名前> [--truth]
 ```
 
 - 指令（cmd_vel）が一定の区間（変化の 0.5 s 後から次の変化の 0.1 s 前まで、1 s 以上）だけを使う。
@@ -38,7 +55,7 @@ python3 noise/estimate_noise.py /root/bags/<録画> --out /root/fig/noise_<名�
 
 ```bash
 DRIVE=drive_stops.py localization_tools/gazebo/run_gazebo_test.sh ekf_localizer stops_ekf   # ホスト：止まる走行を録る
-python3 noise/ndt_init_noise.py /root/bags/stops_ekf --out /root/fig/ndt_init_stops         # コンテナ（約 9 分）
+python3 noise/ndt_init_noise.py /root/bags/gazebo/stops_ekf --out /root/fig/ndt_init_stops         # コンテナ（約 9 分）
 ```
 
 - 真値は止まった区間（始めの 1 s を除く）の `/wheelchair/pose` の平均（止まっているので真値の時刻のずれは効かない）。
@@ -51,7 +68,7 @@ python3 noise/ndt_init_noise.py /root/bags/stops_ekf --out /root/fig/ndt_init_st
 ## LiDAR の取付位置とオドメトリの倍率（`calib/estimate_calibration.py`）
 
 ```bash
-python3 calib/estimate_calibration.py /root/bags/<録画> [...] --out /root/fig/calib [--map <地図の pcd>] [--truth]
+python3 calib/estimate_calibration.py /root/bags/gazebo/<録画> [...] --out /root/fig/calib [--map <地図の pcd>] [--truth]
 ```
 
 真値なしで、NDT の LiDAR の姿勢とオドメトリ（倍率を掛ける前）から求める。その場の旋回と直進が入った録画を使う。

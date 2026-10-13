@@ -6,7 +6,7 @@
   python3 compare_run.py batch <設定の JSON> <結果の jsonl>                              まとめて再生
   python3 compare_run.py reeval <結果の jsonl>                                           残っている bag から指標を計算し直す
   python3 compare_run.py table <結果の jsonl>                                            動き・推定器ごとの表（RANGE=1 で幅も）
-    設定の JSON: [{"motion": "accel", "bag": "/root/bags/drive_accel", "estimator": "ekf_localizer", "runs": 4,
+    設定の JSON: [{"motion": "accel", "bag": "/root/bags/gazebo/drive_accel", "estimator": "ekf_localizer", "runs": 4,
                   "params": {...}, "label": "..."}, ...]（試行名は <motion>_<label>_<回>。label の既定は estimator）
 
 再生は tune_run.py の replay（最初の動作の 8 秒前から最後の動作の 4 秒後まで、ROS_DOMAIN_ID=99）。
@@ -33,6 +33,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localizat
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]   # plot_spin などを import する
 from plot_spin import read_bag, URDF_MOUNT, wrap  # noqa: E402
 from robot_localization_adapter import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix  # noqa: E402
+from bag_paths import tune_bag  # noqa: E402
 
 MAP_OFFSET = np.array([0.041, -0.021])   # NDT − 真値（地図と Gazebo の座標のずれ）[m]
 RT_RATE = 100.0
@@ -167,7 +168,7 @@ def series(bag, topic='/ekf_pose'):
 def run(in_bag, name, estimator, params):
     from tune_run import replay
     out_bag = replay(in_bag, name, estimator, params)
-    return {'name': name, 'estimator': estimator, **evaluate(out_bag)}
+    return {'name': name, 'estimator': estimator, 'out_bag': out_bag, **evaluate(out_bag)}
 
 
 def main():
@@ -201,13 +202,14 @@ def main():
                 f.write(json.dumps(result) + '\n')
             print(json.dumps(result), flush=True)
     elif cmd == 'reeval':
-        # 結果の jsonl の各試行を、残っている出力の bag（/root/bags/tune/<試行名>）から計算し直す（指標を変えたとき）
+        # 結果の jsonl の各試行を、残っている出力の bag（out_bag。無ければ /root/bags/gazebo/tune/<試行名>）から計算し直す
         path = sys.argv[2]
         rows = [json.loads(line) for line in open(path) if line.strip()]
         with open(path, 'w') as f:
             for r in rows:
                 if 'error' not in r:
-                    r.update(evaluate(f"/root/bags/tune/{r['name']}"))
+                    r['out_bag'] = tune_bag(r)
+                    r.update(evaluate(r['out_bag']))
                 f.write(json.dumps(r) + '\n')
         print(f're-evaluated {len(rows)} runs')
     elif cmd == 'table':

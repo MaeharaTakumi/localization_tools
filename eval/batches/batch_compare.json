@@ -1,73 +1,73 @@
 [
  {
   "motion": "accel",
-  "bag": "/root/bags/drive_accel",
+  "bag": "/root/bags/gazebo/drive_accel",
   "estimator": "ekf_localizer",
   "runs": 4
  },
  {
   "motion": "accel",
-  "bag": "/root/bags/drive_accel",
+  "bag": "/root/bags/gazebo/drive_accel",
   "estimator": "robot_localization",
   "runs": 4
  },
  {
   "motion": "curve",
-  "bag": "/root/bags/drive_curve",
+  "bag": "/root/bags/gazebo/drive_curve",
   "estimator": "ekf_localizer",
   "runs": 4
  },
  {
   "motion": "curve",
-  "bag": "/root/bags/drive_curve",
+  "bag": "/root/bags/gazebo/drive_curve",
   "estimator": "robot_localization",
   "runs": 4
  },
  {
   "motion": "slalom",
-  "bag": "/root/bags/drive_slalom",
+  "bag": "/root/bags/gazebo/drive_slalom",
   "estimator": "ekf_localizer",
   "runs": 4
  },
  {
   "motion": "slalom",
-  "bag": "/root/bags/drive_slalom",
+  "bag": "/root/bags/gazebo/drive_slalom",
   "estimator": "robot_localization",
   "runs": 4
  },
  {
   "motion": "reverse",
-  "bag": "/root/bags/drive_reverse",
+  "bag": "/root/bags/gazebo/drive_reverse",
   "estimator": "ekf_localizer",
   "runs": 4
  },
  {
   "motion": "reverse",
-  "bag": "/root/bags/drive_reverse",
+  "bag": "/root/bags/gazebo/drive_reverse",
   "estimator": "robot_localization",
   "runs": 4
  },
  {
   "motion": "spin",
-  "bag": "/root/bags/spin360_w1_ekf2",
+  "bag": "/root/bags/gazebo/spin360_w1_ekf2",
   "estimator": "ekf_localizer",
   "runs": 4
  },
  {
   "motion": "spin",
-  "bag": "/root/bags/spin360_w1_ekf2",
+  "bag": "/root/bags/gazebo/spin360_w1_ekf2",
   "estimator": "robot_localization",
   "runs": 4
  },
  {
   "motion": "stops",
-  "bag": "/root/bags/stops_ekf",
+  "bag": "/root/bags/gazebo/stops_ekf",
   "estimator": "ekf_localizer",
   "runs": 4
  },
  {
   "motion": "stops",
-  "bag": "/root/bags/stops_ekf",
+  "bag": "/root/bags/gazebo/stops_ekf",
   "estimator": "robot_localization",
   "runs": 4
  }

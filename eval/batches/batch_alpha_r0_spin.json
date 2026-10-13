@@ -1,7 +1,7 @@
 [
  {
   "motion": "spin",
-  "bag": "/root/bags/spin360_w1_ekf2",
+  "bag": "/root/bags/gazebo/spin360_w1_ekf2",
   "estimator": "ekf_localizer",
   "label": "ekf_a0_b",
   "runs": 4,
@@ -18,7 +18,7 @@
  },
  {
   "motion": "spin",
-  "bag": "/root/bags/spin360_w1_ekf2",
+  "bag": "/root/bags/gazebo/spin360_w1_ekf2",
   "estimator": "ekf_localizer",
   "label": "ekf_r0_a0",
   "runs": 4,
@@ -39,7 +39,7 @@
  },
  {
   "motion": "spin",
-  "bag": "/root/bags/spin360_w1_ekf2",
+  "bag": "/root/bags/gazebo/spin360_w1_ekf2",
   "estimator": "ekf_localizer",
   "label": "ekf_r0_w0.005",
   "runs": 4,
@@ -60,7 +60,7 @@
  },
  {
   "motion": "spin",
-  "bag": "/root/bags/spin360_w1_ekf2",
+  "bag": "/root/bags/gazebo/spin360_w1_ekf2",
   "estimator": "ekf_localizer",
   "label": "ekf_r0_w0.05",
   "runs": 4,
@@ -81,7 +81,7 @@
  },
  {
   "motion": "spin",
-  "bag": "/root/bags/spin360_w1_ekf2",
+  "bag": "/root/bags/gazebo/spin360_w1_ekf2",
   "estimator": "ekf_localizer",
   "label": "ekf_r0_v0.005",
   "runs": 4,
@@ -102,7 +102,7 @@
  },
  {
   "motion": "spin",
-  "bag": "/root/bags/spin360_w1_ekf2",
+  "bag": "/root/bags/gazebo/spin360_w1_ekf2",
   "estimator": "ekf_localizer",
   "label": "ekf_r0_vw0.005",
   "runs": 4,

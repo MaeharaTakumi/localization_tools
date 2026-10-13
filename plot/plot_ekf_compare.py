@@ -3,7 +3,7 @@
 
   python3 plot_ekf_compare.py <出力の接頭辞> <results の jsonl> [<条件の JSON>]
 
-同じ録画を再生した結果を比べる（tune_run.py の bag は /root/bags/tune/<試行名>）。
+同じ録画を再生した結果を比べる（tune_run.py の bag は /root/bags/gazebo/tune/<試行名>）。
 条件の JSON（省略時は下の移動平均の比較）：
   {"before": [ラベル, 試行名, 色], "after": [ラベル, 試行名, 色],
    "conditions": [[試行名の接頭辞（正規表現）, ラベル, 色], ...], "title": 図の題の補足, "runs": 棒グラフの題の補足}
@@ -35,7 +35,7 @@ import plot_spin  # noqa: E402
 from plot_spin import capitalize_labels, GRID, INK, INK2, load_run, read_bag, SURFACE, TRUTH_COLOR, TRUTH_LW  # noqa: E402
 from plot_velocity import odom_series, truth_velocity  # noqa: E402
 
-TUNE = '/root/bags/tune'
+TUNE = '/root/bags/gazebo/tune'
 BEFORE = ('EKF, moving average 10 (before)', 'w1cmp_ekf_w10_1', '#eb6834')
 AFTER = ('EKF, moving average 1 (after)', 'w1cmp_ekf_w1_1', '#2a78d6')
 # 棒グラフの条件（試行名の接頭辞、ラベル、色）

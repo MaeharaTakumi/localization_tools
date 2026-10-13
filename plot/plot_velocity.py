@@ -3,7 +3,7 @@
 
   python3 plot_velocity.py <出力の接頭辞> <入力 bag> <odom_delay [s]> \\
       <推定器名>:<調整前の bag>:<調整後の bag>:<トピック> ...
-  例: ... ekf_localizer:/root/bags/tune/v_ekf_before_1:/root/bags/tune/final_ekf:/ekf_odom
+  例: ... ekf_localizer:/root/bags/gazebo/tune/v_ekf_before_1:/root/bags/gazebo/tune/final_ekf:/ekf_odom
 
 出力: <接頭辞>_full.png（全体）、<接頭辞>_zoom.png（速度が急に変わる 4 つの瞬間の拡大）。
 真値は入力 bag の /wheelchair/pose（base_footprint）を ±0.03 s の差分で微分したもの（v は車体の前方向成分）。

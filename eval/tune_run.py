@@ -9,7 +9,8 @@
 - parameters の JSON は env の parameters にそのまま入れる。キー "__env__" の中身は env の最上位を上書きする
   （例 {"__env__": {"topics": {...}, "joint_state_odometry": null}}。null の項目は消す）。process_noise_covariance などの 15x15 は
   "<名前>_diag": [15 個] で書く（launch が行列に直す）
-- 出力：/root/bags/tune/<試行名>（bag）と、指標の 1 行 JSON（標準出力の最後の行）
+- 出力：入力と同じ側の tune/<試行名>（/root/bags/gazebo/tune か /root/bags/real/tune。bag_paths.py）と、
+  指標の 1 行 JSON（標準出力の最後の行。out_bag に出力の bag のパス）
 """
 import json
 import os
@@ -29,6 +30,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localizat
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]   # plot_spin などを import する
 from plot_spin import load_run  # noqa: E402
 from transition_eval import evaluate as transition_metrics  # noqa: E402
+from bag_paths import tune_dir  # noqa: E402
 
 LEAD = 8.0
 TAIL = 4.0
@@ -117,10 +119,10 @@ def metrics(bag, pose_topic='/ekf_pose'):
 
 
 def replay(in_bag, name, estimator, params, extra=()):
-    """入力 bag を候補のパラメータで再生して推定器を動かし、出力の bag（/root/bags/tune/<name>）を返す."""
+    """入力 bag を候補のパラメータで再生して推定器を動かし、出力の bag（入力と同じ側の tune/<name>）を返す."""
     params = dict(params)
-    out_bag = f'/root/bags/tune/{name}'
-    os.makedirs('/root/bags/tune', exist_ok=True)
+    out_bag = os.path.join(tune_dir(in_bag), name)
+    os.makedirs(tune_dir(in_bag), exist_ok=True)
     subprocess.run(['rm', '-rf', out_bag])
     phases = phases_of(in_bag)
     with open(out_bag + '_phases.txt', 'w') as f:
@@ -180,7 +182,7 @@ def main():
     extra = sys.argv[5].split() if len(sys.argv) > 5 else []
     out_bag = replay(in_bag, name, estimator, json.loads(params_json), extra)
     pose_topic = '/ndt_pose' if 'use_ekf:=false' in extra else '/ekf_pose'
-    print(json.dumps({'name': name, 'estimator': estimator, **metrics(out_bag, pose_topic)}))
+    print(json.dumps({'name': name, 'estimator': estimator, 'out_bag': out_bag, **metrics(out_bag, pose_topic)}))
 
 
 if __name__ == '__main__':

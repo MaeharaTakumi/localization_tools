@@ -23,6 +23,7 @@ import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]
+from bag_paths import tune_bag  # noqa: E402
 from plot_spin import (BAND, capitalize_labels, GRID, INK, INK2, SERIES, SURFACE, TRUTH_COLOR,  # noqa: E402
                        widths_back_to_front)
 
@@ -203,19 +204,19 @@ def series_plot(out, title, items):
 
 
 # report の入力：動きごとの録画（軌跡）と、時間推移に描く条件（結果の label）
-REPORT_BAGS = {'accel': '/root/bags/drive_accel', 'curve': '/root/bags/drive_curve',
-               'slalom': '/root/bags/drive_slalom', 'reverse': '/root/bags/drive_reverse',
-               'spin': '/root/bags/spin360_w1_ekf2', 'stops': '/root/bags/stops_ekf'}
+REPORT_BAGS = {'accel': '/root/bags/gazebo/drive_accel', 'curve': '/root/bags/gazebo/drive_curve',
+               'slalom': '/root/bags/gazebo/drive_slalom', 'reverse': '/root/bags/gazebo/drive_reverse',
+               'spin': '/root/bags/gazebo/spin360_w1_ekf2', 'stops': '/root/bags/gazebo/stops_ekf'}
 REPORT_SERIES = [('ekf_localizer', 'EKF (ekf_localizer)'), ('robot_localization', 'RL, R_ndt same as ekf_localizer'),
                  ('rl_rndt_small', 'RL, small R_ndt (gazebo.yaml)')]
 
 
 def typical_run(rows, motion, label):
-    """4 回のうち、yaw の平均と切り替え時の yaw の両方が中央値に近い回（時間推移の図に使う）."""
+    """4 回のうち、yaw の平均と切り替え時の yaw の両方が中央値に近い回の結果の行（時間推移の図に使う）."""
     rs = [r for r in rows if r['motion'] == motion and r.get('label', r['estimator']) == label]
     my = float(np.median([r['yaw_mean'] for r in rs]))
     mt = float(np.median([r['trans_yaw_max'] for r in rs]))
-    return min(rs, key=lambda r: abs(r['yaw_mean'] / my - 1) + abs(r['trans_yaw_max'] / mt - 1))['name']
+    return min(rs, key=lambda r: abs(r['yaw_mean'] / my - 1) + abs(r['trans_yaw_max'] / mt - 1))
 
 
 def report(prefix, results):
@@ -229,7 +230,7 @@ def report(prefix, results):
                 'New defaults: ekf_localizer vs robot_localization with timer output, 4 runs each')
         print(f'saved {prefix}_final.png')
     for m in ('accel', 'curve', 'slalom', 'reverse', 'spin'):   # 止まる走行は区間が多いので描かない
-        items = [(text, f'/root/bags/tune/{typical_run(rows, m, label)}') for label, text in REPORT_SERIES]
+        items = [(text, tune_bag(typical_run(rows, m, label))) for label, text in REPORT_SERIES]
         series_plot(f'{prefix}_series_{m}.png',
                     f'{MOTION_LABELS[m]}: error over time (replay; one typical run each)', items)
         print(f'saved {prefix}_series_{m}.png')
@@ -292,8 +293,8 @@ def candidate_series(prefix, results, motion, title, items):
     rows = load_results(results)
     runs = []
     for label, text in items:
-        name = typical_run(rows, motion, label)
-        bag = f'/root/bags/tune/{name}'
+        row = typical_run(rows, motion, label)
+        name, bag = row['name'], tune_bag(row)
         d = read_bag(bag, ['/clock', '/wheelchair/pose', '/ekf_odom'])
         s = series(bag)
         t0 = min(phases_of_bag(bag).values())
