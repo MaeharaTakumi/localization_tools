@@ -1,14 +1,14 @@
 [
  {
   "motion": "accel",
-  "bag": "/root/bags/gazebo/drive_accel",
+  "bag": "/root/ros2_ws/bags/gazebo/drive_accel",
   "estimator": "robot_localization",
   "label": "rl_rndt_small",
   "runs": 4
  },
  {
   "motion": "accel",
-  "bag": "/root/bags/gazebo/drive_accel",
+  "bag": "/root/ros2_ws/bags/gazebo/drive_accel",
   "estimator": "robot_localization",
   "label": "rl_timer",
   "runs": 4,
@@ -20,14 +20,14 @@
  },
  {
   "motion": "curve",
-  "bag": "/root/bags/gazebo/drive_curve",
+  "bag": "/root/ros2_ws/bags/gazebo/drive_curve",
   "estimator": "robot_localization",
   "label": "rl_rndt_small",
   "runs": 4
  },
  {
   "motion": "curve",
-  "bag": "/root/bags/gazebo/drive_curve",
+  "bag": "/root/ros2_ws/bags/gazebo/drive_curve",
   "estimator": "robot_localization",
   "label": "rl_timer",
   "runs": 4,
@@ -39,14 +39,14 @@
  },
  {
   "motion": "slalom",
-  "bag": "/root/bags/gazebo/drive_slalom",
+  "bag": "/root/ros2_ws/bags/gazebo/drive_slalom",
   "estimator": "robot_localization",
   "label": "rl_rndt_small",
   "runs": 4
  },
  {
   "motion": "slalom",
-  "bag": "/root/bags/gazebo/drive_slalom",
+  "bag": "/root/ros2_ws/bags/gazebo/drive_slalom",
   "estimator": "robot_localization",
   "label": "rl_timer",
   "runs": 4,
@@ -58,14 +58,14 @@
  },
  {
   "motion": "reverse",
-  "bag": "/root/bags/gazebo/drive_reverse",
+  "bag": "/root/ros2_ws/bags/gazebo/drive_reverse",
   "estimator": "robot_localization",
   "label": "rl_rndt_small",
   "runs": 4
  },
  {
   "motion": "reverse",
-  "bag": "/root/bags/gazebo/drive_reverse",
+  "bag": "/root/ros2_ws/bags/gazebo/drive_reverse",
   "estimator": "robot_localization",
   "label": "rl_timer",
   "runs": 4,
@@ -77,14 +77,14 @@
  },
  {
   "motion": "spin",
-  "bag": "/root/bags/gazebo/spin360_w1_ekf2",
+  "bag": "/root/ros2_ws/bags/gazebo/spin360_w1_ekf2",
   "estimator": "robot_localization",
   "label": "rl_rndt_small",
   "runs": 4
  },
  {
   "motion": "spin",
-  "bag": "/root/bags/gazebo/spin360_w1_ekf2",
+  "bag": "/root/ros2_ws/bags/gazebo/spin360_w1_ekf2",
   "estimator": "robot_localization",
   "label": "rl_timer",
   "runs": 4,
@@ -96,14 +96,14 @@
  },
  {
   "motion": "stops",
-  "bag": "/root/bags/gazebo/stops_ekf",
+  "bag": "/root/ros2_ws/bags/gazebo/stops_ekf",
   "estimator": "robot_localization",
   "label": "rl_rndt_small",
   "runs": 4
  },
  {
   "motion": "stops",
-  "bag": "/root/bags/gazebo/stops_ekf",
+  "bag": "/root/ros2_ws/bags/gazebo/stops_ekf",
   "estimator": "robot_localization",
   "label": "rl_timer",
   "runs": 4,

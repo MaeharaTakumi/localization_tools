@@ -24,7 +24,7 @@ from plot_spin import capitalize_labels, BAND, GRID, INK, INK2, load_run, read_b
 from plot_spin import TRUTH_COLOR, TRUTH_LW, widths_back_to_front  # noqa: E402
 from plot_velocity import odom_series, phases_of, truth_velocity  # noqa: E402
 
-B = '/root/bags/gazebo'
+B = '/root/ros2_ws/bags/gazebo'
 T = B + '/tune'
 SCALE = 0.922
 C_NONE, C_MULT, C_SCALE, C_TRUTH = '#eb6834', '#1baf7a', '#2a78d6', TRUTH_COLOR

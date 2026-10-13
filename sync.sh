@@ -1,7 +1,7 @@
 #!/bin/bash
 # localization_tools をホストと自己位置推定コンテナ（localizer_rl）の /root/localization_tools の間で写す（ホストで実行）
 #   sync.sh push   ホスト -> コンテナ（.git を除く。eval/results の既存のファイルはコンテナ側を残す）
-#   sync.sh pull   コンテナ -> ホスト（eval/results の結果と、/root/fig の図を workspace/results へ）
+#   sync.sh pull   コンテナ -> ホスト（eval/results の結果と、/root/ros2_ws/fig の図を workspace/results へ）
 # 実行・描画・結果の追記はコンテナで行い、プログラムの編集はホストで行う。
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
@@ -18,8 +18,9 @@ case "${1:-push}" in
     ;;
   pull)
     docker cp $LOC:$DST/eval/results/. "$here/eval/results/"
-    if docker exec $LOC test -d /root/fig; then
-      docker cp $LOC:/root/fig/. "$here/../results/"
+    if docker exec $LOC test -d /root/ros2_ws/fig; then
+      docker cp $LOC:/root/ros2_ws/fig/. "$here/../results/"
+      rm -f "$here/../results/COLCON_IGNORE"   # colcon に探させないための印（図ではない）
     fi
     echo "pulled eval/results and figures"
     ;;

@@ -210,7 +210,7 @@ def pooled(rows, keys, classes):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('bag')
-    ap.add_argument('--out', default='/root/fig/noise')
+    ap.add_argument('--out', default='/root/ros2_ws/fig/noise')
     ap.add_argument('--odom', default='/wheelchair/odom')
     ap.add_argument('--ndt', default='/ndt_pose')
     ap.add_argument('--cmd', default='/wheelchair/diff_drive_controller/cmd_vel')

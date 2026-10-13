@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """NDT の観測ノイズ R_ndt を、「真値 + ノイズ」を初期値にして NDT を計算し直して求める（localizer_rl 内で実行）.
 
-  python3 ndt_init_noise.py <止まる走行の bag> [--out /root/fig/ndt_init] [--passes 3] [--sigma ...]
+  python3 ndt_init_noise.py <止まる走行の bag> [--out /root/ros2_ws/fig/ndt_init] [--passes 3] [--sigma ...]
 
 - bag は drive/profiles.yaml の stops の走行（何か所かで止まる）。止まった区間は <bag>_phases.txt の stop_<名前>_start/_end。
 - 真値：止まった区間（始めの --settle 秒を除く）の /wheelchair/pose の平均（車体）に、取付（/tf_static）を掛けた LiDAR の姿勢。
@@ -202,7 +202,7 @@ def analyse(node, stops, sigma):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('bag')
-    ap.add_argument('--out', default='/root/fig/ndt_init')
+    ap.add_argument('--out', default='/root/ros2_ws/fig/ndt_init')
     ap.add_argument('--passes', type=int, default=3, help='ノイズありで流す回数（このほかにノイズなしを 1 回）')
     ap.add_argument('--sigma', default=DEFAULT_SIGMA, help='ノイズの標準偏差 x,y,z [m],roll,pitch,yaw [deg]')
     ap.add_argument('--settle', type=float, default=1.0, help='止まり始めから使わない時間 [s]')

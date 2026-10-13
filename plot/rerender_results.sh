@@ -1,9 +1,9 @@
 #!/bin/bash
-# results の図をすべて描き直す（localizer_rl 内で実行。図は /root/fig に出る。ホストで sync.sh pull すると workspace/results へ）
+# results の図をすべて描き直す（localizer_rl 内で実行。図は /root/ros2_ws/fig に出る。ホストで sync.sh pull すると workspace/results へ）
 set -u
 T0=/root/localization_tools
 cd $T0/plot
-B=/root/bags/gazebo; T=$B/tune; O=/root/fig; R=$T0/eval/results
+B=/root/ros2_ws/bags/gazebo; T=$B/tune; O=/root/ros2_ws/fig; R=$T0/eval/results
 mkdir -p $O
 run() { echo "== $*" | cut -c1-120; "$@" 2>&1 | grep -E "saved|Error|Traceback|line [0-9]" ; }
 run python3 plot_spin.py $O/spin_results.png "EKF (ekf_localizer)=$B/spin_ekf_localizer" "EKF (robot_localization)=$B/spin_robot_localization"

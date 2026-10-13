@@ -3,10 +3,10 @@
 #
 #   drive/run_test.sh gazebo <動き> <bag 名> [estimator] [launch の追加引数（例 use_ekf:=false）]
 #     Gazebo を起動し直して車椅子を初期位置に戻し、推定器（既定 ekf_localizer）を起動して走らせる。
-#     録画は localizer_rl:/root/bags/gazebo/<bag 名>（同じ名前があれば上書き）
+#     録画は localizer_rl:/root/ros2_ws/bags/gazebo/<bag 名>（同じ名前があれば上書き）
 #   drive/run_test.sh real <動き> <bag 名>
 #     実機。自己位置推定（/ekf_pose）・whill_driver・LiDAR が動いていること（推定の起動は自分で行う。地図・初期姿勢が要るため）。
-#     走り出す前に計画を表示して確認するので、端末から実行する。録画は localizer_rl:/root/bags/real/<bag 名>（同じ名前は止める）
+#     走り出す前に計画を表示して確認するので、端末から実行する。録画は localizer_rl:/root/ros2_ws/bags/real/<bag 名>（同じ名前は止める）
 #
 #   <動き> は drive/profiles.yaml（spin・stops・accel・curve・slalom・reverse。drive/drive_test.py <target> --list）。
 #   速さの上限・走ってよい範囲・トピックは drive/config/<target>.yaml。
@@ -21,7 +21,7 @@ LOC=localizer_rl; GZ=20261002
 T=/root/localization_tools
 CFG=${CONFIG:-$target}
 DT="python3 $T/drive/drive_test.py $CFG ${WHILL:+--whill $WHILL}"
-BAGS=/root/bags/$target
+BAGS=/root/ros2_ws/bags/$target
 case $target in gazebo|real) ;; *) echo "target は gazebo か real"; exit 1;; esac
 
 dexec() { docker exec $LOC bash -ic "$1" 2>&1 | grep -v "terminal process group\|no job control"; }

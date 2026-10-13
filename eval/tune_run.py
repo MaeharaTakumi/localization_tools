@@ -9,7 +9,7 @@
 - parameters の JSON は env の parameters にそのまま入れる。キー "__env__" の中身は env の最上位を上書きする
   （例 {"__env__": {"topics": {...}, "joint_state_odometry": null}}。null の項目は消す）。process_noise_covariance などの 15x15 は
   "<名前>_diag": [15 個] で書く（launch が行列に直す）
-- 出力：入力と同じ側の tune/<試行名>（/root/bags/gazebo/tune か /root/bags/real/tune。bag_paths.py）と、
+- 出力：入力と同じ側の tune/<試行名>（/root/ros2_ws/bags/gazebo/tune か /root/ros2_ws/bags/real/tune。bag_paths.py）と、
   指標の 1 行 JSON（標準出力の最後の行。out_bag に出力の bag のパス）
 """
 import json

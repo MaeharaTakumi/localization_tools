@@ -5,17 +5,17 @@
 
 ```bash
 ./sync.sh push   # ホスト -> コンテナ（eval/results の既存のファイルはコンテナ側を残す）
-./sync.sh pull   # コンテナ -> ホスト（eval/results と /root/fig の図を workspace/results へ）
+./sync.sh pull   # コンテナ -> ホスト（eval/results と /root/ros2_ws/fig の図を workspace/results へ）
 ```
 
 コンテナ内のコマンドは ROS の環境が要るので `docker exec localizer_rl bash -ic '...'` で実行する。
-録画（bag）は `localizer_rl:/root/bags` の下に、**Gazebo と実機で分けて**置く（`eval/bag_paths.py`）。図は `/root/fig`。
+録画（bag）は `localizer_rl:/root/ros2_ws/bags` の下に、**Gazebo と実機で分けて**置く（`eval/bag_paths.py`）。図は `/root/ros2_ws/fig`。
 
 | 場所 | 中身 |
 |---|---|
-| `/root/bags/gazebo/<名前>` | Gazebo の録画。隣に `<名前>_phases.txt`（動作の開始時刻）と `<名前>_info.yaml`（録画の情報） |
-| `/root/bags/gazebo/tune/<試行名>` | その再生の出力（`tune_run.py`・`compare_run.py`。結果の行の `out_bag`） |
-| `/root/bags/real/<名前>`、`/root/bags/real/tune/` | 実機の録画とその再生の出力（同じく `_info.yaml` を付ける） |
+| `/root/ros2_ws/bags/gazebo/<名前>` | Gazebo の録画。隣に `<名前>_phases.txt`（動作の開始時刻）と `<名前>_info.yaml`（録画の情報） |
+| `/root/ros2_ws/bags/gazebo/tune/<試行名>` | その再生の出力（`tune_run.py`・`compare_run.py`。結果の行の `out_bag`） |
+| `/root/ros2_ws/bags/real/<名前>`、`/root/ros2_ws/bags/real/tune/` | 実機の録画とその再生の出力（同じく `_info.yaml` を付ける） |
 
 録画の情報（`eval/bag_info.py`）：Gazebo か実機か、録画日時、長さ、走らせ方、用途、録画したときの推定器、
 Gazebo のオドメトリの移動平均（車輪の角速度から判定）、オドメトリの omega と真値の比（`wheel_separation_multiplier` を
@@ -26,7 +26,7 @@ python3 eval/bag_info.py list                         # 録画の一覧
 python3 eval/bag_info.py write <bag> --source gazebo|real --drive '...' --purpose '...' [--notes '...']
 ```
 
-**`localizer_rl` には `/root/bags` のボリュームが無いので、コンテナを作り直すと録画は消える**（`docker stop`・`start` では残る）。
+**録画と図はコンテナの中（`/root/ros2_ws/bags`・`/root/ros2_ws/fig`。どちらにも `COLCON_IGNORE` を置く）なので、コンテナを作り直すと消える**（`docker stop`・`start` では残る）。作り直す前にホストへ退避する。
 
 | フォルダ | 内容 |
 |---|---|
@@ -40,7 +40,7 @@ python3 eval/bag_info.py write <bag> --source gazebo|real --drive '...' --purpos
 ## R を求める（`noise/estimate_noise.py`）
 
 ```bash
-python3 noise/estimate_noise.py /root/bags/gazebo/<録画> --out /root/fig/noise_<名前> [--truth]
+python3 noise/estimate_noise.py /root/ros2_ws/bags/gazebo/<録画> --out /root/ros2_ws/fig/noise_<名前> [--truth]
 ```
 
 - 指令（cmd_vel）が一定の区間（変化の 0.5 s 後から次の変化の 0.1 s 前まで、1 s 以上）だけを使う。
@@ -55,7 +55,7 @@ python3 noise/estimate_noise.py /root/bags/gazebo/<録画> --out /root/fig/noise
 
 ```bash
 localization_tools/drive/run_test.sh gazebo stops stops_ekf                       # ホスト：止まる走行を録る
-python3 noise/ndt_init_noise.py /root/bags/gazebo/stops_ekf --out /root/fig/ndt_init_stops         # コンテナ（約 9 分）
+python3 noise/ndt_init_noise.py /root/ros2_ws/bags/gazebo/stops_ekf --out /root/ros2_ws/fig/ndt_init_stops         # コンテナ（約 9 分）
 ```
 
 - 真値は止まった区間（始めの 1 s を除く）の `/wheelchair/pose` の平均（止まっているので真値の時刻のずれは効かない）。
@@ -68,7 +68,7 @@ python3 noise/ndt_init_noise.py /root/bags/gazebo/stops_ekf --out /root/fig/ndt_
 ## LiDAR の取付位置とオドメトリの倍率（`calib/estimate_calibration.py`）
 
 ```bash
-python3 calib/estimate_calibration.py /root/bags/gazebo/<録画> [...] --out /root/fig/calib [--map <地図の pcd>] [--truth]
+python3 calib/estimate_calibration.py /root/ros2_ws/bags/gazebo/<録画> [...] --out /root/ros2_ws/fig/calib [--map <地図の pcd>] [--truth]
 ```
 
 真値なしで、NDT の LiDAR の姿勢とオドメトリ（倍率を掛ける前）から求める。その場の旋回と直進が入った録画を使う。
@@ -91,7 +91,7 @@ SCORE_KEYS=trans_max_mean,steady_mean,ang_mean,xy_mean python3 eval/summarize.py
 ```bash
 python3 eval/compare_run.py batch eval/batches/batch_compare.json eval/results/results_compare.jsonl   # 動き x 推定器 x 回数
 RANGE=1 python3 eval/compare_run.py table eval/results/results_compare.jsonl                           # 表
-python3 plot/plot_motion_compare.py report /root/fig/compare eval/results/results_compare.jsonl        # 軌跡・まとめ・時間推移の図
+python3 plot/plot_motion_compare.py report /root/ros2_ws/fig/compare eval/results/results_compare.jsonl        # 軌跡・まとめ・時間推移の図
 ```
 
 指標は stamp の時刻の 6 軸の誤差、実時間の誤差（100 Hz の各時刻に受信済みの最新の `/ekf_pose` とその時刻の真値の差）、
@@ -115,8 +115,8 @@ python3 drive/drive_test.py <gazebo|real> <動き> --simulate    # 計算した�
   を取付で車体に直したもの）が 0.5 s 届かない・ジョイスティックが倒された（実機）・時計が止まった・区間が 60 s を超えた・Ctrl-C
   のどれかで 0 の指令を出して止める（止めた理由は録画の情報ファイルのメモに書く）。実機は計画を表示して `yes` と入力するまで走らない。
   whill_driver も、指令が 1 s 途切れると止まり、ジョイスティックの操作を優先する。
-- **Gazebo**：起動し直して車椅子を初期位置に戻し、推定器を起動して走らせ、`/root/bags/gazebo/<bag 名>` に録る。
-- **実機**：自己位置推定（`/ekf_pose`）・whill_driver・LiDAR が動いていることを確かめてから、`/root/bags/real/<bag 名>` に録る
+- **Gazebo**：起動し直して車椅子を初期位置に戻し、推定器を起動して走らせ、`/root/ros2_ws/bags/gazebo/<bag 名>` に録る。
+- **実機**：自己位置推定（`/ekf_pose`）・whill_driver・LiDAR が動いていることを確かめてから、`/root/ros2_ws/bags/real/<bag 名>` に録る
   （推定の起動は自分で行う。地図と初期姿勢が要るため）。localizer_rl の `.bashrc` の通信設定を実機用にしておく。
   車椅子は `WHILL=blue|red|white`（既定は `config/real.yaml` の `whill: blue`。自己位置推定の launch の `whill:=<色>` と合わせる。
   選んだ色の `cmd_vel` を受けるノードが無ければ、見つかった車椅子を表示して止める）。録画するのは点群・`motor_speed_ts`・

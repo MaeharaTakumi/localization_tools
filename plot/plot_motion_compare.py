@@ -204,9 +204,9 @@ def series_plot(out, title, items):
 
 
 # report の入力：動きごとの録画（軌跡）と、時間推移に描く条件（結果の label）
-REPORT_BAGS = {'accel': '/root/bags/gazebo/drive_accel', 'curve': '/root/bags/gazebo/drive_curve',
-               'slalom': '/root/bags/gazebo/drive_slalom', 'reverse': '/root/bags/gazebo/drive_reverse',
-               'spin': '/root/bags/gazebo/spin360_w1_ekf2', 'stops': '/root/bags/gazebo/stops_ekf'}
+REPORT_BAGS = {'accel': '/root/ros2_ws/bags/gazebo/drive_accel', 'curve': '/root/ros2_ws/bags/gazebo/drive_curve',
+               'slalom': '/root/ros2_ws/bags/gazebo/drive_slalom', 'reverse': '/root/ros2_ws/bags/gazebo/drive_reverse',
+               'spin': '/root/ros2_ws/bags/gazebo/spin360_w1_ekf2', 'stops': '/root/ros2_ws/bags/gazebo/stops_ekf'}
 REPORT_SERIES = [('ekf_localizer', 'EKF (ekf_localizer)'), ('robot_localization', 'RL, R_ndt same as ekf_localizer'),
                  ('rl_rndt_small', 'RL, small R_ndt (gazebo.yaml)')]
 

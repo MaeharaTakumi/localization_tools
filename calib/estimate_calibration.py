@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """LiDAR の取付位置とオドメトリの倍率を、NDT の解とオドメトリから推定する（真値なし。localizer_rl 内で実行）.
 
-  python3 estimate_calibration.py <bag> [<bag> ...] [--out /root/fig/calib] [--truth] [--map <地図の pcd>]
+  python3 estimate_calibration.py <bag> [<bag> ...] [--out /root/ros2_ws/fig/calib] [--truth] [--map <地図の pcd>]
 
 使う走行：その場の旋回（取付位置・omega の倍率）と直進（v の倍率・取付の yaw）。区間は指令（cmd_vel）が一定のところ
 （変化の --settle 秒後から次の変化の --margin 秒前まで）。drive/profiles.yaml の spin・stops の走行で求まる。
@@ -148,7 +148,7 @@ def floor_height(points, xy, z_lidar, radius=1.0):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('bags', nargs='+')
-    ap.add_argument('--out', default='/root/fig/calib')
+    ap.add_argument('--out', default='/root/ros2_ws/fig/calib')
     ap.add_argument('--odom', default='/wheelchair/odom', help='倍率を掛ける前のオドメトリ')
     ap.add_argument('--ndt', default='/ndt_pose')
     ap.add_argument('--cmd', default='/wheelchair/diff_drive_controller/cmd_vel')
