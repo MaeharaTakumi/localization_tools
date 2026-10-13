@@ -18,6 +18,7 @@
   このずれは場所で変わる（直進 16 m で x +40 → 0 mm。止まっていても同じで、どの推定器でも出る）ので、xy は開始位置の近くで
   動く録画（その場の回転・13 か所で止まる）にだけ使い、長く走る録画は xy_raw で比べる
   trans_yaw_max：各動作の切り替え（指令が変わる瞬間）の 0.1 s 前から 1 s 後までの yaw 誤差の最大の、切り替え全体の平均
+                （瞬間ごとの値は trans_yaw[<区間の名前>]）
   latency：受信時刻 − stamp、age：各時刻で使える最新の推定の stamp からの経過時間
 単位は m・deg・ms。
 """
@@ -108,10 +109,11 @@ def evaluate(bag, topic='/ekf_pose'):
         out[prefix + 'yaw_mean'] = float(np.abs(err[:, 5]).mean())
         out[prefix + 'yaw_max'] = float(np.abs(err[:, 5]).max())
     trans = []
-    for tp in phases.values():
+    for name, tp in phases.items():
         w = (ts >= tp - PRE) & (ts <= tp + POST)
         if w.any():
             trans.append(float(np.abs(e[w, 5]).max()))
+            out[f'trans_yaw[{name}]'] = trans[-1]   # 切り替えの瞬間ごと
     out['trans_yaw_max'] = float(np.mean(trans))
 
     # 実時間の誤差：各時刻で受信済みの最新の推定

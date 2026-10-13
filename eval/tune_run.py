@@ -159,6 +159,11 @@ def replay(in_bag, name, estimator, params, extra=()):
         stop(launch)
         stop(record)
         log.close()
+    # ノードが途中で落ちた回は使わない（例：パラメータを読めずに起動しなかった。正常なら全部 finished cleanly）
+    with open(f'/tmp/tune_{name}.log') as f:
+        died = sorted({line.split(']')[1].strip(' [') for line in f if 'process has died' in line})
+    if died:
+        raise RuntimeError(f'process died during the replay: {", ".join(died)} (see /tmp/tune_{name}.log)')
     return out_bag
 
 

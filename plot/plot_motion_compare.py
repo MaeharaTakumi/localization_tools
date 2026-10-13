@@ -5,6 +5,8 @@
   python3 plot_motion_compare.py summary <出力 png> <results.jsonl>          動きごと・推定器ごとの指標（4 回の平均と幅）
   python3 plot_motion_compare.py series <出力 png> <題> <ラベル>=<bag> ...   誤差の時間推移（stamp の時刻・実時間）
   python3 plot_motion_compare.py report <出力の接頭辞> <results.jsonl>      上の 3 つをまとめて（dev_log.md の 22. の図）
+  python3 plot_motion_compare.py candidates <出力 png> <results.jsonl> <題> <label>=<表示名> ...
+                                                                          1 つの動きで候補（label）ごとの指標（dev_log.md の 24.）
 
 動きの名前は compare_run.py の motion（accel, curve, slalom, reverse, spin, stops）。
 """
@@ -231,6 +233,50 @@ def report(prefix, results):
         print(f'saved {prefix}_series_{m}.png')
 
 
+CANDIDATE_METRICS = [
+    ('yaw_mean', 1, 'Yaw error, mean [deg]'),
+    ('trans_yaw_max', 1, 'Yaw error at command changes [deg]'),
+    ('trans_yaw[left turn]', 1, 'Yaw error at the turn start [deg]'),
+    ('trans_yaw[right turn]', 1, 'Yaw error at the reversal [deg]'),
+    ('trans_yaw[forward]', 1, 'Yaw error at turn to forward [deg]'),
+    ('trans_yaw[stop]', 1, 'Yaw error at the stop [deg]'),
+    ('z_mean', 1e3, 'Z error, mean [mm]'),
+    ('rt_yaw_mean', 1, 'Real-time yaw error, mean [deg]'),
+]
+
+
+def candidates(out, results, title, items):
+    """1 つの動きの候補ごとの指標（行 = 候補、点 = 平均、線 = 幅）."""
+    style()
+    rows = load_results(results)
+    labels = [lab for lab, _ in items]
+    fig, axes = plt.subplots(2, 4, figsize=(15, 5.6), facecolor=SURFACE, sharey=True)
+    ypos = {lab: len(labels) - 1 - i for i, lab in enumerate(labels)}
+    for ax, (key, scale, panel_title) in zip(axes.flat, CANDIDATE_METRICS):
+        ax.set_facecolor(SURFACE)
+        xmax = 0.0
+        for i, lab in enumerate(labels):
+            if i % 2 == 0:
+                ax.axhspan(ypos[lab] - 0.5, ypos[lab] + 0.5, color=BAND, lw=0, zorder=0)
+            v = np.array([r[key] for r in rows if r.get('label') == lab]) * scale
+            if not len(v):
+                continue
+            xmax = max(xmax, float(v.max()))
+            ax.plot([v.min(), v.max()], [ypos[lab]] * 2, color=SERIES[0], lw=2.0, solid_capstyle='round', zorder=2)
+            ax.plot(v.mean(), ypos[lab], 'o', color=SERIES[0], ms=7, mec=SURFACE, mew=1.5, zorder=3)
+        ax.set_title(panel_title, loc='left', fontsize=9.5)
+        ax.set_xlim(0, xmax * 1.1)   # 0 から（小さな差を大きく見せない）
+        ax.grid(axis='x', color=GRID, lw=0.6)
+        ax.set_yticks([ypos[lab] for lab in labels])
+        ax.set_yticklabels([text for _, text in items])
+        ax.set_ylim(-0.5, len(labels) - 0.5)
+    fig.suptitle(title + ' (dot = mean, line = range)', x=0.01, ha='left', fontsize=12, fontweight='bold')
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    capitalize_labels(fig)
+    fig.savefig(out, dpi=130, facecolor=SURFACE)
+    print(f'saved {out}')
+
+
 def main():
     cmd, out = sys.argv[1:3]
     if cmd == 'traj':
@@ -241,6 +287,8 @@ def main():
         series_plot(out, sys.argv[3], [a.split('=', 1) for a in sys.argv[4:]])
     elif cmd == 'report':
         report(out, sys.argv[3])
+    elif cmd == 'candidates':
+        candidates(out, sys.argv[3], sys.argv[4], [a.split('=', 1) for a in sys.argv[5:]])
     else:
         raise SystemExit(__doc__)
 
