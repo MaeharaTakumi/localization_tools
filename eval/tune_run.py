@@ -13,6 +13,7 @@
 """
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -159,9 +160,16 @@ def replay(in_bag, name, estimator, params, extra=()):
         stop(launch)
         stop(record)
         log.close()
-    # ノードが途中で落ちた回は使わない（例：パラメータを読めずに起動しなかった。正常なら全部 finished cleanly）
+    # ノードが再生の途中で落ちた回は使わない（例：パラメータを読めずに起動しなかった）。止める合図（launch の
+    # 'user interrupted'）より後に落ちたものは除く（止めるときの SIGINT や、終了時のまれなセグメンテーション違反）
+    died = []
     with open(f'/tmp/tune_{name}.log') as f:
-        died = sorted({line.split(']')[1].strip(' [') for line in f if 'process has died' in line})
+        for line in f:
+            if 'user interrupted' in line:
+                break
+            m = re.search(r'\[([^\]]+)\]: process has died \[pid \d+, exit code (-?\d+)', line)
+            if m:
+                died.append(f'{m.group(1)} (exit code {m.group(2)})')
     if died:
         raise RuntimeError(f'process died during the replay: {", ".join(died)} (see /tmp/tune_{name}.log)')
     return out_bag
