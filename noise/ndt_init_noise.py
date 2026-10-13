@@ -3,7 +3,7 @@
 
   python3 ndt_init_noise.py <止まる走行の bag> [--out /root/fig/ndt_init] [--passes 3] [--sigma ...]
 
-- bag は gazebo/drive_stops.py の走行（何か所かで止まる）。止まった区間は <bag>_phases.txt の stop_<名前>_start/_end。
+- bag は drive/profiles.yaml の stops の走行（何か所かで止まる）。止まった区間は <bag>_phases.txt の stop_<名前>_start/_end。
 - 真値：止まった区間（始めの --settle 秒を除く）の /wheelchair/pose の平均（車体）に、取付（/tf_static）を掛けた LiDAR の姿勢。
   止まっているので真値の時刻のずれ（header なし）は効かない。
 - NDT（pcl_localization、Gazebo の設定）だけを ROS_DOMAIN_ID=99 で起動し、bag の点群を流す。点群が届くたびに、

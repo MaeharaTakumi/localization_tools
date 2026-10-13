@@ -1,0 +1,74 @@
+# テスト走行の動き（drive_test.py。Gazebo・実機で共通）
+#
+# 速さは上限（config/<target>.yaml の limits）に対する割合で書く：
+#   v：前進は v_max、後退（負）は v_reverse_max に対する割合。w：w_max に対する割合（正が左回り）
+#   radius [m] を書くと円弧：v = radius x |w|（v が上限を超えるときは w を下げる）。reverse: true なら後ろ向きに進む
+# 区間の終わり（どれか 1 つ）：
+#   time [s]、yaw [deg]（向きの変化。符号は w と同じ）、distance [m]（車体の中心が進んだ道のり）
+#   stop [s]：止まる。label を書くと動作の開始時刻の記録が stop_<label>_start / stop_<label>_end になる
+#     （noise/ndt_init_noise.py が止まった区間として使う）
+#   slalom：{v, wavelength [m], amplitude [m], cycles}。向きを正弦波で変え、横に amplitude だけ振れる。
+#     最初と最後の半周期は振幅半分（向きの平均が初めの向きになり、終わりで元の向きに戻る）。長さは wavelength x (cycles + 1)
+# repeat: n と segments で繰り返す（name・label の {i} は 0 から n-1）
+#
+# 範囲（config の area。既定は出発地点を基準に前 10 m・後ろ 1 m・左右 2 m）に収まるように、距離・角度・半径で形を決めている。
+# 走る前に、計算した軌跡が範囲に収まるかを確かめる（--simulate で表示だけもできる）。
+
+spin:
+  description: その場で左に 1 周 → 右に 1 周 → 3 秒前進（回転は向きで 360°）
+  segments:
+    - {name: left turn, w: 1.0, yaw: 360}
+    - {name: right turn, w: -1.0, yaw: -360}
+    - {name: forward, v: 1.0, time: 3.0}
+
+stops:
+  description: 13 か所で 5 秒ずつ止まる（出発地点で 45° ずつ 8 方向 → 1.5 m 前進 → 90° ずつ 4 方向 + もう一度）
+  segments:
+    - repeat: 8
+      segments:
+        - {stop: 5.0, label: "A{i}"}
+        - {name: "turn A{i}", w: 0.5, yaw: 45}
+    - {name: forward, v: 0.333, distance: 1.5}
+    - repeat: 4
+      segments:
+        - {stop: 5.0, label: "B{i}"}
+        - {name: "turn B{i}", w: 0.5, yaw: 90}
+    - {stop: 5.0, label: B4}
+
+accel:
+  description: 直進の加減速・停止（1/3 → 2/3 → 1 → 1/3 → 停止 → 1 で急発進 → 急停止 → 2/3 で発進。計 8.5 m）
+  segments:
+    - {name: v 1/3, v: 0.333, distance: 1.0}
+    - {name: v 2/3, v: 0.667, distance: 1.5}
+    - {name: v 1, v: 1.0, distance: 2.5}
+    - {name: v 1/3 (decel), v: 0.333, distance: 0.5}
+    - {name: stop 1, stop: 2.0}
+    - {name: v 1 (start), v: 1.0, distance: 2.0}
+    - {name: stop 2, stop: 2.0}
+    - {name: v 2/3 (start), v: 0.667, distance: 1.0}
+
+curve:
+  description: 1.5 m 前進 → 8 の字（半径 0.75 m の左回り 1 周 → 右回り 1 周）を遅く・速くで 1 回ずつ
+  segments:
+    - {name: forward, v: 0.333, distance: 1.5}
+    - {name: left circle, radius: 0.75, w: 0.4, yaw: 360}
+    - {name: right circle, radius: 0.75, w: -0.4, yaw: -360}
+    - {name: left circle fast, radius: 0.75, w: 0.8, yaw: 360}
+    - {name: right circle fast, radius: 0.75, w: -0.8, yaw: -360}
+
+slalom:
+  description: 1 m 前進 → スラローム（波長 2.5 m、2 周期 + 前後の半周期、向きは最大 ±36°、横の振れ幅 約 0.7 m。計 8.5 m）
+  segments:
+    - {name: forward, v: 0.667, distance: 1.0}
+    - {name: slalom, slalom: {v: 0.667, wavelength: 2.5, amplitude: 0.25, cycles: 2}}
+
+reverse:
+  description: 3 m 前進 → 停止 → 1.5 m 後退 → 後退しながら右・左に 90° ずつ（S 字、半径 0.6 m）→ 止まらずに前進 → 止まらずに速い後退
+  segments:
+    - {name: forward, v: 0.333, distance: 3.0}
+    - {name: stop 1, stop: 1.0}
+    - {name: reverse, v: -0.625, distance: 1.5}
+    - {name: reverse right, radius: 0.6, w: -0.4, reverse: true, yaw: -90}
+    - {name: reverse left, radius: 0.6, w: 0.4, reverse: true, yaw: 90}
+    - {name: forward 2, v: 0.333, distance: 1.5}
+    - {name: reverse fast, v: -1.0, distance: 1.5}

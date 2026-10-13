@@ -34,7 +34,7 @@ python3 eval/bag_info.py write <bag> --source gazebo|real --drive '...' --purpos
 | `calib/` | **LiDAR の取付位置とオドメトリの倍率を推定する**（`estimate_calibration.py`、真値なし。図は `plot_calibration.py`） |
 | `eval/` | 録画の再生・評価・パラメータの調整（`tune_run.py`、`tune_batch.py`、`summarize.py`、`transition_eval.py`、`make_window_bag.py`）。候補は `batches/`、結果は `results/` |
 | `plot/` | 図（`plot_*.py`、`check_*.py`）。`plot_spin.py` は bag の読み込みや図の共通部品も持つ。`rerender_results.sh` で `workspace/results` の図を全部描き直す |
-| `gazebo/` | Gazebo での走行と録画（`run_gazebo_test.sh` はホストで実行）。走り方は `drive_spin.py`（左右 1 周 + 前進）、`drive_stops.py`（向き・位置を変えて 13 回止まる）、`drive_profile.py`（推定器の比較用：加減速・8 の字・スラローム・後退） |
+| `drive/` | **テスト走行と録画（Gazebo・実機共通）**：`run_test.sh`（ホストで実行）、`drive_test.py`（走らせる）、`profiles.yaml`（動き）、`config/gazebo.yaml`・`config/real.yaml`（速さの上限・走ってよい範囲・トピック・録画するトピック）、`config/real_in_gazebo.yaml`（実機の設定を Gazebo で試す） |
 | `test/` | Gazebo なしの合成データのテスト（robot_localization の経路） |
 
 ## R を求める（`noise/estimate_noise.py`）
@@ -54,7 +54,7 @@ python3 noise/estimate_noise.py /root/bags/gazebo/<録画> --out /root/fig/noise
 ## NDT の R を「真値 + ノイズ」の初期値で求める（`noise/ndt_init_noise.py`）
 
 ```bash
-DRIVE=drive_stops.py localization_tools/gazebo/run_gazebo_test.sh ekf_localizer stops_ekf   # ホスト：止まる走行を録る
+localization_tools/drive/run_test.sh gazebo stops stops_ekf                       # ホスト：止まる走行を録る
 python3 noise/ndt_init_noise.py /root/bags/gazebo/stops_ekf --out /root/fig/ndt_init_stops         # コンテナ（約 9 分）
 ```
 
@@ -97,14 +97,29 @@ python3 plot/plot_motion_compare.py report /root/fig/compare eval/results/result
 指標は stamp の時刻の 6 軸の誤差、実時間の誤差（100 Hz の各時刻に受信済みの最新の `/ekf_pose` とその時刻の真値の差）、
 切り替え時（指令が変わる瞬間の 0.1 s 前〜1 s 後）の yaw、推定の古さ。xy は地図と Gazebo の座標のずれ（場所で変わる）を含む。
 
-## Gazebo で走らせて録る（`gazebo/run_gazebo_test.sh`、ホストで実行）
+## テスト走行と録画（`drive/`、Gazebo・実機共通）
 
 ```bash
-localization_tools/gazebo/run_gazebo_test.sh <estimator> <bag 名> [launch の追加引数]
+localization_tools/drive/run_test.sh gazebo <動き> <bag 名> [estimator] [launch の追加引数]   # ホスト
+localization_tools/drive/run_test.sh real <動き> <bag 名>                                    # ホスト（端末から。確認がある）
+python3 drive/drive_test.py <gazebo|real> --list               # 動きの一覧
+python3 drive/drive_test.py <gazebo|real> <動き> --simulate    # 計算した軌跡と範囲（ROS 不要）
 ```
 
-Gazebo を起動し直して初期位置から、左 1 周 → 右 1 周 → 3 秒前進（1 rad/s、1.5 m/s）。始める前に `sync.sh push` する。
-走り方は `DRIVE` で変える（例 `DRIVE="drive_profile.py curve"`。`python3 gazebo/drive_profile.py curve --simulate` で部屋に収まるか計算できる）。
+- **動き**（`profiles.yaml`）：`spin`（その場で左右 1 周 + 3 秒前進）、`stops`（13 か所で止まる）、`accel`（加減速・停止、8.5 m）、
+  `curve`（半径 0.75 m の 8 の字）、`slalom`（波長 2.5 m）、`reverse`（後退・S 字・前後の切り替え）。速さは上限に対する割合、
+  直進は距離、旋回は角度、円は半径で決めるので、上限を変えても形・大きさは同じ。
+- **設定**（`config/<target>.yaml`）：速さの上限（Gazebo v 1.5・後退 0.8 m/s・ω 1.0 rad/s、実機 0.5・0.3・0.5）、走ってよい範囲
+  （出発時の車体の中心を基準に前 10 m・後ろ 1 m・左右 2 m。両方）、指令・姿勢・ジョイスティックのトピック、録画するトピック。
+- **安全**：走る前に計算した軌跡が範囲に収まるか確かめる。走行中は、範囲の外に出た・姿勢（Gazebo は真値、実機は `/ekf_pose`
+  を取付で車体に直したもの）が 0.5 s 届かない・ジョイスティックが倒された（実機）・時計が止まった・区間が 60 s を超えた・Ctrl-C
+  のどれかで 0 の指令を出して止める（止めた理由は録画の情報ファイルのメモに書く）。実機は計画を表示して `yes` と入力するまで走らない。
+  whill_driver も、指令が 1 s 途切れると止まり、ジョイスティックの操作を優先する。
+- **Gazebo**：起動し直して車椅子を初期位置に戻し、推定器を起動して走らせ、`/root/bags/gazebo/<bag 名>` に録る。
+- **実機**：自己位置推定（`/ekf_pose`）・whill_driver・LiDAR が動いていることを確かめてから、`/root/bags/real/<bag 名>` に録る
+  （推定の起動は自分で行う。地図と初期姿勢が要るため）。localizer_rl の `.bashrc` の通信設定を実機用にしておく。
+- **予行演習**：`CONFIG=real_in_gazebo drive/run_test.sh gazebo <動き> <bag 名>` で、実機の上限・`/ekf_pose`・ジョイスティックの
+  監視（`/test/joy_ts`）を Gazebo で試せる。
 
 ## 図
 

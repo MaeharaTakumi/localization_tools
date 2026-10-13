@@ -1,0 +1,39 @@
+# テスト走行・録画の設定：Gazebo（drive_test.py・run_test.sh）
+target: gazebo
+use_sim_time: true
+
+# 速さの上限（profiles.yaml の速さはこれに対する割合）[m/s]、[rad/s]
+limits: {v_max: 1.5, v_reverse_max: 0.8, w_max: 1.0}
+
+# 走ってよい範囲。出発時の車体の中心の位置・向きを基準に、前・後ろ・左・右へ何 m まで [m]
+area: {forward: 10.0, behind: 1.0, left: 2.0, right: 2.0}
+# 走る前に計算した軌跡（omega は指令の sim_omega_scale 倍とみなす）が、範囲の内側にこれだけ余裕があること [m]
+plan_margin: 0.2
+sim_omega_scale: 0.92
+
+# 速度の指令
+command: {topic: /wheelchair/diff_drive_controller/cmd_vel, type: twist_stamped, frame_id: base_link, rate: 50.0}
+# 走行中の車体の姿勢（向き・道のり・範囲の確認）。Gazebo は真値（base_footprint、geometry_msgs/Pose）
+feedback: {topic: /wheelchair/pose, type: pose}
+feedback_timeout: 0.5     # これより古い姿勢しか無いと止める [s]
+max_segment_time: 60.0    # 1 区間の打ち切り [s]
+confirm: false            # true なら走り出す前に確認する
+joystick: null            # 手での操作を検知して止める（実機だけ）
+
+# 録画するトピック（run_test.sh）。推定の出力も録る（再生では使わない）
+record_topics:
+  - /clock
+  - /velodyne_points
+  - /wheelchair/odom
+  - /wheelchair/joint_states
+  - /wheelchair/pose
+  - /wheelchair/diff_drive_controller/cmd_vel
+  - /tf_static
+  - /tf
+  - /localization/odom
+  - /ekf_pose
+  - /ekf_odom
+  - /odometry/global
+  - /odometry/local
+  - /ndt_pose
+  - /localization_debug

@@ -1,0 +1,35 @@
+# テスト走行の設定：実機の設定を Gazebo で試す（予行演習・安全のしくみの確認用）
+#   drive/run_test.sh gazebo <動き> <bag 名> と CONFIG=real_in_gazebo で使う。
+#   real.yaml と同じ上限・範囲で、姿勢は自己位置推定の /ekf_pose（Gazebo の取付で車体に直す）、ジョイスティックは /test/joy_ts
+#   （ros2 topic pub で値を出すと止まるかを確かめられる）。指令と録画のトピックは Gazebo のもの
+target: gazebo
+use_sim_time: true
+limits: {v_max: 0.5, v_reverse_max: 0.3, w_max: 0.5}
+area: {forward: 10.0, behind: 1.0, left: 2.0, right: 2.0}
+plan_margin: 0.2
+sim_omega_scale: 0.92
+command: {topic: /wheelchair/diff_drive_controller/cmd_vel, type: twist_stamped, frame_id: base_link, rate: 50.0}
+feedback:
+  topic: /ekf_pose
+  type: pose_with_covariance
+  mount: {xyz: [-0.17, 0.0, 1.1377], rpy: [0.0, 0.0, 0.0]}   # Gazebo の URDF の base_footprint -> velodyne
+feedback_timeout: 0.5
+max_segment_time: 60.0
+confirm: true
+joystick: {topic: /test/joy_ts, threshold: 5.0}
+record_topics:
+  - /clock
+  - /velodyne_points
+  - /wheelchair/odom
+  - /wheelchair/joint_states
+  - /wheelchair/pose
+  - /wheelchair/diff_drive_controller/cmd_vel
+  - /tf_static
+  - /tf
+  - /localization/odom
+  - /ekf_pose
+  - /ekf_odom
+  - /odometry/global
+  - /odometry/local
+  - /ndt_pose
+  - /localization_debug

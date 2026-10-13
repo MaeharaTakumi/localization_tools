@@ -4,7 +4,7 @@
   python3 estimate_calibration.py <bag> [<bag> ...] [--out /root/fig/calib] [--truth] [--map <地図の pcd>]
 
 使う走行：その場の旋回（取付位置・omega の倍率）と直進（v の倍率・取付の yaw）。区間は指令（cmd_vel）が一定のところ
-（変化の --settle 秒後から次の変化の --margin 秒前まで）。gazebo/drive_spin.py・drive_stops.py の走行で求まる。
+（変化の --settle 秒後から次の変化の --margin 秒前まで）。drive/profiles.yaml の spin・stops の走行で求まる。
 
 - omega の倍率：旋回の区間ごとに、NDT の yaw の変化 / オドメトリの omega の積分（全区間の和の比）
 - v の倍率：直進の区間ごとに、NDT の LiDAR の移動距離 / オドメトリの v の積分（向きが一定なので LiDAR と車体の移動は同じ）

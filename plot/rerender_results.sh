@@ -23,4 +23,5 @@ run python3 plot_motion_compare.py candidate-series $O/alpha_spin $R/results_alp
 run python3 plot_odom_r.py $O/odom_r.png $B/drive_accel $B/drive_curve $B/drive_slalom $B/drive_reverse $B/spin360_w1_ekf2 $B/stops_ekf
 run python3 plot_motion_compare.py candidates $O/alpha_r0_spin.png $R/results_alpha.jsonl "R_odom near 0 with odom_noise_alpha, ekf_localizer: spin in place, 4 runs each" "ekf_a0_b=Current: R_odom default, alpha 0" "ekf_r0_a0=R_odom 1e-6, alpha 0" "ekf_r0_w0.005=R_odom 1e-6, omega² 0.005" "ekf_r0_w0.05=R_odom 1e-6, omega² 0.05" "ekf_r0_v0.005=R_odom 1e-6, v² 0.005" "ekf_r0_vw0.005=R_odom 1e-6, both 0.005"
 run python3 plot_motion_compare.py candidate-series $O/alpha_r0_spin $R/results_alpha.jsonl spin "R_odom near 0 with odom_noise_alpha, spin in place" "ekf_a0_b=Current" "ekf_r0_a0=R_odom 1e-6, alpha 0" "ekf_r0_w0.05=R_odom 1e-6, omega² 0.05" "ekf_r0_v0.005=R_odom 1e-6, v² 0.005" "ekf_r0_vw0.005=R_odom 1e-6, both 0.005"
+run python3 plot_drive_paths.py $O/drive_paths_gazebo.png gazebo spin=$B/test_spin stops=$B/test_stops accel=$B/test_accel curve=$B/test_curve slalom=$B/test_slalom reverse=$B/test_reverse
 ls $O

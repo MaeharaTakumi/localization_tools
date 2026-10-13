@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""run_gazebo_test.sh の bag（推定器ごと）から、/ekf_pose の誤差と NDT の angle_diff の時間推移を描く.
+"""drive/run_test.sh の録画（推定器ごと）から、/ekf_pose の誤差と NDT の angle_diff の時間推移を描く.
 
   python3 plot_spin.py <出力 png> <ラベル>=<bag>[@<姿勢のトピック>] ...
   姿勢のトピックは map -> LiDAR の PoseWithCovarianceStamped（既定 /ekf_pose。NDT 単体なら /ndt_pose）

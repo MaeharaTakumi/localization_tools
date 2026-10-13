@@ -113,16 +113,17 @@ def odom_check(bag):
         if moving.sum() < 50:
             continue
         sig = np.array(jsig[key])[o]
-        best = None
+        cands = []
         for n in (1, 10):
             avg = np.convolve(sig, np.ones(n) / n)[:len(sig)]   # 直近 n 個の平均（diff_drive_controller と同じ向き）
             # 倍率（wheel_separation_multiplier）が違っても比べられるよう、最小二乗の倍率を掛けてから差を取る
             k, rms = fit(np.interp(ot, jt, avg), obs, moving)
-            if best is None or rms < best[1]:
-                best = (n, rms, k)
-        out['odom_window'] = best[0]
+            cands.append((rms, n, k))
+        cands.sort()
         if key == 'omega':
-            out['odom_omega_ratio'] = round(best[2], 3)
+            out['odom_omega_ratio'] = round(cands[0][2], 3)
+        # 速度がほとんど変わらない（短い・遅い）録画では、どちらの平均にも同じくらい合うので判定しない
+        out['odom_window'] = cands[0][1] if cands[0][0] < 0.7 * cands[1][0] else 'unknown'
         break
     return out
 

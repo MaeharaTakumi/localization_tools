@@ -1,0 +1,61 @@
+# テスト走行・録画の設定：実機（WHILL CR + VLP-16。ラズパイは acsl-tcu/project_whill）
+#
+# 実機の車椅子とLiDAR はラズパイ（ホスト名 Drp5_whill_blue）の project_whill が動かす：
+#   whill_driver（名前空間 /<ホスト名>/whill_node）：~/cmd_vel（Twist、m/s・rad/s）を受け、~/motor_speed_ts（左右輪の速度
+#     km/h、x = 右、y = 左）・~/motor_angle_ts・~/joy_ts（ジョイスティック）・~/speed_mode・~/battery_* を 50 Hz で出す。
+#     指令が 1 s 途切れると止まる。ジョイスティックを倒すと指令は無視される。変換の上限は前進 1.67 m/s、後退 0.56 m/s、旋回 約 0.83 rad/s
+#   velodyne（VLP-16、rpm 1200 = 20 Hz）：/velodyne_points（launch の namespace 引数は公式の launch では使われないので名前空間なし）
+#   ublox（RTK-GNSS、屋外）：/fix など
+# 自己位置推定の PC（localizer_rl）から LAN 越しに使う（.bashrc の通信設定を実機用に切り替える）。
+target: real
+use_sim_time: false
+
+# 速さの上限（profiles.yaml の速さはこれに対する割合）[m/s]、[rad/s]（ユーザー指示の既定）
+limits: {v_max: 0.5, v_reverse_max: 0.3, w_max: 0.5}
+
+# 走ってよい範囲。出発時の車体の中心の位置・向きを基準に、前・後ろ・左・右へ何 m まで [m]（ユーザー指示の既定）
+area: {forward: 10.0, behind: 1.0, left: 2.0, right: 2.0}
+plan_margin: 0.2
+sim_omega_scale: 1.0      # 実機の旋回の倍率は未校正
+
+# 速度の指令（whill_driver）
+command: {topic: /Drp5_whill_blue/whill_node/cmd_vel, type: twist, rate: 50.0}
+# 走行中の車体の姿勢：自己位置推定の /ekf_pose（map -> LiDAR）を取付で車体（base_link）に直す。
+# mount は base_link -> velodyne（localization_bringup の param/env/real.yaml の static_tfs と同じにする）
+feedback:
+  topic: /ekf_pose
+  type: pose_with_covariance
+  mount: {xyz: [-0.17, 0.0, 1.2], rpy: [0.0, 0.0, 0.017]}
+feedback_timeout: 0.5     # 自己位置がこれより古いと止める [s]（推定が止まったとき）
+max_segment_time: 60.0
+confirm: true             # 走り出す前に計画を表示して確認する
+# 手での操作（ジョイスティック）を検知したら止める。joy_ts の x, y（±100 %）の絶対値がしきい値を超えたら
+joystick: {topic: /Drp5_whill_blue/whill_node/joy_ts, threshold: 5.0}
+
+# 録画するトピック（run_test.sh）
+record_topics:
+  # ラズパイ（project_whill）
+  - /velodyne_points
+  - /Drp5_whill_blue/whill_node/motor_speed_ts
+  - /Drp5_whill_blue/whill_node/motor_angle_ts
+  - /Drp5_whill_blue/whill_node/joy_ts
+  - /Drp5_whill_blue/whill_node/cmd_vel
+  - /Drp5_whill_blue/whill_node/speed_mode
+  - /Drp5_whill_blue/whill_node/battery_level
+  - /Drp5_whill_blue/whill_node/battery_current
+  # RTK-GNSS（屋外で動かしているとき。無ければ 0 件のまま）
+  - /fix
+  - /fix_velocity
+  - /navpvt
+  # 自己位置推定の PC（whill_odometry・取付・推定の出力）
+  - /wheelchair/odom
+  - /tf_static
+  - /tf
+  - /initialpose
+  - /localization/odom
+  - /ekf_pose
+  - /ekf_odom
+  - /odometry/global
+  - /odometry/local
+  - /ndt_pose
+  - /localization_debug
