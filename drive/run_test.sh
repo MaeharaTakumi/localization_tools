@@ -18,7 +18,7 @@
 #   速さの上限・走ってよい範囲・トピックは drive/config/<target>.yaml。
 #   環境変数：PURPOSE（録画の用途。<bag 名>_info.yaml に書く）、CONFIG（設定の yaml のコンテナ内のパス。既定は target の設定）、
 #             WHILL（実機の車椅子の色 blue・red・white。既定は設定の whill。自己位置推定の launch の whill:=<色> と合わせる）
-#   録画の隣に <bag 名>_phases.txt（動作の開始時刻）と <bag 名>_info.yaml（eval/bag_info.py）を書く。
+#   録画の隣に <bag 名>_phases.txt（動作の開始時刻）、<bag 名>_drive.log（drive_test.py の出力）、<bag 名>_info.yaml（eval/bag_info.py）を書く。
 set -u
 # ros2 topic の CLI は --no-daemon で使う。timeout の中で最初の ros2 が CLI のデーモンを起動すると、デーモンが timeout の
 # プロセスグループに入り、時間切れのシグナルで壊れる（以後 ros2 topic が「!rclpy.ok()」で落ちる。2026-10-14 に起きた）
@@ -93,7 +93,7 @@ if [ "$target" = gazebo ]; then
   fi
   echo "== start recording and $est"
   [ "$(count_loc)" = 0 ] || { echo "localization processes are still running in ${WHERE:-this container}"; exit 1; }
-  cx "rm -rf $BAGS/$bag $BAGS/${bag}_phases.txt $BAGS/${bag}_info.yaml"
+  cx "rm -rf $BAGS/$bag $BAGS/${bag}_phases.txt $BAGS/${bag}_drive.log $BAGS/${bag}_info.yaml"
   cbg "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$bag.log 2>&1"
   sleep 3
   cbg "ros2 launch localization_bringup localization.launch.py env:=gazebo estimator:=$est rviz:=false $extra > /tmp/launch_$bag.log 2>&1"
@@ -124,7 +124,7 @@ else
   status=$?
 fi
 
-cx "cp /tmp/drive_phases.txt $BAGS/${bag}_phases.txt"
+cx "cp /tmp/drive_phases.txt $BAGS/${bag}_phases.txt; cp /tmp/drive_$bag.log $BAGS/${bag}_drive.log"
 sleep 3
 echo "== stop"
 stop_bg "ros2 bag record -o $BAGS/$bag"
@@ -137,6 +137,6 @@ else
   sleep 5
 fi
 notes=$(cx "$DT $profile --describe" | tail -1)
-[ "$status" = 0 ] || notes="走行を途中で止めた（drive_test.py の終了コード $status、ログ ${WHERE}/tmp/drive_$bag.log）。$notes"
+[ "$status" = 0 ] || notes="走行を途中で止めた（drive_test.py の終了コード $status、ログ ${bag}_drive.log）。$notes"
 cx "python3 $T/eval/bag_info.py write $BAGS/$bag --source $target --drive 'drive/drive_test.py $profile' --purpose '${PURPOSE:-}' --notes '$notes'"
 exit $status

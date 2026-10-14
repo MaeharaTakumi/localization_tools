@@ -14,7 +14,7 @@
 
 | 場所 | 中身 |
 |---|---|
-| `/root/ros2_ws/bags/gazebo/<名前>` | Gazebo の録画。隣に `<名前>_phases.txt`（動作の開始時刻）と `<名前>_info.yaml`（録画の情報） |
+| `/root/ros2_ws/bags/gazebo/<名前>` | Gazebo の録画。隣に `<名前>_phases.txt`（動作の開始時刻）、`<名前>_drive.log`（テスト走行のログ。2026-10-14 から）、`<名前>_info.yaml`（録画の情報） |
 | `/root/ros2_ws/bags/gazebo/tune/<試行名>` | その再生の出力（`tune_run.py`・`compare_run.py`。結果の行の `out_bag`） |
 | `/root/ros2_ws/bags/real/<名前>`、`/root/ros2_ws/bags/real/tune/` | 実機の録画とその再生の出力（同じく `_info.yaml` を付ける） |
 
@@ -34,7 +34,7 @@ python3 eval/bag_info.py write <bag> --source gazebo|real --drive '...' --purpos
 | `noise/` | **観測ノイズ R を求める**：`estimate_noise.py`（真値なし、走行中の残差）、`ndt_init_noise.py`（NDT の R を「真値 + ノイズ」の初期値で計算し直して求める）。図は `plot_noise.py` |
 | `calib/` | **LiDAR の取付位置とオドメトリの倍率を推定する**（`estimate_calibration.py`、真値なし。図は `plot_calibration.py`） |
 | `eval/` | 録画の再生・評価・パラメータの調整（`tune_run.py`、`tune_batch.py`、`summarize.py`、`transition_eval.py`、`make_window_bag.py`）。候補は `batches/`、結果は `results/` |
-| `plot/` | 図（`plot_*.py`、`check_*.py`）。`plot_spin.py` は bag の読み込みや図の共通部品も持つ。`rerender_results.sh` で `workspace/results` の図を全部描き直す |
+| `plot/` | 図（`plot_*.py`、`check_*.py`）。`plot_spin.py` は bag の読み込みや図の共通部品も持つ。`rerender_results.sh` で `workspace/results` の図を全部描き直す（NDT の R の図は計算に約 9 分かかるので `FULL=1` のときだけ） |
 | `drive/` | **テスト走行と録画（Gazebo・実機共通）**：`run_test.sh`（ホストで実行）、`drive_test.py`（走らせる）、`profiles.yaml`（動き）、`config/gazebo.yaml`・`config/real.yaml`（速さの上限・走ってよい範囲・トピック・録画するトピック）、`config/real_in_gazebo.yaml`（実機の設定を Gazebo で試す） |
 | `test/` | Gazebo なしの合成データのテスト（robot_localization の経路） |
 

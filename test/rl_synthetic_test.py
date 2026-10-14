@@ -18,6 +18,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy
 from rosgraph_msgs.msg import Clock
 from sensor_msgs.msg import PointCloud2
 
+sys.dont_write_bytecode = True   # src の scripts に __pycache__ を作らない
 sys.path.insert(0, '/root/ros2_ws/src/localization_bringup/scripts')
 from robot_localization_adapter import (  # noqa: E402
     fill_pose_msg, matrix_to_vec, pose_msg_to_matrix, vec_to_matrix, wrap)
