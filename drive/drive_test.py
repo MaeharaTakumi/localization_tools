@@ -429,7 +429,7 @@ def main():
     ap.add_argument('--describe', action='store_true', help='動きと設定を 1 行で（録画の情報ファイル用）')
     ap.add_argument('--whill', default=None, help='実機の車椅子の色（blue・red・white）。既定は設定の whill')
     ap.add_argument('--command-topic', action='store_true', help='指令のトピック（run_test.sh が使う）')
-    args = ap.parse_args()
+    args = ap.parse_intermixed_args()   # run_test.sh は target --whill <色> profile の順で渡す
     cfg = load_config(args.target, args.whill)
     if args.command_topic:
         print(cfg['command']['topic'])
