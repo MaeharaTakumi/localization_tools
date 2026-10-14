@@ -100,9 +100,14 @@ python3 plot/plot_motion_compare.py report /root/ros2_ws/fig/compare eval/result
 
 ## テスト走行と録画（`drive/`、Gazebo・実機共通）
 
+`run_test.sh` はホストからでも、自己位置推定のコンテナの中（docker が無い）からでも実行できる。ホストからは `docker exec` で
+コンテナ（`LOC`、既定 `test_maehara`）に入って動かし、コンテナの中ではその場で直接動かす（そのスクリプトのある
+`localization_tools` を使うので、置き場所は `/root/localization_tools` でもよい）。コンテナの中からは Gazebo を起動し直せないので、
+Gazebo のときは Gazebo が動いていて車椅子が初期位置にあること。
+
 ```bash
-localization_tools/drive/run_test.sh gazebo <動き> <bag 名> [estimator] [launch の追加引数]   # ホスト
-localization_tools/drive/run_test.sh real <動き> <bag 名>                                    # ホスト（端末から。確認がある）
+localization_tools/drive/run_test.sh gazebo <動き> <bag 名> [estimator] [launch の追加引数]   # ホストかコンテナの中
+localization_tools/drive/run_test.sh real <動き> <bag 名>                                    # 端末から（確認がある）
 python3 drive/drive_test.py <gazebo|real> --list               # 動きの一覧
 python3 drive/drive_test.py <gazebo|real> <動き> --simulate    # 計算した軌跡と範囲（ROS 不要）
 ```
