@@ -15,7 +15,7 @@
 #     走り出す前に計画を表示して確認するので、端末から実行する。録画は /root/ros2_ws/bags/real/<bag 名>（同じ名前は止める）
 #
 #   <bag 名> を check/<名前> にすると bags/<target>/check/ に録る（ツールの動作確認など、比較・調整に使わない録画）。
-#   <動き> は drive/profiles.yaml（spin・stops・accel・curve・slalom・reverse。drive/drive_test.py <target> --list）。
+#   <動き> は drive/profiles.yaml（spin・spin5・stops・accel・curve・slalom・reverse。drive/drive_test.py <target> --list）。
 #   速さの上限・走ってよい範囲・トピックは drive/config/<target>.yaml。
 #   環境変数：PURPOSE（録画の用途。<bag 名>_info.yaml に書く）、CONFIG（設定の yaml のコンテナ内のパス。既定は target の設定）、
 #             WHILL（実機の車椅子の色 blue・red・white。既定は設定の whill。自己位置推定の launch の whill:=<色> と合わせる）

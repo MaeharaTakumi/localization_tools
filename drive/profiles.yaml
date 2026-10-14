@@ -21,6 +21,24 @@ spin:
     - {name: right turn, w: -1.0, yaw: -360}
     - {name: forward, v: 1.0, time: 3.0}
 
+# 区間は 1 周ずつ（実機の 0.5 rad/s で 5 周を 1 区間にすると約 63 s で、max_segment_time 60 s を超える）。
+# 各方向の最初の周を left turn・right turn にして、spin と同じ名前で回転の始まり・反転・前進への切り替えが分かるようにする
+# （tune_run.py・plot_spin.py などはこの名前を使う）
+spin5:
+  description: その場で左に 5 周 → 右に 5 周 → 3 秒前進（1 周ずつの区間。回転は向きで 360° x 5）
+  segments:
+    - {name: left turn, w: 1.0, yaw: 360}
+    - {name: left turn lap 2, w: 1.0, yaw: 360}
+    - {name: left turn lap 3, w: 1.0, yaw: 360}
+    - {name: left turn lap 4, w: 1.0, yaw: 360}
+    - {name: left turn lap 5, w: 1.0, yaw: 360}
+    - {name: right turn, w: -1.0, yaw: -360}
+    - {name: right turn lap 2, w: -1.0, yaw: -360}
+    - {name: right turn lap 3, w: -1.0, yaw: -360}
+    - {name: right turn lap 4, w: -1.0, yaw: -360}
+    - {name: right turn lap 5, w: -1.0, yaw: -360}
+    - {name: forward, v: 1.0, time: 3.0}
+
 stops:
   description: 13 か所で 5 秒ずつ止まる（出発地点で 45° ずつ 8 方向 → 1.5 m 前進 → 90° ずつ 4 方向 + もう一度）
   segments:
