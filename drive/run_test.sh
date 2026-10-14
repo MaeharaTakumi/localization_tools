@@ -1,12 +1,12 @@
 #!/bin/bash
-# テスト走行と録画（ホストで実行）。自己位置推定のコンテナ（localizer_rl）で録画し、drive/drive_test.py で走らせる
+# テスト走行と録画（ホストで実行）。自己位置推定のコンテナ（test_maehara）で録画し、drive/drive_test.py で走らせる
 #
 #   drive/run_test.sh gazebo <動き> <bag 名> [estimator] [launch の追加引数（例 use_ekf:=false）]
 #     Gazebo を起動し直して車椅子を初期位置に戻し、推定器（既定 ekf_localizer）を起動して走らせる。
-#     録画は localizer_rl:/root/ros2_ws/bags/gazebo/<bag 名>（同じ名前があれば上書き）
+#     録画は test_maehara:/root/ros2_ws/bags/gazebo/<bag 名>（同じ名前があれば上書き）
 #   drive/run_test.sh real <動き> <bag 名>
 #     実機。自己位置推定（/ekf_pose）・whill_driver・LiDAR が動いていること（推定の起動は自分で行う。地図・初期姿勢が要るため）。
-#     走り出す前に計画を表示して確認するので、端末から実行する。録画は localizer_rl:/root/ros2_ws/bags/real/<bag 名>（同じ名前は止める）
+#     走り出す前に計画を表示して確認するので、端末から実行する。録画は test_maehara:/root/ros2_ws/bags/real/<bag 名>（同じ名前は止める）
 #
 #   <動き> は drive/profiles.yaml（spin・stops・accel・curve・slalom・reverse。drive/drive_test.py <target> --list）。
 #   速さの上限・走ってよい範囲・トピックは drive/config/<target>.yaml。
@@ -17,7 +17,7 @@ set -u
 target=${1:?gazebo か real}; profile=${2:?動き}; bag=${3:?bag 名}
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(dirname "$here")   # localization_tools
-LOC=localizer_rl; GZ=20261002
+LOC=test_maehara; GZ=20261002
 T=/root/localization_tools
 CFG=${CONFIG:-$target}
 DT="python3 $T/drive/drive_test.py $CFG ${WHILL:+--whill $WHILL}"
@@ -96,6 +96,6 @@ else
   sleep 5
 fi
 notes=$(dexec "$DT $profile --describe" | tail -1)
-[ "$status" = 0 ] || notes="走行を途中で止めた（drive_test.py の終了コード $status、ログ localizer_rl:/tmp/drive_$bag.log）。$notes"
+[ "$status" = 0 ] || notes="走行を途中で止めた（drive_test.py の終了コード $status、ログ test_maehara:/tmp/drive_$bag.log）。$notes"
 dexec "python3 $T/eval/bag_info.py write $BAGS/$bag --source $target --drive 'drive/drive_test.py $profile' --purpose '${PURPOSE:-}' --notes '$notes'"
 exit $status

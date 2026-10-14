@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""同じ録画を再生した各推定器の出力について、6 軸と処理時間の推移を描く（localizer_rl 内で実行）.
+"""同じ録画を再生した各推定器の出力について、6 軸と処理時間の推移を描く（test_maehara 内で実行）.
 
   python3 plot_axes.py <出力の接頭辞> <ラベル>=<bag>@<姿勢のトピック> ...
   出力: <接頭辞>_position.png（x, y, z。LiDAR と車体）、<接頭辞>_orientation.png（roll, pitch, yaw）、

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""tune_run.py を設定のリスト（JSON）ごとに順に動かし、結果を JSON Lines に追記する（localizer_rl 内で実行）.
+"""tune_run.py を設定のリスト（JSON）ごとに順に動かし、結果を JSON Lines に追記する（test_maehara 内で実行）.
 
   python3 tune_batch.py <入力 bag> <設定の JSON> <結果の jsonl>
   設定の JSON: [{"name": ..., "estimator": ..., "params": {...}}, ...]

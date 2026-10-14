@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gazebo なしのテスト用 env を作る（localizer_rl 内で実行）：インストール済みの gazebo.yaml に、
+"""Gazebo なしのテスト用 env を作る（test_maehara 内で実行）：インストール済みの gazebo.yaml に、
 Gazebo の robot_state_publisher が配信する URDF の取付を static_tfs として足す.
 
   python3 make_test_env.py [出力パス（既定 /tmp/env_gazebo_test.yaml）]

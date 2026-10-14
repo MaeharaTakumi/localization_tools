@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""録画（drive/run_test.sh の bag）を再生して、候補のパラメータで推定器を動かし、指標を出す（localizer_rl 内で実行）.
+"""録画（drive/run_test.sh の bag）を再生して、候補のパラメータで推定器を動かし、指標を出す（test_maehara 内で実行）.
 
   python3 tune_run.py <入力 bag> <試行名> <estimator> '<parameters の JSON>' ['<launch の追加引数>']
 

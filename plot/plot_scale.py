@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""オドメトリの omega の倍率の補正（Gazebo の wheel_separation_multiplier と推定側の odom_scale）を図にする（localizer_rl 内で実行）.
+"""オドメトリの omega の倍率の補正（Gazebo の wheel_separation_multiplier と推定側の odom_scale）を図にする（test_maehara 内で実行）.
 
   python3 plot_scale.py <出力の接頭辞> <results の jsonl> ...
 

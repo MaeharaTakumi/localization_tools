@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""推定器の比較（eval/compare_run.py）の図（localizer_rl 内で実行）.
+"""推定器の比較（eval/compare_run.py）の図（test_maehara 内で実行）.
 
   python3 plot_motion_compare.py traj <出力 png> <動き>=<bag> ...            真値の軌跡（地図の壁の上）
   python3 plot_motion_compare.py summary <出力 png> <results.jsonl>          動きごと・推定器ごとの指標（4 回の平均と幅）

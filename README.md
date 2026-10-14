@@ -1,15 +1,15 @@
 # localization_tools
 
 自己位置推定（`localization_bringup`、ekf_localizer / robot_localization）の検証・調整・描画のプログラム。
-**編集はホスト（`workspace/localization_tools`）、実行は自己位置推定コンテナ `localizer_rl` の `/root/localization_tools`**。
+**編集はホスト（`workspace/localization_tools`）、実行は自己位置推定コンテナ `test_maehara` の `/root/localization_tools`**。
 
 ```bash
 ./sync.sh push   # ホスト -> コンテナ（eval/results の既存のファイルはコンテナ側を残す）
 ./sync.sh pull   # コンテナ -> ホスト（eval/results と /root/ros2_ws/fig の図を workspace/results へ）
 ```
 
-コンテナ内のコマンドは ROS の環境が要るので `docker exec localizer_rl bash -ic '...'` で実行する。
-録画（bag）は `localizer_rl:/root/ros2_ws/bags` の下に、**Gazebo と実機で分けて**置く（`eval/bag_paths.py`）。図は `/root/ros2_ws/fig`。
+コンテナ内のコマンドは ROS の環境が要るので `docker exec test_maehara bash -ic '...'` で実行する。
+録画（bag）は `test_maehara:/root/ros2_ws/bags` の下に、**Gazebo と実機で分けて**置く（`eval/bag_paths.py`）。図は `/root/ros2_ws/fig`。
 
 | 場所 | 中身 |
 |---|---|
@@ -117,7 +117,7 @@ python3 drive/drive_test.py <gazebo|real> <動き> --simulate    # 計算した�
   whill_driver も、指令が 1 s 途切れると止まり、ジョイスティックの操作を優先する。
 - **Gazebo**：起動し直して車椅子を初期位置に戻し、推定器を起動して走らせ、`/root/ros2_ws/bags/gazebo/<bag 名>` に録る。
 - **実機**：自己位置推定（`/ekf_pose`）・whill_driver・LiDAR が動いていることを確かめてから、`/root/ros2_ws/bags/real/<bag 名>` に録る
-  （推定の起動は自分で行う。地図と初期姿勢が要るため）。localizer_rl の `.bashrc` の通信設定を実機用にしておく。
+  （推定の起動は自分で行う。地図と初期姿勢が要るため）。test_maehara の `.bashrc` の通信設定を実機用にしておく。
   車椅子は `WHILL=blue|red|white`（既定は `config/real.yaml` の `whill: blue`。自己位置推定の launch の `whill:=<色>` と合わせる。
   選んだ色の `cmd_vel` を受けるノードが無ければ、見つかった車椅子を表示して止める）。録画するのは点群・`motor_speed_ts`・
   `cmd_vel`・バッテリーと推定の出力（`motor_angle_ts`・`joy_ts`・`speed_mode`・GNSS は録らない）。

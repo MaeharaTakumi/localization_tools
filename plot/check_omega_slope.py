@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""omega が変わるとき（回転開始・反転）の傾きを、真値・オドメトリ・車輪の角速度で比べる（localizer_rl 内で実行）.
+"""omega が変わるとき（回転開始・反転）の傾きを、真値・オドメトリ・車輪の角速度で比べる（test_maehara 内で実行）.
 
   python3 check_omega_slope.py <出力 png> <bag>   （bag に /wheelchair/joint_states が無ければ、真値とオドメトリだけ）
 

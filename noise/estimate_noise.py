@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""観測ノイズの共分散 R（オドメトリ・NDT）を、真値を使わずに録画から求める（localizer_rl 内で実行）.
+"""観測ノイズの共分散 R（オドメトリ・NDT）を、真値を使わずに録画から求める（test_maehara 内で実行）.
 
   python3 estimate_noise.py <bag> [--out <出力の接頭辞>] [--truth] [オプション]
 

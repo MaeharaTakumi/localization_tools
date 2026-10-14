@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""オドメトリと各推定器の v・omega の推移を、真値と比べて描く（localizer_rl 内で実行）.
+"""オドメトリと各推定器の v・omega の推移を、真値と比べて描く（test_maehara 内で実行）.
 
   python3 plot_velocity.py <出力の接頭辞> <入力 bag> <odom_delay [s]> \\
       <推定器名>:<調整前の bag>:<調整後の bag>:<トピック> ...

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""テスト走行（drive/drive_test.py）の軌跡を、出発時の車体の位置・向きを基準に、走ってよい範囲と重ねて描く（localizer_rl 内で実行）.
+"""テスト走行（drive/drive_test.py）の軌跡を、出発時の車体の位置・向きを基準に、走ってよい範囲と重ねて描く（test_maehara 内で実行）.
 
   python3 plot_drive_paths.py <出力 png> <設定（gazebo・real・yaml のパス）> <動き>=<bag>[@<姿勢のトピック>] ...
 

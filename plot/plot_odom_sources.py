@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gazebo のオドメトリの取り方（diff_drive の 0.2 s 移動平均 / それを 0.09 s 戻したもの / 車輪の角速度）を比べる図（localizer_rl 内で実行）.
+"""Gazebo のオドメトリの取り方（diff_drive の 0.2 s 移動平均 / それを 0.09 s 戻したもの / 車輪の角速度）を比べる図（test_maehara 内で実行）.
 
   python3 plot_odom_sources.py <出力の接頭辞> <入力 bag> <results の jsonl>
 

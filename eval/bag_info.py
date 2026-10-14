@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""録画（bag）の情報ファイル <bag>_info.yaml を書く・一覧を出す（localizer_rl 内で実行）.
+"""録画（bag）の情報ファイル <bag>_info.yaml を書く・一覧を出す（test_maehara 内で実行）.
 
   python3 bag_info.py write <bag> --source gazebo|real [--drive ...] [--purpose ...] [--notes ...]
                                   [--estimator ...] [--odom-window N]

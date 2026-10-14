@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LiDAR の取付位置とオドメトリの倍率を、NDT の解とオドメトリから推定する（真値なし。localizer_rl 内で実行）.
+"""LiDAR の取付位置とオドメトリの倍率を、NDT の解とオドメトリから推定する（真値なし。test_maehara 内で実行）.
 
   python3 estimate_calibration.py <bag> [<bag> ...] [--out /root/ros2_ws/fig/calib] [--truth] [--map <地図の pcd>]
 

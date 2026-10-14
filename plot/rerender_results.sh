@@ -1,5 +1,5 @@
 #!/bin/bash
-# results の図をすべて描き直す（localizer_rl 内で実行。図は /root/ros2_ws/fig に出る。ホストで sync.sh pull すると workspace/results へ）
+# results の図をすべて描き直す（test_maehara 内で実行。図は /root/ros2_ws/fig に出る。ホストで sync.sh pull すると workspace/results へ）
 set -u
 T0=/root/localization_tools
 cd $T0/plot

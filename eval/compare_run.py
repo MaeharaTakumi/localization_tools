@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""推定器の比較：録画を再生して推定器を動かし、どの動きにも使える指標を出す（localizer_rl 内で実行）.
+"""推定器の比較：録画を再生して推定器を動かし、どの動きにも使える指標を出す（test_maehara 内で実行）.
 
   python3 compare_run.py run <入力 bag> <試行名> <estimator> ['<parameters の JSON>']   再生して指標（1 行 JSON）
   python3 compare_run.py eval <出力 bag> [<姿勢のトピック>]                              再生済みの bag の指標だけ

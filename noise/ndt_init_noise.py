@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NDT の観測ノイズ R_ndt を、「真値 + ノイズ」を初期値にして NDT を計算し直して求める（localizer_rl 内で実行）.
+"""NDT の観測ノイズ R_ndt を、「真値 + ノイズ」を初期値にして NDT を計算し直して求める（test_maehara 内で実行）.
 
   python3 ndt_init_noise.py <止まる走行の bag> [--out /root/ros2_ws/fig/ndt_init] [--passes 3] [--sigma ...]
 

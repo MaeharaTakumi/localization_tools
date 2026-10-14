@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gazebo の左右車輪の回転から v・omega を計算し、diff_drive_controller のオドメトリと真値に照らし合わせる（localizer_rl 内で実行）.
+"""Gazebo の左右車輪の回転から v・omega を計算し、diff_drive_controller のオドメトリと真値に照らし合わせる（test_maehara 内で実行）.
 
   python3 check_wheel_odom.py <bag>（/tf に robot_state_publisher の車輪リンク、/wheelchair/odom、/wheelchair/pose、/clock）
 

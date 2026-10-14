@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""録画の /wheelchair/odom の速度を、diff_drive_controller の移動平均 n 個のものに置き換えた bag を作る（localizer_rl 内で実行）.
+"""録画の /wheelchair/odom の速度を、diff_drive_controller の移動平均 n 個のものに置き換えた bag を作る（test_maehara 内で実行）.
 
   python3 make_window_bag.py <入力 bag> <出力 bag> <n>
 
