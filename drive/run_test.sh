@@ -23,6 +23,7 @@
 set -u
 # ros2 topic の CLI は --no-daemon で使う。timeout の中で最初の ros2 が CLI のデーモンを起動すると、デーモンが timeout の
 # プロセスグループに入り、時間切れのシグナルで壊れる（以後 ros2 topic が「!rclpy.ok()」で落ちる。2026-10-14 に起きた）
+# --no-daemon のときトピックを探す時間は既定 0.5 s で、見つけ損ねると待たずに失敗する（10 回に 1 回）ので --spin-time 3 にする
 target=${1:?gazebo か real}; profile=${2:?動き}; bag=${3:?bag 名}
 tag=${bag//\//_}   # /tmp のログの名前（bag 名に check/ などの下のディレクトリを書いてもよい）
 case $target in gazebo|real) ;; *) echo "target は gazebo か real"; exit 1;; esac
@@ -85,13 +86,13 @@ if [ "$target" = gazebo ]; then
     docker exec $GZ pkill -KILL -x gzserver 2>/dev/null; docker exec $GZ pkill -KILL -x gzclient 2>/dev/null
     docker exec -d $GZ bash -ic 'ros2 launch connection_wheelchair connection_wheelchair.launch.py > /tmp/claude_gazebo_launch.log 2>&1'
     for _ in $(seq 60); do
-      cx 'timeout 5 ros2 topic echo --once --no-daemon /wheelchair/odom > /dev/null 2>&1' && break
+      cx 'timeout 5 ros2 topic echo --once --no-daemon --spin-time 3 /wheelchair/odom > /dev/null 2>&1' && break
       sleep 2
     done
     sleep 5
   else
     echo "== コンテナの中なので Gazebo は起動し直さない（Gazebo が動いていて、車椅子が初期位置にあること）"
-    cx 'timeout 8 ros2 topic echo --once --no-daemon /wheelchair/odom > /dev/null 2>&1' || { echo "Gazebo（/wheelchair/odom）が見えない"; exit 1; }
+    cx 'timeout 8 ros2 topic echo --once --no-daemon --spin-time 3 /wheelchair/odom > /dev/null 2>&1' || { echo "Gazebo（/wheelchair/odom）が見えない"; exit 1; }
   fi
   echo "== start recording and $est"
   [ "$(count_loc)" = 0 ] || { echo "localization processes are still running in ${WHERE:-this container}"; exit 1; }
@@ -106,15 +107,15 @@ if [ "$target" = gazebo ]; then
 else
   echo "== check the real robot"
   if cx "test -e $BAGS/$bag"; then echo "$BAGS/$bag は既にある（別の名前にする）"; exit 1; fi
-  cx "timeout 8 ros2 topic echo --once --no-daemon /ekf_pose > /dev/null 2>&1" || { echo "/ekf_pose が来ない（自己位置推定を起動し、初期姿勢を合わせる）"; exit 1; }
+  cx "timeout 8 ros2 topic echo --once --no-daemon --spin-time 3 /ekf_pose > /dev/null 2>&1" || { echo "/ekf_pose が来ない（自己位置推定を起動し、初期姿勢を合わせる）"; exit 1; }
   cmd=$(cx "$DT --command-topic" | tail -1)
-  subs=$(cx "ros2 topic info --no-daemon --spin-time 2 $cmd" | sed -n 's/Subscription count: //p')
+  subs=$(cx "ros2 topic info --no-daemon --spin-time 3 $cmd" | sed -n 's/Subscription count: //p')
   if [ "${subs:-0}" -lt 1 ]; then
     echo "$cmd を受けるノード（whill_driver）が無い。車椅子の色（WHILL=blue|red|white）を確かめる。見つかった車椅子："
-    cx "ros2 topic list --no-daemon --spin-time 2" | grep "whill_node/cmd_vel" | sed 's/^/  /'
+    cx "ros2 topic list --no-daemon --spin-time 3" | grep "whill_node/cmd_vel" | sed 's/^/  /'
     exit 1
   fi
-  present=$(cx "ros2 topic list --no-daemon --spin-time 2")
+  present=$(cx "ros2 topic list --no-daemon --spin-time 3")
   for t in $topics; do
     echo "$present" | grep -qx "$t" || echo "  （まだ無いトピック：$t。録画は続ける）"
   done
