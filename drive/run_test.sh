@@ -18,7 +18,7 @@ target=${1:?gazebo か real}; profile=${2:?動き}; bag=${3:?bag 名}
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(dirname "$here")   # localization_tools
 LOC=test_maehara; GZ=20261002
-T=/root/localization_tools
+T=/root/ros2_ws/localization_tools
 CFG=${CONFIG:-$target}
 DT="python3 $T/drive/drive_test.py $CFG ${WHILL:+--whill $WHILL}"
 BAGS=/root/ros2_ws/bags/$target
@@ -29,7 +29,7 @@ count_loc() {
   docker exec $LOC bash -c 'ps -eo cmd | grep -E "ekf_node|ekf_localizer_node|robot_localization_adapter|static_transform|ros2 launch|pcl_localization|ros2 bag|rviz2" | grep -v grep | wc -l'
 }
 
-# localization_tools 一式をコンテナの /root/localization_tools に置く（走行・描画・評価もそこで行う）
+# localization_tools 一式をコンテナの /root/ros2_ws/localization_tools に置く（走行・描画・評価もそこで行う）
 "$root/sync.sh" push
 dexec "$DT $profile --simulate" || { echo "動き $profile が範囲に収まらない・設定が読めない"; exit 1; }
 topics=$(dexec "$DT --record-topics" | tail -1)

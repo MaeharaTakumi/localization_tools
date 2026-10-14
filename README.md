@@ -1,7 +1,8 @@
 # localization_tools
 
 自己位置推定（`localization_bringup`、ekf_localizer / robot_localization）の検証・調整・描画のプログラム。
-**編集はホスト（`workspace/localization_tools`）、実行は自己位置推定コンテナ `test_maehara` の `/root/localization_tools`**。
+**編集はホスト（`workspace/localization_tools`）、実行は自己位置推定コンテナ `test_maehara` の `/root/ros2_ws/localization_tools`**
+（ROS のパッケージではないので `src` の外。colcon が中を探さないよう `COLCON_IGNORE` を置いている）。
 
 ```bash
 ./sync.sh push   # ホスト -> コンテナ（eval/results の既存のファイルはコンテナ側を残す）
