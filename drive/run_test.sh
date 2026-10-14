@@ -14,6 +14,7 @@
 #     実機。自己位置推定（/ekf_pose）・whill_driver・LiDAR が動いていること（推定の起動は自分で行う。地図・初期姿勢が要るため）。
 #     走り出す前に計画を表示して確認するので、端末から実行する。録画は /root/ros2_ws/bags/real/<bag 名>（同じ名前は止める）
 #
+#   <bag 名> を check/<名前> にすると bags/<target>/check/ に録る（ツールの動作確認など、比較・調整に使わない録画）。
 #   <動き> は drive/profiles.yaml（spin・stops・accel・curve・slalom・reverse。drive/drive_test.py <target> --list）。
 #   速さの上限・走ってよい範囲・トピックは drive/config/<target>.yaml。
 #   環境変数：PURPOSE（録画の用途。<bag 名>_info.yaml に書く）、CONFIG（設定の yaml のコンテナ内のパス。既定は target の設定）、
@@ -23,6 +24,7 @@ set -u
 # ros2 topic の CLI は --no-daemon で使う。timeout の中で最初の ros2 が CLI のデーモンを起動すると、デーモンが timeout の
 # プロセスグループに入り、時間切れのシグナルで壊れる（以後 ros2 topic が「!rclpy.ok()」で落ちる。2026-10-14 に起きた）
 target=${1:?gazebo か real}; profile=${2:?動き}; bag=${3:?bag 名}
+tag=${bag//\//_}   # /tmp のログの名前（bag 名に check/ などの下のディレクトリを書いてもよい）
 case $target in gazebo|real) ;; *) echo "target は gazebo か real"; exit 1;; esac
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(dirname "$here")   # localization_tools
@@ -69,7 +71,7 @@ stop_bg() { cx "pkill -INT -f '[${1:0:1}]${1:1}'"; }
 [ $INSIDE = 1 ] || "$root/sync.sh" push
 cx "$DT $profile --simulate" || { echo "動き $profile が範囲に収まらない・設定が読めない"; exit 1; }
 topics=$(cx "$DT --record-topics" | tail -1)
-cx "mkdir -p $BAGS && touch $(dirname $BAGS)/COLCON_IGNORE"
+cx "mkdir -p $(dirname $BAGS/$bag) && touch $(dirname $BAGS)/COLCON_IGNORE"
 
 if [ "$target" = gazebo ]; then
   est=${4:-ekf_localizer}; extra=${5:-}
@@ -94,12 +96,12 @@ if [ "$target" = gazebo ]; then
   echo "== start recording and $est"
   [ "$(count_loc)" = 0 ] || { echo "localization processes are still running in ${WHERE:-this container}"; exit 1; }
   cx "rm -rf $BAGS/$bag $BAGS/${bag}_phases.txt $BAGS/${bag}_drive.log $BAGS/${bag}_info.yaml"
-  cbg "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$bag.log 2>&1"
+  cbg "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$tag.log 2>&1"
   sleep 3
-  cbg "ros2 launch localization_bringup localization.launch.py env:=gazebo estimator:=$est rviz:=false $extra > /tmp/launch_$bag.log 2>&1"
+  cbg "ros2 launch localization_bringup localization.launch.py env:=gazebo estimator:=$est rviz:=false $extra > /tmp/launch_$tag.log 2>&1"
   sleep 25   # 地図の読み込みと NDT の収束を待つ
   echo "== drive"
-  cx "$DT $profile --yes 2>&1 | tee /tmp/drive_$bag.log; exit \${PIPESTATUS[0]}"
+  cx "$DT $profile --yes 2>&1 | tee /tmp/drive_$tag.log; exit \${PIPESTATUS[0]}"
   status=$?
 else
   echo "== check the real robot"
@@ -117,14 +119,14 @@ else
     echo "$present" | grep -qx "$t" || echo "  （まだ無いトピック：$t。録画は続ける）"
   done
   echo "== start recording"
-  cbg "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$bag.log 2>&1"
+  cbg "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$tag.log 2>&1"
   sleep 3
   echo "== drive（計画を確かめて yes で走り出す。止めるときは Ctrl-C かジョイスティック）"
-  cit "$DT $profile 2>&1 | tee /tmp/drive_$bag.log; exit \${PIPESTATUS[0]}"
+  cit "$DT $profile 2>&1 | tee /tmp/drive_$tag.log; exit \${PIPESTATUS[0]}"
   status=$?
 fi
 
-cx "cp /tmp/drive_phases.txt $BAGS/${bag}_phases.txt; cp /tmp/drive_$bag.log $BAGS/${bag}_drive.log"
+cx "cp /tmp/drive_phases.txt $BAGS/${bag}_phases.txt; cp /tmp/drive_$tag.log $BAGS/${bag}_drive.log"
 sleep 3
 echo "== stop"
 stop_bg "ros2 bag record -o $BAGS/$bag"
@@ -132,11 +134,11 @@ if [ "$target" = gazebo ]; then
   stop_bg "ros2 launch localization_bringup"
   sleep 8
   echo "remaining localization processes: $(count_loc)"
-  cx "grep -h 'mount base_footprint' /tmp/launch_$bag.log | cut -c1-170"
+  cx "grep -h 'mount base_footprint' /tmp/launch_$tag.log | cut -c1-170"
 else
   sleep 5
 fi
 notes=$(cx "$DT $profile --describe" | tail -1)
-[ "$status" = 0 ] || notes="走行を途中で止めた（drive_test.py の終了コード $status、ログ ${bag}_drive.log）。$notes"
+[ "$status" = 0 ] || notes="走行を途中で止めた（drive_test.py の終了コード $status、ログ $(basename $bag)_drive.log）。$notes"
 cx "python3 $T/eval/bag_info.py write $BAGS/$bag --source $target --drive 'drive/drive_test.py $profile' --purpose '${PURPOSE:-}' --notes '$notes'"
 exit $status

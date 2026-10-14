@@ -29,7 +29,7 @@ import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]
-from bag_paths import SOURCES, source_dir  # noqa: E402
+from bag_paths import CHECK, SOURCES, source_dir  # noqa: E402
 
 WHEEL_RADIUS, WHEEL_SEPARATION = 0.1325, 0.492   # Gazebo の URDF（diff_drive_controller と同じ）
 ESTIMATOR_TOPICS = [('/odometry/global', 'robot_localization'), ('/ekf_odom', 'ekf_localizer')]
@@ -164,14 +164,15 @@ def write(args):
 def list_bags(args):
     rows = []
     for source in ([args.source] if args.source else SOURCES):
-        for path in sorted(glob.glob(os.path.join(source_dir(source), '*_info.yaml'))):
+        d = source_dir(source)
+        for path in sorted(glob.glob(os.path.join(d, '*_info.yaml'))) + sorted(glob.glob(os.path.join(d, CHECK, '*_info.yaml'))):
             with open(path) as f:
                 i = yaml.safe_load(f)
-            rows.append((source, os.path.basename(path)[:-len('_info.yaml')], i))
-    print(f"{'source':<7} {'name':<20} {'recorded':<17} {'dur[s]':>7} {'MB':>5} {'odom_w':>7} {'w/truth':>7} "
+            rows.append((source, os.path.relpath(path, d)[:-len('_info.yaml')], i))
+    print(f"{'source':<7} {'name':<28} {'recorded':<17} {'dur[s]':>7} {'MB':>5} {'odom_w':>7} {'w/truth':>7} "
           f"{'estimator':<19} purpose")
     for source, name, i in rows:
-        print(f"{source:<7} {name:<20} {i['recorded'][:16]:<17} {i['duration_s']:>7.1f} {i['size_mb']:>5.0f} "
+        print(f"{source:<7} {name:<28} {i['recorded'][:16]:<17} {i['duration_s']:>7.1f} {i['size_mb']:>5.0f} "
               f"{str(i['odom_window']):>7} {str(i.get('odom_truth_omega_ratio')):>7} {i['estimator']:<19} {i['purpose']}")
 
 

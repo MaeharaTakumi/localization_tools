@@ -32,7 +32,7 @@ PLOT_COLORS="#2a78d6,#eb6834" run python3 plot_spin.py $O/qr_unstable.png "EKF, 
 for b in spin360_w1_ekf spin360_w1_ekf2; do run python3 ../noise/estimate_noise.py $B/$b --out $O/noise_$b --truth; done
 run python3 ../calib/estimate_calibration.py $B/spin360_w1_ekf $B/spin360_w1_ekf2 $B/stops_ekf --out $O/calib --truth --map /root/ros2_ws/map/SC10_4_0.05.pcd
 # run_test.sh の確認（33）
-run python3 plot_drive_paths.py $O/runner_paths.png gazebo "From the host (spin)=$B/runner_host_spin" "Inside the container (spin)=$B/runner_inside_spin" "Inside, real-robot flow (real limits)=$B/runner_inside_realflow"
+run python3 plot_drive_paths.py $O/runner_paths.png gazebo "From the host (spin)=$B/check/runner_host_spin" "Inside the container (spin)=$B/check/runner_inside_spin" "Inside, real-robot flow (real limits)=$B/check/runner_inside_realflow"
 # NDT の R を「真値 + ノイズ」の初期値で求める（15）
 [ "${FULL:-0}" = 1 ] && run python3 ../noise/ndt_init_noise.py $B/stops_ekf --out $O/ndt_init_stops
 ls $O
