@@ -11,11 +11,14 @@
 
 コンテナ内のコマンドは ROS の環境が要るので `docker exec test_maehara bash -ic '...'` で実行する。
 録画（bag）は `test_maehara:/root/ros2_ws/bags` の下に、**Gazebo と実機で分けて**置く（`eval/bag_paths.py`）。図は `/root/ros2_ws/fig`。
+どちらも地図（`/root/ros2_ws/map`）も、ホストの `localizer_rl_docker/data/{bags,fig,map}` を割り当てたもの（2026-10-14 から。コンテナを作り直しても消えない。
+コンテナの中で作ったファイルはホストでは root の持ち物になる）。
 
 | 場所 | 中身 |
 |---|---|
 | `/root/ros2_ws/bags/gazebo/<名前>` | Gazebo の録画。隣に `<名前>_phases.txt`（動作の開始時刻）、`<名前>_drive.log`（テスト走行のログ。2026-10-14 から）、`<名前>_info.yaml`（録画の情報） |
 | `/root/ros2_ws/bags/gazebo/tune/<試行名>` | その再生の出力（`tune_run.py`・`compare_run.py`。結果の行の `out_bag`） |
+| `/root/ros2_ws/bags/gazebo/check/<名前>` | ツールの動作確認などの録画（比較・調整に使わない。`run_test.sh` の bag 名を `check/<名前>` にする） |
 | `/root/ros2_ws/bags/real/<名前>`、`/root/ros2_ws/bags/real/tune/` | 実機の録画とその再生の出力（同じく `_info.yaml` を付ける） |
 
 録画の情報（`eval/bag_info.py`）：Gazebo か実機か、録画日時、長さ、走らせ方、用途、録画したときの推定器、
