@@ -8,6 +8,11 @@
   滑らかに変わる。各観測から滑らかな成分（前後 --window/2 秒の局所 1 次式）を取り除き、残り（残差）の分散を
   観測ノイズとみなす。残差は当てはめの自由度の分だけ小さく出るので、てこ比 h で r / sqrt(1 - h) に直してから分散を取る。
 - オドメトリ：v・omega（--scale を掛けた後。推定器に入るのと同じ値）の残差 → R_odom [v, omega]
+  - R_v は定速で直進する区間の v の残差から求める（直進の区間が無ければ、動いている区間全体）
+  - R_omega は R_v と車輪の間隔（--tread）から計算する：左右の車輪の速度のノイズが独立で同じ大きさ sigma_w なら
+    v = (vR + vL) / 2、omega = (vR - vL) / b から Var(v) = sigma_w^2 / 2、Var(omega) = 2 sigma_w^2 / b^2。
+    倍率 s_v・s_omega を掛けた後の値なので R_omega = 4 R_v (s_omega / s_v)^2 / b^2（b / s_omega が実効的な車輪の間隔）。
+    直接測った omega の残差（直進・旋回・動いている区間）も比べるために出す（旋回中は滑りなど車輪の速度以外のばらつきも入る）
 - NDT：LiDAR の姿勢を取付（/tf_static か --mount）で車体の姿勢に直して局所 1 次式を当て、それを LiDAR に戻した姿勢との差
   （map 座標の x, y, z と roll, pitch, yaw）→ R_ndt [x, y, z, roll, pitch, yaw]（ekf_localizer の並び）
 - 区間は 停止 / 旋回 / 直進 に分ける。R の推奨値は「動いている区間（旋回 + 直進）」をまとめた分散（停止は参考）
@@ -17,7 +22,8 @@
 - --truth（Gazebo だけ）：同じ区間で真値（/wheelchair/pose）との差の分散も出して比べる。R の決定には使わない
 
 出力：表（標準出力）、<接頭辞>.yaml（env の parameters に貼れる形）、<接頭辞>.json、
-      <接頭辞>_segments.png（区間と残差）、<接頭辞>_summary.png（標準偏差の比較）
+      <接頭辞>_segments.png（区間と残差）、<接頭辞>_summary.png（標準偏差の比較）、
+      <接頭辞>_hist.png（残差のヒストグラムと正規分布）
 """
 import argparse
 import json
@@ -207,6 +213,36 @@ def pooled(rows, keys, classes):
     return out
 
 
+def plot_residual_hist(path, odom_rows, ndt_rows, sigma_w_tread, args):
+    """残差のヒストグラムと正規分布：v（直進）、omega（直進・旋回）、NDT の 6 成分（動いている区間）."""
+    from plot_noise import C_EFF, C_TRUTH, plot_hist
+
+    def pick(rows, key, classes):
+        return np.concatenate([r[key] for cls, r in rows if cls in classes] or [np.array([])])
+
+    def rms(x):
+        x = x[np.isfinite(x)]
+        return float(np.sqrt(np.mean(x ** 2))) if len(x) else float('nan')
+
+    moving = ('turning', 'straight', 'curve')
+    panels = []
+    for title, key, classes, f, unit in (('Odometry v, straight', 'v', ('straight',), 1e3, 'mm/s'),
+                                         ('Odometry omega, straight', 'omega', ('straight',), 1e3, 'mrad/s'),
+                                         ('Odometry omega, turning', 'omega', ('turning',), 1e3, 'mrad/s')):
+        x = pick(odom_rows, key, classes) * f
+        curves = [('Normal, residual sigma', rms(x), C_EFF)]
+        if key == 'omega':
+            curves.append((f'Normal from v and tread {args.tread} m', sigma_w_tread * f, C_TRUTH))
+        panels.append({'title': title, 'unit': unit, 'data': x, 'curves': curves})
+    for key in NDT_KEYS:
+        f, unit = (1e3, 'mm') if key in ('x', 'y', 'z') else (math.degrees(1.0), 'deg')
+        x = pick(ndt_rows, key, moving) * f
+        panels.append({'title': f'NDT {key}, moving', 'unit': unit, 'data': x,
+                       'curves': [('Normal, residual sigma', rms(x), C_EFF)]})
+    plot_hist(path, panels, f'Residual distribution and the normal distribution (no truth; local linear window '
+                            f'{args.window:.1f} s, no correlation correction)')
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('bag')
@@ -215,6 +251,9 @@ def main():
     ap.add_argument('--ndt', default='/ndt_pose')
     ap.add_argument('--cmd', default='/wheelchair/diff_drive_controller/cmd_vel')
     ap.add_argument('--scale', default='1.0,0.922', help='odom_scale [v, omega]（推定器に入るのと同じ値にする）')
+    ap.add_argument('--tread', type=float, default=0.492,
+                    help='オドメトリが omega を計算するときの車輪の間隔 [m]（R_omega の計算に使う。Gazebo 0.492（diff_drive_controller の '
+                         'wheel_separation）、実機は whill_odometry の tread_width）')
     ap.add_argument('--base', default='base_footprint')
     ap.add_argument('--lidar', default='velodyne')
     ap.add_argument('--mount', default='', help='x,y,z,roll,pitch,yaw（/tf_static に無いとき）')
@@ -260,6 +299,7 @@ def main():
 
     odom_rows, ndt_rows, truth_odom_rows, truth_ndt_rows, used = [], [], [], [], []
     corr_odom, corr_ndt = [], []   # 時間的なつながりを測る残差（動いている区間、長めの窓）
+    corr_straight = []             # 同じく直進の区間だけ（R_v 用）
     half_c = args.corr_window / 2.0
     for t0, t1, v, w in segs:
         a, b = t0 + args.settle, t1 - args.margin
@@ -274,6 +314,8 @@ def main():
         if cls != 'stopped':
             corr_odom.append(odom_residuals(ot[mo], ov[mo], ow[mo], half_c))
             corr_ndt.append(ndt_residuals(nt[mn], [mats[i] for i in np.where(mn)[0]], mount, half_c))
+            if cls == 'straight':
+                corr_straight.append(corr_odom[-1])
         if args.truth:   # 区間ごとの平均（一定のずれ）を引いた真値との差
             truth_odom_rows.append((cls, {k: terr_odom[k][mo] - np.nanmean(terr_odom[k][mo]) for k in ODOM_KEYS}))
             truth_ndt_rows.append((cls, {k: terr_ndt[k][mn] - np.nanmean(terr_ndt[k][mn]) for k in NDT_KEYS}))
@@ -310,24 +352,55 @@ def main():
     for k, (tau, rho) in list(tau_odom.items()) + list(tau_ndt.items()):
         print(f'  {k:<6} tau_int {tau:6.2f}   rho ' + ' '.join(f'{x:+.2f}' for x in rho[:3]))
     if args.no_correlation:
-        r_odom, r_ndt = r_odom_white, r_ndt_white
+        r_odom_moving, r_ndt = r_odom_white, r_ndt_white
     else:
-        r_odom = [r * tau_odom[k][0] for r, k in zip(r_odom_white, ODOM_KEYS)]
+        r_odom_moving = [r * tau_odom[k][0] for r, k in zip(r_odom_white, ODOM_KEYS)]
         r_ndt = [r * tau_ndt[k][0] for r, k in zip(r_ndt_white, NDT_KEYS)]
+
+    # R_v は直進の区間から、R_omega は R_v と車輪の間隔から（左右の車輪の速度のノイズが独立で同じ大きさと仮定）
+    var_v_straight = est_odom['straight']['v'][0] if est_odom['straight']['v'][1] else float('nan')
+    tau_v_straight = correlation_time(corr_straight, ('v',), 1.0 / np.median(np.diff(ot)), args.max_lag)['v'][0]
+    tread_factor = 4.0 * (sw / sv) ** 2 / args.tread ** 2
+    if np.isfinite(var_v_straight):
+        v_from = 'straight'
+        tau_v = 1.0 if args.no_correlation or not np.isfinite(tau_v_straight) else tau_v_straight
+        r_v_white, r_v = var_v_straight, var_v_straight * tau_v
+    else:
+        print('\n直進の区間が無いので、R_v は動いている区間全体から求める')
+        v_from, tau_v = 'moving', (1.0 if args.no_correlation else tau_odom['v'][0])
+        r_v_white, r_v = r_odom_white[0], r_odom_moving[0]
+    r_w_tread, r_w_tread_white = r_v * tread_factor, r_v_white * tread_factor
+    r_odom = [r_v, r_w_tread]
+    measured_w = {c: est_odom[c]['omega'][0] for c in ('straight', 'turning', 'moving')}
+    print(f'\nR_odom: v from {v_from} segments (tau_int {tau_v:.2f}), omega = 4 R_v (s_omega / s_v)^2 / b^2 '
+          f'(tread b {args.tread} m, scale {sv}, {sw}; effective tread {args.tread / sw * sv:.4f} m)')
+    print(f'  sigma_v      {math.sqrt(r_v_white):.4g} m/s (white)   R_v {r_v:.3g}')
+    print(f'  sigma_omega  {math.sqrt(r_w_tread_white):.4g} rad/s (from v and tread, white)   R_omega {r_w_tread:.3g}')
+    print('  measured omega residual sigma (white): ' + ', '.join(
+        f'{c} {math.sqrt(x):.4g}' if np.isfinite(x) else f'{c} -' for c, x in measured_w.items())
+        + ' rad/s' + (f'   moving x tau_int: R_omega {r_odom_moving[1]:.3g}' if not args.no_correlation else ''))
+
     snippet = {
         'odom_covariance': {'R_odom': [float(f'{x:.3g}') for x in r_odom]},
         'ekf_localizer': {'R_ndt': [float(f'{x:.3g}') for x in r_ndt]},
     }
-    print('\n# R（動いている区間の残差の分散' + ('' if args.no_correlation else ' x 積分相関時間') + '）。env の parameters に入れる\n' + yaml.safe_dump(snippet, sort_keys=False))
+    how = '分散' if args.no_correlation else '分散 x 積分相関時間'
+    print(f'\n# R（R_v は{"直進の" if v_from == "straight" else "動いている"}区間、R_omega は R_v と車輪の間隔 {args.tread} m から、'
+          f'R_ndt は動いている区間の残差の{how}）。env の parameters に入れる\n' + yaml.safe_dump(snippet, sort_keys=False))
     os.makedirs(os.path.dirname(args.out) or '.', exist_ok=True)
     with open(args.out + '.yaml', 'w') as f:
-        how = '分散' if args.no_correlation else '分散 x 積分相関時間'
-        f.write(f'# estimate_noise.py {args.bag}（真値なし。動いている区間の残差の{how}）\n')
+        f.write(f'# estimate_noise.py {args.bag}（真値なし。残差の{how}）\n'
+                f'# R_odom：v は{"直進の" if v_from == "straight" else "動いている"}区間、omega は 4 R_v (s_omega / s_v)^2 / b^2'
+                f'（b {args.tread} m、倍率 {sv}, {sw}）\n'
+                f'# 直接測った omega の R（動いている区間{"" if args.no_correlation else " x 積分相関時間"}）は '
+                f'{r_odom_moving[1]:.3g}（比べるだけ）\n')
         yaml.safe_dump(snippet, f, sort_keys=False)
     with open(args.out + '.json', 'w') as f:
         json.dump({'bag': args.bag, 'segments': used, 'odom': est_odom, 'ndt': est_ndt,
                    'truth_odom': tru_odom, 'truth_ndt': tru_ndt, 'R_odom': r_odom, 'R_ndt': r_ndt,
-                   'R_odom_white': r_odom_white, 'R_ndt_white': r_ndt_white,
+                   'R_odom_white': [r_v_white, r_w_tread_white], 'R_ndt_white': r_ndt_white,
+                   'R_odom_moving': r_odom_moving, 'R_odom_moving_white': r_odom_white,
+                   'R_v_from': v_from, 'tau_v': tau_v, 'tread': args.tread, 'scale': [sv, sw],
                    'tau_odom': {k: v[0] for k, v in tau_odom.items()},
                    'tau_ndt': {k: v[0] for k, v in tau_ndt.items()}}, f, indent=1)
     print(f'saved {args.out}.yaml, {args.out}.json')
@@ -336,6 +409,7 @@ def main():
     plot_segments(args.out + '_segments.png', ot, ov, ow, nt, used, odom_rows, ndt_rows, segs, half)
     tau = None if args.no_correlation else {k: v[0] for k, v in list(tau_odom.items()) + list(tau_ndt.items())}
     plot_summary(args.out + '_summary.png', est_odom, est_ndt, tru_odom, tru_ndt, tau)
+    plot_residual_hist(args.out + '_hist.png', odom_rows, ndt_rows, math.sqrt(r_w_tread_white), args)
 
 
 if __name__ == '__main__':

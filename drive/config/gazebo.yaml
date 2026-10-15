@@ -10,6 +10,9 @@ area: {forward: 10.0, behind: 1.0, left: 2.0, right: 2.0}
 # 走る前に計算した軌跡（omega は指令の sim_omega_scale 倍とみなす）が、範囲の内側にこれだけ余裕があること [m]
 plan_margin: 0.2
 sim_omega_scale: 0.92
+# オドメトリが omega を計算するときの車輪の間隔 [m]（Gazebo の diff_drive_controller の wheel_separation。
+# calib/estimate_all.py が R_omega = 4 R_v / b^2 に使う。実機は whill_odometry の tread_width を読むのでここには書かない）
+tread: 0.492
 
 # 速度の指令
 command: {topic: /wheelchair/diff_drive_controller/cmd_vel, type: twist_stamped, frame_id: base_link, rate: 50.0}

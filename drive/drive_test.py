@@ -26,6 +26,7 @@ import numpy as np
 import yaml
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+CALIB_PARAM = os.path.join(os.path.dirname(HERE), 'param', 'calib.yaml')   # 動き calib（generate: calib）の設定
 
 
 def load_yaml(path):
@@ -124,6 +125,32 @@ def resolve(s, lim):
     else:
         raise ValueError(f'区間の終わり（time・yaw・distance・stop・slalom）が無い（区間 {s}）')
     return seg
+
+
+def calib_profile(cfg, path=CALIB_PARAM):
+    """パラメータ推定用の動き（param/calib.yaml の motion）を、profiles.yaml と同じ形（速さは上限に対する割合）にする."""
+    m = load_yaml(path)['motion']
+    lim = cfg['limits']
+
+    def frac(key, limit_key):
+        x = float(m[key])
+        if not 0 < x <= lim[limit_key] + 1e-9:
+            raise SystemExit(f'{path} の {key} {x} は 0 より大きく、上限 {limit_key} {lim[limit_key]} 以下にする'
+                             f'（{config_path(cfg.get("target", ""))}）')
+        return x / lim[limit_key]
+
+    w_spin, v = frac('spin_omega', 'w_max'), frac('straight_v', 'v_max')
+    stop, turns, t_straight = float(m['stop_time']), int(m['spin_turns']), float(m['straight_time'])
+    segs = [{'stop': stop, 'label': 'start'}]
+    for side, w, yaw in (('left', w_spin, 360), ('right', -w_spin, -360)):
+        for k in range(turns):   # 1 周ずつ（spin5 と同じ名前）
+            segs.append({'name': f'{side} turn' + (f' lap {k + 1}' if k else ''), 'w': w, 'yaw': yaw})
+    segs += [{'stop': stop, 'label': 'spin'},
+             {'name': 'straight', 'v': v, 'time': t_straight},
+             {'stop': stop, 'label': 'end'}]
+    desc = (f"パラメータ推定用（param/calib.yaml）：止まる {stop} s → 左右に {turns} 周ずつ（{m['spin_omega']} rad/s）→ "
+            f"直進 {m['straight_v']} m/s x {t_straight} s = {float(m['straight_v']) * t_straight:.1f} m（片道）")
+    return {'description': desc, 'segments': segs}
 
 
 def build(cfg, profiles, name):
@@ -417,6 +444,9 @@ def main():
         print(cfg['command']['topic'])
         return 0
     profiles = load_yaml(args.profiles)
+    for key, p in profiles.items():   # 設定ファイルから作る動き（calib）
+        if p.get('generate') == 'calib' and (key == args.profile or args.describe):
+            profiles[key] = calib_profile(cfg)
     if args.record_topics:
         print(' '.join(cfg['record_topics']))
         return 0

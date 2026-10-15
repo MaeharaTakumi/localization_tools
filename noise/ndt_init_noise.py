@@ -2,6 +2,7 @@
 """NDT の観測ノイズ R_ndt を、「真値 + ノイズ」を初期値にして NDT を計算し直して求める（コンテナ test 内で実行）.
 
   python3 ndt_init_noise.py <止まる走行の bag> [--out /root/ros2_ws/fig/ndt_init] [--passes 3] [--sigma ...]
+  python3 ndt_init_noise.py --from-json <出力の json> [--out ...]   # 計算し直さず図だけ描く
 
 - bag は drive/profiles.yaml の stops の走行（何か所かで止まる）。止まった区間は <bag>_phases.txt の stop_<名前>_start/_end。
 - 真値：止まった区間（始めの --settle 秒を除く）の /wheelchair/pose の平均（車体）に、取付（/tf_static）を掛けた LiDAR の姿勢。
@@ -201,14 +202,21 @@ def analyse(node, stops, sigma):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    ap.add_argument('bag')
+    ap.add_argument('bag', nargs='?')
     ap.add_argument('--out', default='/root/ros2_ws/fig/ndt_init')
+    ap.add_argument('--from-json', default='', help='前に出力した json から図（<out>.png・<out>_hist.png）だけ描く')
     ap.add_argument('--passes', type=int, default=3, help='ノイズありで流す回数（このほかにノイズなしを 1 回）')
     ap.add_argument('--sigma', default=DEFAULT_SIGMA, help='ノイズの標準偏差 x,y,z [m],roll,pitch,yaw [deg]')
     ap.add_argument('--settle', type=float, default=1.0, help='止まり始めから使わない時間 [s]')
     ap.add_argument('--base', default='base_footprint')
     ap.add_argument('--lidar', default='velodyne')
     args = ap.parse_args()
+    if args.from_json:
+        saved = json.load(open(args.from_json))
+        plot_all(args.out, saved['stats'], np.array(saved['sigma']), saved['R_ndt_now'])
+        return
+    if not args.bag:
+        ap.error('bag か --from-json を指定する')
     s = [float(x) for x in args.sigma.split(',')]
     sigma = np.array(s[:3] + [math.radians(x) for x in s[3:]])
 
@@ -289,8 +297,24 @@ def main():
         json.dump({'bag': args.bag, 'sigma': sigma.tolist(), 'stops': [s[0] for s in stops],
                    'stats': stats, 'R_ndt': r_ndt, 'R_ndt_now': old}, f)
     print(f'saved {args.out}.yaml, {args.out}.json')
-    from plot_noise import plot_init_noise
-    plot_init_noise(args.out + '.png', stats, sigma, old)
+    plot_all(args.out, stats, sigma, old)
+
+
+def plot_all(out, stats, sigma, old):
+    """図：初期値のずれと解の誤差（<out>.png）、解の誤差のヒストグラムと正規分布（<out>_hist.png）."""
+    from plot_noise import C_EFF, C_STOP, plot_hist, plot_init_noise
+    plot_init_noise(out + '.png', stats, sigma, old)
+    res = np.array(stats['noise']['res'])
+    panels = []
+    for i, key in enumerate(NDT_KEYS):
+        f, unit = (1e3, 'mm') if i < 3 else (math.degrees(1.0), 'deg')
+        curves = [('Normal, R_ndt', math.sqrt(stats['noise']['var'][i]) * f, C_EFF)]
+        if 'no_noise' in stats:
+            curves.append(('Normal, initial guess = truth', math.sqrt(stats['no_noise']['var'][i]) * f, C_STOP))
+        panels.append({'title': f'NDT {key}', 'unit': unit, 'data': res[:, i] * f, 'curves': curves})
+    sig = ', '.join(f'{s * f:.3g}' for s, f in zip(sigma, [1e3] * 3 + [math.degrees(1.0)] * 3))
+    plot_hist(out + '_hist.png', panels, f'NDT error (stop mean removed) with the initial guess = truth + noise '
+                                         f'(noise sigma {sig} mm, deg)')
 
 
 if __name__ == '__main__':

@@ -28,4 +28,8 @@ run python3 ../calib/estimate_calibration.py $B/spin360_w1_ekf $B/spin360_w1_ekf
 run python3 plot_drive_paths.py $O/runner_paths.png gazebo "From the host (spin)=$B/check/runner_host_spin" "Inside the container (spin)=$B/check/runner_inside_spin" "Inside, real-robot flow (real limits)=$B/check/runner_inside_realflow"
 # NDT の R を「真値 + ノイズ」の初期値で求める（15）
 [ "${FULL:-0}" = 1 ] && run python3 ../noise/ndt_init_noise.py $B/stops_ekf --out $O/ndt_init_stops
+# FULL=1 でなければ、前の結果（json）から図とヒストグラムだけ描き直す
+[ "${FULL:-0}" = 1 ] || [ ! -f $O/ndt_init_stops.json ] || run python3 ../noise/ndt_init_noise.py --from-json $O/ndt_init_stops.json --out $O/ndt_init_stops
+# パラメータ推定用の動き（calib）で走った録画から、R・倍率・取付をまとめて推定する（46）
+run python3 ../calib/estimate_all.py gazebo $B/gazebo_calib_test --out $O/calib_gazebo
 ls $O

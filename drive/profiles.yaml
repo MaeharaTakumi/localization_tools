@@ -90,3 +90,8 @@ reverse:
     - {name: reverse left, radius: 0.6, w: 0.4, reverse: true, yaw: 90}
     - {name: forward 2, v: 0.333, distance: 1.5}
     - {name: reverse fast, v: -1.0, distance: 1.5}
+
+# パラメータ推定用（calib/run_calib.sh がこの動きで走って推定する）。速度・角速度・秒数・周回数などは param/calib.yaml の motion
+calib:
+  description: パラメータ推定用（止まる → その場で左右に旋回 → 片道の直進。速さ・回数・秒数は param/calib.yaml）
+  generate: calib

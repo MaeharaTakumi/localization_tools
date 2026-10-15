@@ -1,0 +1,16 @@
+# パラメータ推定（観測ノイズ R・オドメトリの倍率・LiDAR の取付）用の走行の設定（drive calib・calib/run_calib.sh）。
+# Gazebo・実機で共通の 1 組（ユーザー指示）。速さは drive/config/<target>.yaml の上限以下にする
+# （実機の上限 v 0.5 m/s・omega 0.5 rad/s、Gazebo v 1.5 m/s・omega 1.0 rad/s。超えると走る前に止める）。
+#
+# 動き：止まる → その場で左に spin_turns 周 → 右に spin_turns 周 → 止まる → 直進 straight_time 秒（片道）→ 止まる
+# 使い道：
+#   止まる区間     … NDT の roll・pitch（取付。床が水平と仮定）、止まっているときのノイズ
+#   その場の旋回   … omega の倍率、取付の x・y（LiDAR が描く円）、旋回中の omega の残差
+#   直進           … R_v（定速の直進の v の残差）とそこから計算する R_omega、v の倍率、取付の yaw
+# 走ってよい範囲（前 10 m・後ろ 1 m・左右 2 m）に収まるかは走る前に確かめる（drive_list <target> calib）。
+motion:
+  stop_time: 5.0        # 止まる時間 [s]（指令が変わってから 0.5 s は推定に使わない）
+  spin_omega: 0.4       # その場の旋回の角速度 [rad/s]
+  spin_turns: 2         # 左・右それぞれの周回数（1 周ずつの区間にする）
+  straight_v: 0.4       # 直進の速度 [m/s]
+  straight_time: 20.0   # 直進の時間 [s]（片道。距離 = straight_v x straight_time。前 10 m の範囲に収める）

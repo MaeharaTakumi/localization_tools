@@ -6,7 +6,7 @@
 使う走行：その場の旋回（取付位置・omega の倍率）と直進（v の倍率・取付の yaw）。区間は指令（cmd_vel）が一定のところ
 （変化の --settle 秒後から次の変化の --margin 秒前まで）。drive/profiles.yaml の spin・stops の走行で求まる。
 
-- omega の倍率：旋回の区間ごとに、NDT の yaw の変化 / オドメトリの omega の積分（全区間の和の比）
+- omega の倍率：旋回の区間ごとに、NDT の yaw の変化 / オドメトリの omega の積分（全区間の絶対値の和の比）
 - v の倍率：直進の区間ごとに、NDT の LiDAR の移動距離 / オドメトリの v の積分（向きが一定なので LiDAR と車体の移動は同じ）
 - 取付の水平位置 (x, y)：その場の旋回では車体（回転の中心）が動かないので、LiDAR の位置 p = c + R(yaw_L) m'
   （c は区間ごとの回転の中心、ゆっくりした移動も 1 次で許す）を最小二乗で解く。m' = R(-yaw_m) m
@@ -50,7 +50,7 @@ def load(bag, args):
             return np.asarray(ts, float)
     od = sorted((stamp(m), m.twist.twist.linear.x, m.twist.twist.angular.z) for _, m in d[args.odom])
     ot, ov, ow = (np.array(x) for x in zip(*od))
-    nd = sorted((stamp(m), matrix_to_vec(pose_msg_to_matrix(m.pose.pose))) for _, m in d[args.ndt])
+    nd = sorted(((stamp(m), matrix_to_vec(pose_msg_to_matrix(m.pose.pose))) for _, m in d[args.ndt]), key=lambda x: x[0])
     nt = np.array([t for t, _ in nd])
     nv = np.array([v for _, v in nd])
     nv[:, 5] = np.unwrap(nv[:, 5])
@@ -209,7 +209,7 @@ def main():
     out = {}
     print(f'segments: {len(w_rows)} turning, {len(v_rows)} straight, {len(stops)} stopped')
     if w_rows:
-        sw = sum(x['dyaw'] for x in w_rows) / sum(x['odom'] for x in w_rows)
+        sw = sum(abs(x['dyaw']) for x in w_rows) / sum(abs(x['odom']) for x in w_rows)   # 左右の旋回を打ち消さない
         out['omega_scale'] = sw
         print(f'\nomega scale (NDT yaw change / odometry): {sw:.4f}   now {cur_w}')
         for x in w_rows:

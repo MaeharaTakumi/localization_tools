@@ -3,6 +3,7 @@
 
   plot_segments：使った区間（指令が一定）と、オドメトリ・NDT の残差の時間推移
   plot_summary ：標準偏差の比較（真値なしの推定：動いている区間・停止、--truth なら真値との差）
+  plot_hist    ：残差のヒストグラムと正規分布（estimate_noise.py・ndt_init_noise.py）
 """
 import math
 import os
@@ -21,6 +22,7 @@ from plot_spin import (BAND, capitalize_labels, GRID, INK, INK2, SURFACE,  # noq
 CLASS_LABEL = {'stopped': 'Stopped', 'turning': 'Turning', 'straight': 'Straight', 'curve': 'Curve'}
 C_OMEGA, C_V, C_YAW, C_X, C_Y = '#2a78d6', '#eb6834', '#4a3aa7', '#1baf7a', '#eda100'
 C_EST, C_EFF, C_STOP, C_TRUTH = '#2a78d6', '#4a3aa7', '#1baf7a', '#eb6834'
+C_MAD = '#eda100'   # ヒストグラムの頑健な sigma の正規分布
 
 
 def setup():
@@ -178,6 +180,61 @@ def plot_init_noise(path, stats, sigma, old):
     sig = ', '.join(f'{n} {s * f:.3g} {u}' for n, s, f, u in zip(names, sigma, scale, units))
     fig.suptitle(f'NDT error when the initial guess is truth + noise (noise sigma: {sig})', x=0.02, ha='left',
                  fontsize=12, fontweight='bold', color=INK, y=0.995)
+    capitalize_labels(fig)   # 頭文字を大文字に（識別子はそのまま）
+    fig.savefig(path, dpi=110, facecolor=SURFACE)
+    plt.close(fig)
+    print(f'saved {path}')
+
+
+def plot_hist(path, panels, title):
+    """残差のヒストグラム（確率密度）と正規分布 N(0, sigma^2) の比較.
+
+    panels：[{'title', 'unit', 'data'（表示の単位）, 'curves': [(凡例, sigma（表示の単位）, 色), ...]}]。
+    curves の 1 つ目は残差そのものの sigma（二乗平均の平方根。R に使う値）。範囲は +-4.5 sigma（外れた点の数を書く）。
+    外れた点に左右されない sigma（1.4826 x 中央絶対偏差。正規分布なら sigma と同じ）の正規分布も重ねる（裾の重さを見る）。
+    """
+    setup()
+    ncol = 3
+    nrow = (len(panels) + ncol - 1) // ncol
+    fig, axes = plt.subplots(nrow, ncol, figsize=(15, 3.9 * nrow), facecolor=SURFACE, squeeze=False)
+    for ax in axes.flat[len(panels):]:
+        ax.set_visible(False)
+    for ax, p in zip(axes.flat, panels):
+        style(ax)
+        x = np.asarray(p['data'], float)
+        x = x[np.isfinite(x)]
+        ax.set_title(p['title'], fontsize=9.5, pad=15)
+        ax.set_xlabel(f"Residual [{p['unit']}]")
+        if len(x) < 5:
+            ax.text(0.5, 0.5, 'No data', transform=ax.transAxes, ha='center', va='center', color=INK2)
+            continue
+        s0 = float(np.sqrt(np.mean(x ** 2)))
+        lim = 4.5 * s0 if s0 > 0 else 1.0
+        out = int((np.abs(x) > lim).sum())
+        dens, _, _ = ax.hist(x[np.abs(x) <= lim], bins=np.linspace(-lim, lim, 46), density=True, color=C_EST,
+                             alpha=0.35, edgecolor=SURFACE, lw=0.6, zorder=2, label=f'Residuals (n {len(x)})')
+        # 縦軸はヒストグラムと（残差の sigma・頑健な sigma の）正規分布の山の高いほうまで。それより細い分布は上が切れる
+        robust = 1.4826 * float(np.median(np.abs(x - np.median(x))))
+        curves = list(p['curves'][:1]) + ([('Normal, robust sigma (1.4826 MAD)', robust, C_MAD)] if robust > 0 else []) \
+            + list(p['curves'][1:])
+        peak = max([float(dens.max())] + [1.0 / (sg * math.sqrt(2 * math.pi)) for _, sg, _ in curves[:2] if sg > 0])
+        grid = np.linspace(-lim, lim, 400)
+        widths = widths_back_to_front(len(curves))
+        for i, (label, sigma, color) in enumerate(curves):
+            if not (np.isfinite(sigma) and sigma > 0):
+                continue
+            pdf = np.exp(-0.5 * (grid / sigma) ** 2) / (sigma * math.sqrt(2 * math.pi))
+            ax.plot(grid, np.minimum(pdf, 1.08 * peak), color=color, lw=widths[i], zorder=3 + i,
+                    label=f'{label} (sigma {sigma:.3g})')
+        ax.set_ylim(0, 1.15 * peak)
+        m = x - x.mean()
+        kurt = float(np.mean(m ** 4) / np.mean(m ** 2) ** 2 - 3.0) if np.mean(m ** 2) > 0 else float('nan')
+        note = f'mean {x.mean():.2g}, excess kurtosis {kurt:.1f}' + (f', {out} outside +-4.5 sigma' if out else '')
+        ax.text(0.0, 1.015, note, transform=ax.transAxes, ha='left', va='bottom', fontsize=8, color=INK2)
+        ax.legend(loc='upper left', frameon=False, fontsize=7.8)
+    axes[0][0].set_ylabel('Probability density')
+    fig.suptitle(title, x=0.02, ha='left', fontsize=12, fontweight='bold', color=INK, y=0.995)
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
     capitalize_labels(fig)   # 頭文字を大文字に（識別子はそのまま）
     fig.savefig(path, dpi=110, facecolor=SURFACE)
     plt.close(fig)

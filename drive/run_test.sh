@@ -17,7 +17,8 @@
 #
 #   <bag 名> を省くと <target>_<動き>_<年月日_時分秒>（例 red_spin5_20261015_153012）にする。
 #   <bag 名> を check/<名前> にすると bags/<gazebo|real>/check/ に録る（ツールの動作確認など、比較・調整に使わない録画）。
-#   <動き> は drive/profiles.yaml（spin・spin5・stops・accel・curve・slalom・reverse。drive/drive_test.py <target> --list）。
+#   <動き> は drive/profiles.yaml（spin・spin5・stops・accel・curve・slalom・reverse・calib。drive/drive_test.py <target> --list）。
+#   calib はパラメータ推定用（速さ・回数・秒数は param/calib.yaml。推定までまとめて行うなら calib/run_calib.sh）。
 #   速さの上限・走ってよい範囲・トピックは drive/config/<target>.yaml。
 #   環境変数：PURPOSE（録画の用途。<bag 名>_info.yaml に書く）、CONFIG（設定の yaml のコンテナ内のパス。既定は target の設定。
 #             例 CONFIG=real_in_gazebo で実機の設定を Gazebo で試す）
