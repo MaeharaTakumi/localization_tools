@@ -116,7 +116,7 @@ python3 drive/drive_test.py <gazebo|red|blue|white> --list               # 動�
 python3 drive/drive_test.py <gazebo|red|blue|white> <動き> --simulate    # 計算した軌跡と範囲（ROS 不要）
 ```
 
-コンテナの中では、`test_drive`（= `drive/run_test.sh`）・`test_list`（動きの一覧。`test_list red spin5` で計画）・`bags`（録画の一覧）
+コンテナの中では、`test_drive`（= `drive/run_test.sh`）・`test_list`（動きの一覧。`test_list red spin5` で計画）・`bags_list`（録画の一覧。`bags_list real` で実機だけ）
 のコマンドでも呼べる（localizer_docker の `src/aliases.txt`）。
 
 - **動き**（`profiles.yaml`）：`spin`（その場で左右 1 周 + 3 秒前進）、`spin5`（その場で左に 5 周 → 右に 5 周 + 3 秒前進）、`stops`（13 か所で止まる）、`accel`（加減速・停止、8.5 m）、
