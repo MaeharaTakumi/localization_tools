@@ -1,7 +1,8 @@
 # localization_tools
 
-自己位置推定（`localization_bringup`、ekf_localizer / robot_localization）の検証・調整・描画のプログラム。
-**編集はホスト（`workspace/localization_tools`）、実行は自己位置推定コンテナ `test_maehara` の `/root/ros2_ws/localization_tools`**
+自己位置推定（`localization_bringup`、NDT + ekf_localizer）の検証・調整・描画・テスト走行のプログラム。
+robot_localization と比べる機能（再生・合成データのテスト・比較の図）は 2026-10-15 に廃止した（git の履歴に残っている）。
+**編集はホスト（`workspace/localization_tools`）、実行は自己位置推定コンテナ `test` の `/root/ros2_ws/localization_tools`**
 （ROS のパッケージではないので `src` の外。colcon が中を探さないよう `COLCON_IGNORE` を置いている）。
 
 ```bash
@@ -9,9 +10,9 @@
 ./sync.sh pull   # コンテナ -> ホスト（eval/results と /root/ros2_ws/fig の図を workspace/results へ）
 ```
 
-コンテナ内のコマンドは ROS の環境が要るので `docker exec test_maehara bash -ic '...'` で実行する。
-録画（bag）は `test_maehara:/root/ros2_ws/bags` の下に、**Gazebo と実機で分けて**置く（`eval/bag_paths.py`）。図は `/root/ros2_ws/fig`。
-どちらも地図（`/root/ros2_ws/map`）も、ホストの `localizer_rl_docker/data/{bags,fig,map}` を割り当てたもの（2026-10-14 から。コンテナを作り直しても消えない。
+コンテナ内のコマンドは ROS の環境が要るので `docker exec test bash -ic '...'` で実行する。
+録画（bag）は `test:/root/ros2_ws/bags` の下に、**Gazebo と実機で分けて**置く（`eval/bag_paths.py`）。図は `/root/ros2_ws/fig`。
+どちらも地図（`/root/ros2_ws/map`）も、ホストの `localizer_docker/data/{bags,fig,map}` を割り当てたもの（2026-10-14 から。コンテナを作り直しても消えない。
 コンテナの中で作ったファイルはホストでは root の持ち物になる）。
 
 | 場所 | 中身 |
@@ -39,7 +40,6 @@ python3 eval/bag_info.py write <bag> --source gazebo|real --drive '...' --purpos
 | `eval/` | 録画の再生・評価・パラメータの調整（`tune_run.py`、`tune_batch.py`、`summarize.py`、`transition_eval.py`、`make_window_bag.py`）。候補は `batches/`、結果は `results/` |
 | `plot/` | 図（`plot_*.py`、`check_*.py`）。`plot_spin.py` は bag の読み込みや図の共通部品も持つ。`rerender_results.sh` で `workspace/results` の図を全部描き直す（NDT の R の図は計算に約 9 分かかるので `FULL=1` のときだけ） |
 | `drive/` | **テスト走行と録画（Gazebo・実機共通）**：`run_test.sh`（ホストかコンテナの中で実行）、`drive_test.py`（走らせる）、`profiles.yaml`（動き）、`config/gazebo.yaml`・`config/real.yaml`（速さの上限・走ってよい範囲・トピック・録画するトピック）、`config/real_in_gazebo.yaml`（実機の設定を Gazebo で試す） |
-| `test/` | Gazebo なしの合成データのテスト（robot_localization の経路） |
 
 ## R を求める（`noise/estimate_noise.py`）
 
@@ -83,17 +83,18 @@ python3 calib/estimate_calibration.py /root/ros2_ws/bags/gazebo/<録画> [...] -
 ## 録画を再生して評価・調整する（`eval/`）
 
 ```bash
-python3 eval/tune_run.py <録画> <試行名> <estimator> '<parameters の JSON>' ['use_ekf:=false']
+python3 eval/tune_run.py <録画> <試行名> '<parameters の JSON>' ['use_ekf:=false']
 python3 eval/tune_batch.py <録画> eval/batches/<候補>.json eval/results/<結果>.jsonl
 SCORE_KEYS=trans_max_mean,steady_mean,ang_mean,xy_mean python3 eval/summarize.py eval/results/<結果>.jsonl <基準の接頭辞>
 ```
 
 `ROS_DOMAIN_ID=99` で再生するので Gazebo・MATLAB とは混ざらない。指標（`tune_run.py` の出力）は真値を使う（Gazebo だけ）。
 
-推定器の比較（どの動きの録画にも使える指標。`dev_log.md` の 22）：
+いろいろな動きの録画での比較（どの動きの録画にも使える指標。`dev_log.md` の 22）：
+
 
 ```bash
-python3 eval/compare_run.py batch eval/batches/batch_compare.json eval/results/results_compare.jsonl   # 動き x 推定器 x 回数
+python3 eval/compare_run.py batch eval/batches/batch_compare.json eval/results/results_compare.jsonl   # 動き x 候補（label） x 回数
 RANGE=1 python3 eval/compare_run.py table eval/results/results_compare.jsonl                           # 表
 python3 plot/plot_motion_compare.py report /root/ros2_ws/fig/compare eval/results/results_compare.jsonl        # 軌跡・まとめ・時間推移の図
 ```
@@ -104,12 +105,12 @@ python3 plot/plot_motion_compare.py report /root/ros2_ws/fig/compare eval/result
 ## テスト走行と録画（`drive/`、Gazebo・実機共通）
 
 `run_test.sh` はホストからでも、自己位置推定のコンテナの中（docker が無い）からでも実行できる。ホストからは `docker exec` で
-コンテナ（`LOC`、既定 `test_maehara`）に入って動かし、コンテナの中ではその場で直接動かす（そのスクリプトのある
+コンテナ（`LOC`、既定 `test`）に入って動かし、コンテナの中ではその場で直接動かす（そのスクリプトのある
 `localization_tools` を使うので、置き場所は `/root/localization_tools` でもよい）。コンテナの中からは Gazebo を起動し直せないので、
 Gazebo のときは Gazebo が動いていて車椅子が初期位置にあること。
 
 ```bash
-localization_tools/drive/run_test.sh gazebo <動き> <bag 名> [estimator] [launch の追加引数]   # ホストかコンテナの中
+localization_tools/drive/run_test.sh gazebo <動き> <bag 名> [launch の追加引数]   # ホストかコンテナの中
 localization_tools/drive/run_test.sh real <動き> <bag 名>                                    # 端末から（確認がある）
 python3 drive/drive_test.py <gazebo|real> --list               # 動きの一覧
 python3 drive/drive_test.py <gazebo|real> <動き> --simulate    # 計算した軌跡と範囲（ROS 不要）
@@ -126,7 +127,7 @@ python3 drive/drive_test.py <gazebo|real> <動き> --simulate    # 計算した�
   whill_driver も、指令が 1 s 途切れると止まり、ジョイスティックの操作を優先する。
 - **Gazebo**：起動し直して車椅子を初期位置に戻し、推定器を起動して走らせ、`/root/ros2_ws/bags/gazebo/<bag 名>` に録る。
 - **実機**：自己位置推定（`/ekf_pose`）・whill_driver・LiDAR が動いていることを確かめてから、`/root/ros2_ws/bags/real/<bag 名>` に録る
-  （推定の起動は自分で行う。地図と初期姿勢が要るため）。test_maehara の `.bashrc` の通信設定を実機用にしておく。
+  （推定の起動は自分で行う。地図と初期姿勢が要るため）。test の `.bashrc` の通信設定を実機用にしておく。
   車椅子は `WHILL=blue|red|white`（既定は `config/real.yaml` の `whill: blue`。自己位置推定の launch の `whill:=<色>` と合わせる。
   選んだ色の `cmd_vel` を受けるノードが無ければ、見つかった車椅子を表示して止める）。録画するのは点群・`motor_speed_ts`・
   `cmd_vel`・バッテリーと推定の出力（`motor_angle_ts`・`joy_ts`・`speed_mode`・GNSS は録らない）。

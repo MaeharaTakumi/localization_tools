@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NDT の観測ノイズ R_ndt を、「真値 + ノイズ」を初期値にして NDT を計算し直して求める（test_maehara 内で実行）.
+"""NDT の観測ノイズ R_ndt を、「真値 + ノイズ」を初期値にして NDT を計算し直して求める（コンテナ test 内で実行）.
 
   python3 ndt_init_noise.py <止まる走行の bag> [--out /root/ros2_ws/fig/ndt_init] [--passes 3] [--sigma ...]
 
@@ -45,7 +45,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localizat
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]   # plot_spin などを import する
 from estimate_noise import mount_from_tf_static, NDT_KEYS, wrap  # noqa: E402
 from plot_spin import read_bag  # noqa: E402
-from robot_localization_adapter import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix  # noqa: E402
+from pose_math import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix  # noqa: E402
 
 SHARE = '/root/ros2_ws/install'
 NDT_PARAM = f'{SHARE}/pcl_localization_ros2/share/pcl_localization_ros2/param/localization.yaml'
@@ -279,7 +279,7 @@ def main():
     for name, b in (stats.get('no_noise') or stats['noise'])['bias'].items():
         print(f'  {name:<4} ' + ' '.join(f'{x * f:7.2f}' for x, (_, f) in zip(b, unit)))
     r_ndt = [float(f'{x:.3g}') for x in stats['noise']['var']]
-    snippet = {'ekf_localizer': {'R_ndt': r_ndt}, 'robot_localization_adapter': {'R_ndt': r_ndt}}
+    snippet = {'ekf_localizer': {'R_ndt': r_ndt}}
     print('\n# R_ndt（真値 + ノイズを初期値にした NDT の誤差の分散）\n' + yaml.safe_dump(snippet, sort_keys=False))
     os.makedirs(os.path.dirname(args.out) or '.', exist_ok=True)
     with open(args.out + '.yaml', 'w') as f:

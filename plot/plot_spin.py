@@ -21,8 +21,8 @@ from rclpy.serialization import deserialize_message  # noqa: E402
 import rosbag2_py  # noqa: E402
 from rosidl_runtime_py.utilities import get_message  # noqa: E402
 
-sys.path.insert(0, '/root/ros2_ws/src/localization_bringup/scripts')
-from robot_localization_adapter import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix  # noqa: E402
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'eval'))   # pose_math
+from pose_math import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix  # noqa: E402
 
 URDF_MOUNT = vec_to_matrix([-0.17, 0.0, 0.10 + 1.0 + 0.0377, 0.0, 0.0, 0.0])
 # dataviz 参照パレット（categorical slot 1〜3）と面・文字色

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """rosbag の /ekf_pose（map -> LiDAR）と base の推定を、Gazebo の真値 /wheelchair/pose と比べる.
 
-  python3 evaluate_bag.py <bag> [base の推定トピック（/odometry/global か /ekf_odom）]
+  python3 evaluate_bag.py <bag> [base の推定トピック（既定 /ekf_odom）]
 
 /wheelchair/pose（base_footprint、header なし）の時刻は、bag の受信時刻を /clock で sim time に直して使う。
 真値の LiDAR は URDF の取付 base_footprint -> velodyne = (-0.17, 0, 1.1377)、回転 0。
@@ -14,8 +14,7 @@ from rclpy.serialization import deserialize_message
 import rosbag2_py
 from rosidl_runtime_py.utilities import get_message
 
-sys.path.insert(0, '/root/ros2_ws/src/localization_bringup/scripts')
-from robot_localization_adapter import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix  # noqa: E402
+from pose_math import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix  # noqa: E402
 
 URDF_MOUNT = vec_to_matrix([-0.17, 0.0, 0.10 + 1.0 + 0.0377, 0.0, 0.0, 0.0])
 SKIP = 10.0  # 最初の出力から除く時間 [s]（NDT の収束待ち）
@@ -39,7 +38,7 @@ def stamp(m):
 
 def main():
     path = sys.argv[1]
-    base_topic = sys.argv[2] if len(sys.argv) > 2 else '/odometry/global'
+    base_topic = sys.argv[2] if len(sys.argv) > 2 else '/ekf_odom'
     d = read(path)
     clk = np.array([(t, m.clock.sec + m.clock.nanosec * 1e-9) for t, m in d['/clock']])
     truth_t = np.interp([t for t, _ in d['/wheelchair/pose']], clk[:, 0], clk[:, 1])

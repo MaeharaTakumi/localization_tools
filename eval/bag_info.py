@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""録画（bag）の情報ファイル <bag>_info.yaml を書く・一覧を出す（test_maehara 内で実行）.
+"""録画（bag）の情報ファイル <bag>_info.yaml を書く・一覧を出す（コンテナ test 内で実行）.
 
   python3 bag_info.py write <bag> --source gazebo|real [--drive ...] [--purpose ...] [--notes ...]
                                   [--estimator ...] [--odom-window N]
@@ -32,7 +32,7 @@ sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]
 from bag_paths import CHECK, SOURCES, source_dir  # noqa: E402
 
 WHEEL_RADIUS, WHEEL_SEPARATION = 0.1325, 0.492   # Gazebo の URDF（diff_drive_controller と同じ）
-ESTIMATOR_TOPICS = [('/odometry/global', 'robot_localization'), ('/ekf_odom', 'ekf_localizer')]
+ESTIMATOR_TOPICS = [('/ekf_odom', 'ekf_localizer')]
 
 
 def info_path(bag):

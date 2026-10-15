@@ -1,54 +1,10 @@
 [
  {
   "name": "qg_ekf_1",
-  "estimator": "ekf_localizer",
-  "params": {}
- },
- {
-  "name": "qg_rl_oldR_1",
-  "estimator": "robot_localization",
-  "params": {
-   "robot_localization_adapter": {
-    "R_ndt": [
-     0.01,
-     0.01,
-     0.01,
-     0.03,
-     0.03,
-     0.001
-    ]
-   }
-  }
- },
- {
-  "name": "qg_rl_1",
-  "estimator": "robot_localization",
   "params": {}
  },
  {
   "name": "qg_ekf_2",
-  "estimator": "ekf_localizer",
-  "params": {}
- },
- {
-  "name": "qg_rl_oldR_2",
-  "estimator": "robot_localization",
-  "params": {
-   "robot_localization_adapter": {
-    "R_ndt": [
-     0.01,
-     0.01,
-     0.01,
-     0.03,
-     0.03,
-     0.001
-    ]
-   }
-  }
- },
- {
-  "name": "qg_rl_2",
-  "estimator": "robot_localization",
   "params": {}
  }
 ]

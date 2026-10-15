@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""オドメトリの大きさ（|v|・|omega|）と R の関係（test_maehara 内で実行）.
+"""オドメトリの大きさ（|v|・|omega|）と R の関係（コンテナ test 内で実行）.
 
   python3 plot_odom_r.py <出力 png> <bag> ...
 

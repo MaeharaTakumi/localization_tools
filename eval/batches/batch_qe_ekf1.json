@@ -1,7 +1,6 @@
 [
  {
   "name": "qe_ekf_oldQ_1",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -33,7 +32,6 @@
  },
  {
   "name": "qe_ekf_Bzrp_1",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -65,7 +63,6 @@
  },
  {
   "name": "qe_ekf_oldQ_2",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -97,7 +94,6 @@
  },
  {
   "name": "qe_ekf_Bzrp_2",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -129,7 +125,6 @@
  },
  {
   "name": "qe_ekf_B",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -161,7 +156,6 @@
  },
  {
   "name": "qe_ekf_pose10",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -193,7 +187,6 @@
  },
  {
   "name": "qe_ekf_Bzrp_w1",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -225,7 +218,6 @@
  },
  {
   "name": "qe_ekf_Bzrp_w100",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [

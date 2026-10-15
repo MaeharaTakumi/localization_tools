@@ -33,7 +33,5 @@ record_topics:
   - /localization/odom
   - /ekf_pose
   - /ekf_odom
-  - /odometry/global
-  - /odometry/local
   - /ndt_pose
   - /localization_debug

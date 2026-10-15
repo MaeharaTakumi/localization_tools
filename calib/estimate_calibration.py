@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LiDAR の取付位置とオドメトリの倍率を、NDT の解とオドメトリから推定する（真値なし。test_maehara 内で実行）.
+"""LiDAR の取付位置とオドメトリの倍率を、NDT の解とオドメトリから推定する（真値なし。コンテナ test 内で実行）.
 
   python3 estimate_calibration.py <bag> [<bag> ...] [--out /root/ros2_ws/fig/calib] [--truth] [--map <地図の pcd>]
 
@@ -29,7 +29,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localizat
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise', 'calib')]   # plot_spin などを import する
 from estimate_noise import classify, command_segments, mount_from_tf_static, stamp  # noqa: E402
 from plot_spin import read_bag  # noqa: E402
-from robot_localization_adapter import matrix_to_vec, pose_msg_to_matrix  # noqa: E402
+from pose_math import matrix_to_vec, pose_msg_to_matrix  # noqa: E402
 
 
 def rot(a):

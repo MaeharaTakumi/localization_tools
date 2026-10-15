@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gazebo のオドメトリの取り方（diff_drive の 0.2 s 移動平均 / それを 0.09 s 戻したもの / 車輪の角速度）を比べる図（test_maehara 内で実行）.
+"""Gazebo のオドメトリの取り方（diff_drive の 0.2 s 移動平均 / それを 0.09 s 戻したもの / 車輪の角速度）を比べる図（コンテナ test 内で実行）.
 
   python3 plot_odom_sources.py <出力の接頭辞> <入力 bag> <results の jsonl>
 
@@ -27,12 +27,10 @@ TRANSITIONS = [('start', 'left turn'), ('reverse', 'right turn'), ('to forward',
 SOURCES = [('/wheelchair/odom (0.2 s moving average)', '#eb6834', 2.6),
            ('/wheelchair/odom, stamp - 0.09 s', '#4a3aa7', 1.9),
            ('from wheel joint velocity (/wheelchair/joint_states)', '#2a78d6', 1.2)]
-# 棒グラフの条件（名前の接頭辞、ラベル、色）。推定器ごとに、薄い色 = 平均 + 0.09 s、濃い色 = 車輪の角速度
+# 棒グラフの条件（名前の接頭辞、ラベル、色）。薄い色 = 平均 + 0.09 s、濃い色 = 車輪の角速度
 CONDITIONS = [('hv_ndt_only', 'NDT only', '#eda100'),
               ('hv_avg_ekf_', 'ekf_localizer: average + 0.09 s', '#86b6ef'),
-              ('hv_ekf_', 'ekf_localizer: wheel joint velocity', '#2a78d6'),
-              ('hv_avg_rl_', 'robot_localization: average + 0.09 s', '#8fd6b9'),
-              ('hv_rl_', 'robot_localization: wheel joint velocity', '#1baf7a')]
+              ('hv_ekf_', 'ekf_localizer: wheel joint velocity', '#2a78d6')]
 METRICS = [('start_max', 'yaw error peak: rotation start [deg]'),
            ('reverse_max', 'yaw error peak: reverse [deg]'),
            ('to_fwd_max', 'yaw error peak: rotation -> forward [deg]'),

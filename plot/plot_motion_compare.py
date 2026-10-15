@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""推定器の比較（eval/compare_run.py）の図（test_maehara 内で実行）.
+"""推定の比較（eval/compare_run.py）の図（test 内で実行）.
 
   python3 plot_motion_compare.py traj <出力 png> <動き>=<bag> ...            真値の軌跡（地図の壁の上）
-  python3 plot_motion_compare.py summary <出力 png> <results.jsonl>          動きごと・推定器ごとの指標（4 回の平均と幅）
+  python3 plot_motion_compare.py summary <出力 png> <results.jsonl>          動きごと・label ごとの指標（4 回の平均と幅）
   python3 plot_motion_compare.py series <出力 png> <題> <ラベル>=<bag> ...   誤差の時間推移（stamp の時刻・実時間）
   python3 plot_motion_compare.py report <出力の接頭辞> <results.jsonl>      上の 3 つをまとめて（dev_log.md の 22. の図）
   python3 plot_motion_compare.py candidates <出力 png> <results.jsonl> <題> <label>=<表示名> ...
@@ -33,18 +33,9 @@ MOTION_LABELS = {
     'accel': 'Accelerate / stop', 'curve': 'Curves (figure 8)', 'slalom': 'Slalom', 'reverse': 'Reverse',
     'spin': 'Spin in place', 'stops': 'Stops (13)',
 }
-# 結果の label（既定は estimator）ごとの凡例と色
-#   robot_localization  R_ndt は robot_localization.yaml（ekf_localizer と同じ値。launch を直す前に実際に動いていた設定）
-#   rl_rndt_small       R_ndt は gazebo.yaml（止まった状態で測った小さい値。launch を直して効くようになった）
-#   rl_timer            rl_rndt_small の /ekf_pose を timer（50 Hz、現在時刻）で出す（参考）
-#   rl_final            2026-10-13 からの既定（R_ndt は robot_localization.yaml、timer）
-EST_LABELS = {'ekf_localizer': 'EKF (ekf_localizer)',
-              'robot_localization': 'RL (robot_localization), R_ndt same as ekf_localizer',
-              'rl_rndt_small': 'RL (robot_localization), small R_ndt (gazebo.yaml)',
-              'rl_timer': 'RL, small R_ndt, timer output (reference)',
-              'rl_final': 'RL (robot_localization), new default: timer output'}
-EST_COLORS = {'ekf_localizer': SERIES[0], 'robot_localization': SERIES[1], 'rl_rndt_small': SERIES[2],
-              'rl_timer': SERIES[3], 'rl_final': '#e87ba4'}   # 参照パレットの slot 5（magenta）
+# 結果の label（既定は ekf_localizer）ごとの凡例と色（summary はここにある label だけを描く。候補の比較は candidates を使う）
+EST_LABELS = {'ekf_localizer': 'EKF (ekf_localizer)'}
+EST_COLORS = {'ekf_localizer': SERIES[0]}
 
 
 def style():
@@ -126,7 +117,7 @@ def load_results(path):
 
 
 def summary(out, results, labels=None,
-            title='Comparison of ekf_localizer and robot_localization: replay of the same recordings, 4 runs each'):
+            title='Replay of the same recordings, 4 runs each'):
     """labels を渡すとその条件だけ描く."""
     style()
     rows = load_results(results)
@@ -207,8 +198,7 @@ def series_plot(out, title, items):
 REPORT_BAGS = {'accel': '/root/ros2_ws/bags/gazebo/drive_accel', 'curve': '/root/ros2_ws/bags/gazebo/drive_curve',
                'slalom': '/root/ros2_ws/bags/gazebo/drive_slalom', 'reverse': '/root/ros2_ws/bags/gazebo/drive_reverse',
                'spin': '/root/ros2_ws/bags/gazebo/spin360_w1_ekf2', 'stops': '/root/ros2_ws/bags/gazebo/stops_ekf'}
-REPORT_SERIES = [('ekf_localizer', 'EKF (ekf_localizer)'), ('robot_localization', 'RL, R_ndt same as ekf_localizer'),
-                 ('rl_rndt_small', 'RL, small R_ndt (gazebo.yaml)')]
+REPORT_SERIES = [('ekf_localizer', 'EKF (ekf_localizer)')]
 
 
 def typical_run(rows, motion, label):
@@ -223,12 +213,8 @@ def report(prefix, results):
     rows = load_results(results)
     traj(f'{prefix}_paths.png', list(REPORT_BAGS.items()))
     print(f'saved {prefix}_paths.png')
-    summary(f'{prefix}_summary.png', results, ['ekf_localizer', 'robot_localization', 'rl_rndt_small', 'rl_timer'])
+    summary(f'{prefix}_summary.png', results, [label for label, _ in REPORT_SERIES])
     print(f'saved {prefix}_summary.png')
-    if any(r.get('label') == 'rl_final' for r in rows):
-        summary(f'{prefix}_final.png', results, ['ekf_localizer', 'rl_final'],
-                'New defaults: ekf_localizer vs robot_localization with timer output, 4 runs each')
-        print(f'saved {prefix}_final.png')
     for m in ('accel', 'curve', 'slalom', 'reverse', 'spin'):   # 止まる走行は区間が多いので描かない
         items = [(text, tune_bag(typical_run(rows, m, label))) for label, text in REPORT_SERIES]
         series_plot(f'{prefix}_series_{m}.png',

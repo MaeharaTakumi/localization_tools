@@ -1,132 +1,30 @@
 [
  {
   "name": "hv_ekf_1",
-  "estimator": "ekf_localizer",
   "params": {}
  },
  {
   "name": "hv_ekf_accv_1",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "accel_noise_tau": [
      0.05,
      0.0
-    ]
-   }
-  }
- },
- {
-  "name": "hv_rl_1",
-  "estimator": "robot_localization",
-  "params": {}
- },
- {
-  "name": "hv_rl_Qw10_1",
-  "estimator": "robot_localization",
-  "params": {
-   "ekf_filter_node_map": {
-    "process_noise_covariance_diag": [
-     0.05,
-     0.05,
-     0.005,
-     0.05,
-     0.05,
-     0.05,
-     5.0,
-     0.025,
-     0.04,
-     0.01,
-     0.01,
-     10.0,
-     0.01,
-     0.01,
-     0.015
-    ]
-   },
-   "ekf_filter_node_odom": {
-    "process_noise_covariance_diag": [
-     0.05,
-     0.05,
-     0.005,
-     0.05,
-     0.05,
-     0.05,
-     5.0,
-     0.025,
-     0.04,
-     0.01,
-     0.01,
-     10.0,
-     0.01,
-     0.01,
-     0.015
     ]
    }
   }
  },
  {
   "name": "hv_ekf_2",
-  "estimator": "ekf_localizer",
   "params": {}
  },
  {
   "name": "hv_ekf_accv_2",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "accel_noise_tau": [
      0.05,
      0.0
-    ]
-   }
-  }
- },
- {
-  "name": "hv_rl_2",
-  "estimator": "robot_localization",
-  "params": {}
- },
- {
-  "name": "hv_rl_Qw10_2",
-  "estimator": "robot_localization",
-  "params": {
-   "ekf_filter_node_map": {
-    "process_noise_covariance_diag": [
-     0.05,
-     0.05,
-     0.005,
-     0.05,
-     0.05,
-     0.05,
-     5.0,
-     0.025,
-     0.04,
-     0.01,
-     0.01,
-     10.0,
-     0.01,
-     0.01,
-     0.015
-    ]
-   },
-   "ekf_filter_node_odom": {
-    "process_noise_covariance_diag": [
-     0.05,
-     0.05,
-     0.005,
-     0.05,
-     0.05,
-     0.05,
-     5.0,
-     0.025,
-     0.04,
-     0.01,
-     0.01,
-     10.0,
-     0.01,
-     0.01,
-     0.015
     ]
    }
   }

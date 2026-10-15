@@ -1,17 +1,14 @@
 [
  {
   "name": "qg_ekf_3",
-  "estimator": "ekf_localizer",
   "params": {}
  },
  {
   "name": "qg_ekf_4",
-  "estimator": "ekf_localizer",
   "params": {}
  },
  {
   "name": "qg_ekf_oldR_4",
-  "estimator": "ekf_localizer",
   "params": {
    "ekf_localizer": {
     "R_ndt": [
@@ -27,17 +24,14 @@
  },
  {
   "name": "qg_ekf_5",
-  "estimator": "ekf_localizer",
   "params": {}
  },
  {
   "name": "qg_ekf_6",
-  "estimator": "ekf_localizer",
   "params": {}
  },
  {
   "name": "qg_ekf_oldR_6",
-  "estimator": "ekf_localizer",
   "params": {
    "ekf_localizer": {
     "R_ndt": [

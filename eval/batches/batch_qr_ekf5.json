@@ -1,7 +1,6 @@
 [
  {
   "name": "qr5_ekf_B_1",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -33,7 +32,6 @@
  },
  {
   "name": "qr5_ekf_Bzrp_1",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -65,7 +63,6 @@
  },
  {
   "name": "qr5_ekf_B_2",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -97,7 +94,6 @@
  },
  {
   "name": "qr5_ekf_Bzrp_2",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [

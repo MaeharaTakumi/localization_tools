@@ -6,7 +6,7 @@
 #     指令が 1 s 途切れると止まる。ジョイスティックを倒すと指令は無視される。変換の上限は前進 1.67 m/s、後退 0.56 m/s、旋回 約 0.83 rad/s
 #   velodyne（VLP-16、rpm 1200 = 20 Hz）：/velodyne_points（launch の namespace 引数は公式の launch では使われないので名前空間なし）
 #   ublox（RTK-GNSS、屋外）：/ublox_gps_node/fix など（録画しない。ユーザー指示）
-# 自己位置推定の PC（test_maehara）から LAN 越しに使う（.bashrc の通信設定を実機用に切り替える）。
+# 自己位置推定の PC（test）から LAN 越しに使う（.bashrc の通信設定を実機用に切り替える）。
 target: real
 use_sim_time: false
 
@@ -52,7 +52,5 @@ record_topics:
   - /localization/odom
   - /ekf_pose
   - /ekf_odom
-  - /odometry/global
-  - /odometry/local
   - /ndt_pose
   - /localization_debug

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""同じ録画を再生した各推定器の出力について、6 軸と処理時間の推移を描く（test_maehara 内で実行）.
+"""同じ録画を再生した各推定器の出力について、6 軸と処理時間の推移を描く（コンテナ test 内で実行）.
 
   python3 plot_axes.py <出力の接頭辞> <ラベル>=<bag>@<姿勢のトピック> ...
   出力: <接頭辞>_position.png（x, y, z。LiDAR と車体）、<接頭辞>_orientation.png（roll, pitch, yaw）、
@@ -24,7 +24,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localizat
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]   # plot_spin などを import する
 from plot_spin import capitalize_labels, BAND, GRID, INK, INK2, read_bag, SURFACE, URDF_MOUNT  # noqa: E402
 from plot_spin import TRUTH_COLOR, TRUTH_LW, widths_back_to_front  # noqa: E402
-from robot_localization_adapter import matrix_to_vec, pose_msg_to_matrix  # noqa: E402
+from pose_math import matrix_to_vec, pose_msg_to_matrix  # noqa: E402
 
 COLORS = os.environ.get('PLOT_COLORS', '#2a78d6,#1baf7a,#eda100').split(',')
 MOUNT_INV = np.linalg.inv(URDF_MOUNT)

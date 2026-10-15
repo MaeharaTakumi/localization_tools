@@ -1,7 +1,6 @@
 [
  {
   "name": "ekf_a0",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "odom_noise_alpha": [
@@ -15,7 +14,6 @@
  },
  {
   "name": "ekf_a0b",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "odom_noise_alpha": [
@@ -29,7 +27,6 @@
  },
  {
   "name": "ekf_w0.01",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "odom_noise_alpha": [
@@ -43,7 +40,6 @@
  },
  {
   "name": "ekf_w0.05",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "odom_noise_alpha": [
@@ -57,7 +53,6 @@
  },
  {
   "name": "ekf_w0.2",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "odom_noise_alpha": [
@@ -71,7 +66,6 @@
  },
  {
   "name": "ekf_v0.01",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "odom_noise_alpha": [
@@ -85,7 +79,6 @@
  },
  {
   "name": "ekf_v0.05w0.05",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "odom_noise_alpha": [
@@ -99,7 +92,6 @@
  },
  {
   "name": "ekf_cross",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "odom_noise_alpha": [
@@ -108,130 +100,6 @@
      0.01,
      0.05
     ]
-   }
-  }
- },
- {
-  "name": "rl_a0",
-  "estimator": "robot_localization",
-  "params": {
-   "odom_covariance": {
-    "odom_noise_alpha": [
-     0,
-     0,
-     0,
-     0
-    ]
-   }
-  }
- },
- {
-  "name": "rl_a0b",
-  "estimator": "robot_localization",
-  "params": {
-   "odom_covariance": {
-    "odom_noise_alpha": [
-     0,
-     0,
-     0,
-     0
-    ]
-   }
-  }
- },
- {
-  "name": "rl_w0.01",
-  "estimator": "robot_localization",
-  "params": {
-   "odom_covariance": {
-    "odom_noise_alpha": [
-     0,
-     0,
-     0,
-     0.01
-    ]
-   }
-  }
- },
- {
-  "name": "rl_w0.05",
-  "estimator": "robot_localization",
-  "params": {
-   "odom_covariance": {
-    "odom_noise_alpha": [
-     0,
-     0,
-     0,
-     0.05
-    ]
-   }
-  }
- },
- {
-  "name": "rl_w0.2",
-  "estimator": "robot_localization",
-  "params": {
-   "odom_covariance": {
-    "odom_noise_alpha": [
-     0,
-     0,
-     0,
-     0.2
-    ]
-   }
-  }
- },
- {
-  "name": "rl_v0.01",
-  "estimator": "robot_localization",
-  "params": {
-   "odom_covariance": {
-    "odom_noise_alpha": [
-     0.01,
-     0,
-     0,
-     0
-    ]
-   }
-  }
- },
- {
-  "name": "rl_v0.05w0.05",
-  "estimator": "robot_localization",
-  "params": {
-   "odom_covariance": {
-    "odom_noise_alpha": [
-     0.05,
-     0,
-     0,
-     0.05
-    ]
-   }
-  }
- },
- {
-  "name": "rl_cross",
-  "estimator": "robot_localization",
-  "params": {
-   "odom_covariance": {
-    "odom_noise_alpha": [
-     0.01,
-     0.01,
-     0.01,
-     0.05
-    ]
-   }
-  }
- },
- {
-  "name": "rl_dynQ",
-  "estimator": "robot_localization",
-  "params": {
-   "ekf_filter_node_map": {
-    "dynamic_process_noise_covariance": true
-   },
-   "ekf_filter_node_odom": {
-    "dynamic_process_noise_covariance": true
    }
   }
  }

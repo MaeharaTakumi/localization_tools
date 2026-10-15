@@ -1,11 +1,11 @@
 #!/bin/bash
-# localization_tools をホストと自己位置推定コンテナ（test_maehara）の /root/ros2_ws/localization_tools の間で写す（ホストで実行）
+# localization_tools をホストと自己位置推定コンテナ（test）の /root/ros2_ws/localization_tools の間で写す（ホストで実行）
 #   sync.sh push   ホスト -> コンテナ（.git を除く。eval/results の既存のファイルはコンテナ側を残す）
 #   sync.sh pull   コンテナ -> ホスト（eval/results の結果と、/root/ros2_ws/fig の図を workspace/results へ）
 # 実行・描画・結果の追記はコンテナで行い、プログラムの編集はホストで行う。
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
-LOC=${LOC:-test_maehara}
+LOC=${LOC:-test}
 DST=/root/ros2_ws/localization_tools
 case "${1:-push}" in
   push)

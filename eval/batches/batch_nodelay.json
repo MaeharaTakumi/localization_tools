@@ -1,16 +1,6 @@
 [
  {
   "name": "nodelay_ekf_1",
-  "estimator": "ekf_localizer",
-  "params": {
-   "odom_covariance": {
-    "odom_delay": 0.0
-   }
-  }
- },
- {
-  "name": "nodelay_rl_1",
-  "estimator": "robot_localization",
   "params": {
    "odom_covariance": {
     "odom_delay": 0.0
@@ -19,16 +9,6 @@
  },
  {
   "name": "nodelay_ekf_2",
-  "estimator": "ekf_localizer",
-  "params": {
-   "odom_covariance": {
-    "odom_delay": 0.0
-   }
-  }
- },
- {
-  "name": "nodelay_rl_2",
-  "estimator": "robot_localization",
   "params": {
    "odom_covariance": {
     "odom_delay": 0.0

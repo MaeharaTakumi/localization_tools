@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""オドメトリと各推定器の v・omega の推移を、真値と比べて描く（test_maehara 内で実行）.
+"""オドメトリと各推定器の v・omega の推移を、真値と比べて描く（コンテナ test 内で実行）.
 
   python3 plot_velocity.py <出力の接頭辞> <入力 bag> <odom_delay [s]> \\
       <推定器名>:<調整前の bag>:<調整後の bag>:<トピック> ...
@@ -25,7 +25,7 @@ import numpy as np  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]   # plot_spin などを import する
 from plot_spin import capitalize_labels, BAND, GRID, INK, INK2, read_bag, SURFACE, TRUTH_COLOR, TRUTH_LW  # noqa: E402
-from robot_localization_adapter import matrix_to_vec, pose_msg_to_matrix  # noqa: E402
+from pose_math import matrix_to_vec, pose_msg_to_matrix  # noqa: E402
 
 # dataviz 参照パレット（調整後 slot 1・オドメトリ slot 2・調整前 slot 3・遅れを補正したオドメトリ slot 7）と真値
 C_AFTER, C_ODOM, C_BEFORE, C_ODOM_COMP, C_TRUTH = '#2a78d6', '#eb6834', '#1baf7a', '#4a3aa7', TRUTH_COLOR

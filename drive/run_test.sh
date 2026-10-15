@@ -2,12 +2,12 @@
 # テスト走行と録画。drive/drive_test.py で走らせ、自己位置推定のコンテナの中で録画する
 #
 # どこで実行してもよい：
-#   - ホスト（docker がある）：コンテナ test_maehara（環境変数 LOC で変えられる）に docker exec で入って動かす。
+#   - ホスト（docker がある）：コンテナ test（環境変数 LOC で変えられる）に docker exec で入って動かす。
 #     始めに sync.sh push でホストの localization_tools をコンテナの /root/ros2_ws/localization_tools に写す
 #   - 自己位置推定のコンテナの中（docker が無い）：その場で直接動かす。このスクリプトのある localization_tools を使う
 #
-#   drive/run_test.sh gazebo <動き> <bag 名> [estimator] [launch の追加引数（例 use_ekf:=false）]
-#     推定器（既定 ekf_localizer）を起動して走らせる。ホストからなら Gazebo を起動し直して車椅子を初期位置に戻す
+#   drive/run_test.sh gazebo <動き> <bag 名> [launch の追加引数（例 use_ekf:=false）]
+#     自己位置推定（NDT + ekf_localizer）を起動して走らせる。ホストからなら Gazebo を起動し直して車椅子を初期位置に戻す
 #     （コンテナの中からは Gazebo を起動し直せないので、Gazebo が動いていて車椅子が初期位置にあること）。
 #     録画は /root/ros2_ws/bags/gazebo/<bag 名>（同じ名前があれば上書き）
 #   drive/run_test.sh real <動き> <bag 名>
@@ -29,7 +29,7 @@ tag=${bag//\//_}   # /tmp のログの名前（bag 名に check/ などの下の
 case $target in gazebo|real) ;; *) echo "target は gazebo か real"; exit 1;; esac
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(dirname "$here")   # localization_tools
-LOC=${LOC:-test_maehara}; GZ=20261002
+LOC=${LOC:-test}; GZ=20261002
 if command -v docker > /dev/null 2>&1; then
   INSIDE=0; T=/root/ros2_ws/localization_tools; WHERE="$LOC:"
 else
@@ -63,7 +63,7 @@ cit() {
   if [ $INSIDE = 1 ]; then bash -c "$1"; else docker exec -it $LOC bash -ic "$1"; fi
 }
 count_loc() {
-  cx 'ps -eo cmd | grep -E "ekf_node|ekf_localizer_node|robot_localization_adapter|static_transform|ros2 launch|pcl_localization|ros2 bag|rviz2" | grep -v grep | wc -l'
+  cx 'ps -eo cmd | grep -E "ekf_localizer_node|static_transform|ros2 launch|pcl_localization|ros2 bag|rviz2" | grep -v grep | wc -l'
 }
 # pkill -f のパターンの先頭を [x] にして、pkill を動かす bash 自身（コマンド行にパターンを含む）に当たらないようにする
 stop_bg() { cx "pkill -INT -f '[${1:0:1}]${1:1}'"; }
@@ -75,7 +75,7 @@ topics=$(cx "$DT --record-topics" | tail -1)
 cx "mkdir -p $(dirname $BAGS/$bag) && touch $(dirname $BAGS)/COLCON_IGNORE"
 
 if [ "$target" = gazebo ]; then
-  est=${4:-ekf_localizer}; extra=${5:-}
+  extra=${4:-}
   if [ $INSIDE = 0 ]; then
     echo "== restart Gazebo"
     docker exec $GZ bash -c 'pkill -INT -f "[r]os2 launch connection_wheelchair"'
@@ -94,12 +94,12 @@ if [ "$target" = gazebo ]; then
     echo "== コンテナの中なので Gazebo は起動し直さない（Gazebo が動いていて、車椅子が初期位置にあること）"
     cx 'timeout 8 ros2 topic echo --once --no-daemon --spin-time 3 /wheelchair/odom > /dev/null 2>&1' || { echo "Gazebo（/wheelchair/odom）が見えない"; exit 1; }
   fi
-  echo "== start recording and $est"
+  echo "== start recording and localization ${extra:+($extra)}"
   [ "$(count_loc)" = 0 ] || { echo "localization processes are still running in ${WHERE:-this container}"; exit 1; }
   cx "rm -rf $BAGS/$bag $BAGS/${bag}_phases.txt $BAGS/${bag}_drive.log $BAGS/${bag}_info.yaml"
   cbg "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$tag.log 2>&1"
   sleep 3
-  cbg "ros2 launch localization_bringup localization.launch.py env:=gazebo estimator:=$est rviz:=false $extra > /tmp/launch_$tag.log 2>&1"
+  cbg "ros2 launch localization_bringup localization.launch.py env:=gazebo rviz:=false $extra > /tmp/launch_$tag.log 2>&1"
   sleep 25   # 地図の読み込みと NDT の収束を待つ
   echo "== drive"
   cx "$DT $profile --yes 2>&1 | tee /tmp/drive_$tag.log; exit \${PIPESTATUS[0]}"

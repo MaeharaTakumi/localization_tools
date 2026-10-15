@@ -1,17 +1,14 @@
 [
  {
   "name": "qr_ekf_oldR_1",
-  "estimator": "ekf_localizer",
   "params": {}
  },
  {
   "name": "qr_ekf_oldR_2",
-  "estimator": "ekf_localizer",
   "params": {}
  },
  {
   "name": "qr_ekf_newR_1",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -33,7 +30,6 @@
  },
  {
   "name": "qr_ekf_newR_2",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -55,7 +51,6 @@
  },
  {
   "name": "qr_ekf_yaw5e-3",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -87,7 +82,6 @@
  },
  {
   "name": "qr_ekf_yaw5e-4",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -119,7 +113,6 @@
  },
  {
   "name": "qr_ekf_yaw5e-5",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -151,7 +144,6 @@
  },
  {
   "name": "qr_ekf_xy5e-3",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -183,7 +175,6 @@
  },
  {
   "name": "qr_ekf_xy5e-4",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -215,7 +206,6 @@
  },
  {
   "name": "qr_ekf_w1",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -247,7 +237,6 @@
  },
  {
   "name": "qr_ekf_w100",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -279,7 +268,6 @@
  },
  {
   "name": "qr_ekf_w0.1",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -311,7 +299,6 @@
  },
  {
   "name": "qr_ekf_v0.5",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -343,7 +330,6 @@
  },
  {
   "name": "qr_ekf_v0.005",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [
@@ -375,7 +361,6 @@
  },
  {
   "name": "qr_ekf_zrp5e-4",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "R_odom": [

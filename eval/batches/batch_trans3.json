@@ -1,7 +1,6 @@
 [
  {
   "name": "ekf_d0.09_Qw10_b",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "odom_delay": 0.09
@@ -22,7 +21,6 @@
  },
  {
   "name": "ekf_d0.09_Qw10_Rw1e-3",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "odom_delay": 0.09,
@@ -47,7 +45,6 @@
  },
  {
   "name": "ekf_d0.05_Qw10",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "odom_delay": 0.05
@@ -68,7 +65,6 @@
  },
  {
   "name": "ekf_d0.13_Qw10",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "odom_delay": 0.13
@@ -89,7 +85,6 @@
  },
  {
   "name": "ekf_d0.09_Qw100",
-  "estimator": "ekf_localizer",
   "params": {
    "odom_covariance": {
     "odom_delay": 0.09
@@ -110,7 +105,6 @@
  },
  {
   "name": "ekf_d0_Qw10",
-  "estimator": "ekf_localizer",
   "params": {
    "ekf_localizer": {
     "Q": [
@@ -122,303 +116,6 @@
      0.05,
      0.05,
      10.0
-    ]
-   }
-  }
- },
- {
-  "name": "rl_d0.09_Qv5_b",
-  "estimator": "robot_localization",
-  "params": {
-   "odom_covariance": {
-    "odom_delay": 0.09
-   },
-   "ekf_filter_node_map": {
-    "process_noise_covariance_diag": [
-     0.05,
-     0.05,
-     0.005,
-     0.05,
-     0.05,
-     0.05,
-     5.0,
-     0.025,
-     0.04,
-     0.01,
-     0.01,
-     1.0,
-     0.01,
-     0.01,
-     0.015
-    ]
-   },
-   "ekf_filter_node_odom": {
-    "process_noise_covariance_diag": [
-     0.05,
-     0.05,
-     0.005,
-     0.05,
-     0.05,
-     0.05,
-     5.0,
-     0.025,
-     0.04,
-     0.01,
-     0.01,
-     1.0,
-     0.01,
-     0.01,
-     0.015
-    ],
-    "smooth_lagged_data": true,
-    "history_length": 1.0
-   }
-  }
- },
- {
-  "name": "rl_d0.09_Qv5_Rv5e-4",
-  "estimator": "robot_localization",
-  "params": {
-   "odom_covariance": {
-    "odom_delay": 0.09,
-    "R_odom": [
-     0.0005,
-     0.005
-    ]
-   },
-   "ekf_filter_node_map": {
-    "process_noise_covariance_diag": [
-     0.05,
-     0.05,
-     0.005,
-     0.05,
-     0.05,
-     0.05,
-     5.0,
-     0.025,
-     0.04,
-     0.01,
-     0.01,
-     1.0,
-     0.01,
-     0.01,
-     0.015
-    ]
-   },
-   "ekf_filter_node_odom": {
-    "process_noise_covariance_diag": [
-     0.05,
-     0.05,
-     0.005,
-     0.05,
-     0.05,
-     0.05,
-     5.0,
-     0.025,
-     0.04,
-     0.01,
-     0.01,
-     1.0,
-     0.01,
-     0.01,
-     0.015
-    ],
-    "smooth_lagged_data": true,
-    "history_length": 1.0
-   }
-  }
- },
- {
-  "name": "rl_d0.09_Qv5_Rv5e-4_Rw1e-3",
-  "estimator": "robot_localization",
-  "params": {
-   "odom_covariance": {
-    "odom_delay": 0.09,
-    "R_odom": [
-     0.0005,
-     0.001
-    ]
-   },
-   "ekf_filter_node_map": {
-    "process_noise_covariance_diag": [
-     0.05,
-     0.05,
-     0.005,
-     0.05,
-     0.05,
-     0.05,
-     5.0,
-     0.025,
-     0.04,
-     0.01,
-     0.01,
-     1.0,
-     0.01,
-     0.01,
-     0.015
-    ]
-   },
-   "ekf_filter_node_odom": {
-    "process_noise_covariance_diag": [
-     0.05,
-     0.05,
-     0.005,
-     0.05,
-     0.05,
-     0.05,
-     5.0,
-     0.025,
-     0.04,
-     0.01,
-     0.01,
-     1.0,
-     0.01,
-     0.01,
-     0.015
-    ],
-    "smooth_lagged_data": true,
-    "history_length": 1.0
-   }
-  }
- },
- {
-  "name": "rl_d0.05_Qv5",
-  "estimator": "robot_localization",
-  "params": {
-   "odom_covariance": {
-    "odom_delay": 0.05
-   },
-   "ekf_filter_node_map": {
-    "process_noise_covariance_diag": [
-     0.05,
-     0.05,
-     0.005,
-     0.05,
-     0.05,
-     0.05,
-     5.0,
-     0.025,
-     0.04,
-     0.01,
-     0.01,
-     1.0,
-     0.01,
-     0.01,
-     0.015
-    ]
-   },
-   "ekf_filter_node_odom": {
-    "process_noise_covariance_diag": [
-     0.05,
-     0.05,
-     0.005,
-     0.05,
-     0.05,
-     0.05,
-     5.0,
-     0.025,
-     0.04,
-     0.01,
-     0.01,
-     1.0,
-     0.01,
-     0.01,
-     0.015
-    ],
-    "smooth_lagged_data": true,
-    "history_length": 1.0
-   }
-  }
- },
- {
-  "name": "rl_d0.09_Qv50",
-  "estimator": "robot_localization",
-  "params": {
-   "odom_covariance": {
-    "odom_delay": 0.09
-   },
-   "ekf_filter_node_map": {
-    "process_noise_covariance_diag": [
-     0.05,
-     0.05,
-     0.005,
-     0.05,
-     0.05,
-     0.05,
-     50.0,
-     0.025,
-     0.04,
-     0.01,
-     0.01,
-     1.0,
-     0.01,
-     0.01,
-     0.015
-    ]
-   },
-   "ekf_filter_node_odom": {
-    "process_noise_covariance_diag": [
-     0.05,
-     0.05,
-     0.005,
-     0.05,
-     0.05,
-     0.05,
-     50.0,
-     0.025,
-     0.04,
-     0.01,
-     0.01,
-     1.0,
-     0.01,
-     0.01,
-     0.015
-    ],
-    "smooth_lagged_data": true,
-    "history_length": 1.0
-   }
-  }
- },
- {
-  "name": "rl_d0_Qv5",
-  "estimator": "robot_localization",
-  "params": {
-   "ekf_filter_node_map": {
-    "process_noise_covariance_diag": [
-     0.05,
-     0.05,
-     0.005,
-     0.05,
-     0.05,
-     0.05,
-     5.0,
-     0.025,
-     0.04,
-     0.01,
-     0.01,
-     1.0,
-     0.01,
-     0.01,
-     0.015
-    ]
-   },
-   "ekf_filter_node_odom": {
-    "process_noise_covariance_diag": [
-     0.05,
-     0.05,
-     0.005,
-     0.05,
-     0.05,
-     0.05,
-     5.0,
-     0.025,
-     0.04,
-     0.01,
-     0.01,
-     1.0,
-     0.01,
-     0.01,
-     0.015
     ]
    }
   }

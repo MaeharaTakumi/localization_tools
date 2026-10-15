@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""録画（drive/run_test.sh の bag）を再生して、候補のパラメータで推定器を動かし、指標を出す（test_maehara 内で実行）.
+"""録画（drive/run_test.sh の bag）を再生して、候補のパラメータで推定器を動かし、指標を出す（コンテナ test 内で実行）.
 
-  python3 tune_run.py <入力 bag> <試行名> <estimator> '<parameters の JSON>' ['<launch の追加引数>']
+  python3 tune_run.py <入力 bag> <試行名> '<parameters の JSON>' ['<launch の追加引数>']
 
 - ROS_DOMAIN_ID=99 で動かす（Gazebo・MATLAB とは混ざらない）
 - 入力 bag は最初の動作（<bag>_phases.txt の最も早い時刻。左右 1 周なら「左回転」）の LEAD 秒前から、最後（stop）の TAIL 秒後まで再生する。/tf_static が流れないので、調整用の env にだけ
   URDF と同じ取付（base_footprint -> base_link -> velodyne_base_link -> velodyne）を static_tfs で書く
 - parameters の JSON は env の parameters にそのまま入れる。キー "__env__" の中身は env の最上位を上書きする
-  （例 {"__env__": {"topics": {...}, "joint_state_odometry": null}}。null の項目は消す）。process_noise_covariance などの 15x15 は
-  "<名前>_diag": [15 個] で書く（launch が行列に直す）
+  （例 {"__env__": {"topics": {...}, "joint_state_odometry": null}}。null の項目は消す）
+- 推定器は ekf_localizer（launch の追加引数 use_ekf:=false なら NDT 単体。結果の estimator は ndt_only）
 - 出力：入力と同じ側の tune/<試行名>（/root/ros2_ws/bags/gazebo/tune か /root/ros2_ws/bags/real/tune。bag_paths.py）と、
   指標の 1 行 JSON（標準出力の最後の行。out_bag に出力の bag のパス）
 """
@@ -40,8 +40,7 @@ URDF_TFS = [
     {'parent': 'base_link', 'child': 'velodyne_base_link', 'xyz': [-0.17, 0.0, 1.0], 'rpy': [0.0, 0.0, 0.0]},
     {'parent': 'velodyne_base_link', 'child': 'velodyne', 'xyz': [0.0, 0.0, 0.0377], 'rpy': [0.0, 0.0, 0.0]},
 ]
-OUT_TOPICS = ['/clock', '/wheelchair/pose', '/ekf_pose', '/ndt_pose', '/localization_debug', '/odometry/global',
-              '/ekf_odom']
+OUT_TOPICS = ['/clock', '/wheelchair/pose', '/ekf_pose', '/ndt_pose', '/localization_debug', '/ekf_odom']
 IN_TOPICS = ['/clock', '/velodyne_points', '/wheelchair/odom', '/wheelchair/joint_states', '/wheelchair/pose']
 
 
@@ -75,11 +74,6 @@ def play_window(bag, phases):
             end = t
             break
     return (start - first) * 1e-9, (end - start) * 1e-9
-
-
-def expand(params):
-    # 15x15 の行列の <名前>_diag は launch が行列に直すので、そのまま渡す（gazebo.yaml の同じキーを上書きする）
-    return params
 
 
 def stop(proc):
@@ -118,7 +112,7 @@ def metrics(bag, pose_topic='/ekf_pose'):
     }
 
 
-def replay(in_bag, name, estimator, params, extra=()):
+def replay(in_bag, name, params, extra=()):
     """入力 bag を候補のパラメータで再生して推定器を動かし、出力の bag（入力と同じ側の tune/<name>）を返す."""
     params = dict(params)
     out_bag = os.path.join(tune_dir(in_bag), name)
@@ -137,7 +131,7 @@ def replay(in_bag, name, estimator, params, extra=()):
             env.pop(key, None)
         else:
             env[key] = value
-    for node, p in expand(params).items():
+    for node, p in params.items():
         env['parameters'][node] = {**(env['parameters'].get(node) or {}), **p}   # env の節が空（None）でもよい
     env_path = f'/tmp/tune_env_{name}.yaml'
     with open(env_path, 'w') as f:
@@ -147,7 +141,7 @@ def replay(in_bag, name, estimator, params, extra=()):
     log = open(f'/tmp/tune_{name}.log', 'w')
     launch = subprocess.Popen(
         ['ros2', 'launch', 'localization_bringup', 'localization.launch.py', f'env:={env_path}',
-         f'estimator:={estimator}', 'rviz:=false', *extra],
+         'rviz:=false', *extra],
         env=penv, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
     record = subprocess.Popen(['ros2', 'bag', 'record', '-o', out_bag, *OUT_TOPICS],
                               env=penv, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
@@ -178,11 +172,12 @@ def replay(in_bag, name, estimator, params, extra=()):
 
 
 def main():
-    in_bag, name, estimator, params_json = sys.argv[1:5]
-    extra = sys.argv[5].split() if len(sys.argv) > 5 else []
-    out_bag = replay(in_bag, name, estimator, json.loads(params_json), extra)
-    pose_topic = '/ndt_pose' if 'use_ekf:=false' in extra else '/ekf_pose'
-    print(json.dumps({'name': name, 'estimator': estimator, 'out_bag': out_bag, **metrics(out_bag, pose_topic)}))
+    in_bag, name, params_json = sys.argv[1:4]
+    extra = sys.argv[4].split() if len(sys.argv) > 4 else []
+    out_bag = replay(in_bag, name, json.loads(params_json), extra)
+    ndt_only = 'use_ekf:=false' in extra
+    print(json.dumps({'name': name, 'estimator': 'ndt_only' if ndt_only else 'ekf_localizer', 'out_bag': out_bag,
+                      **metrics(out_bag, '/ndt_pose' if ndt_only else '/ekf_pose')}))
 
 
 if __name__ == '__main__':

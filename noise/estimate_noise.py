@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""観測ノイズの共分散 R（オドメトリ・NDT）を、真値を使わずに録画から求める（test_maehara 内で実行）.
+"""観測ノイズの共分散 R（オドメトリ・NDT）を、真値を使わずに録画から求める（コンテナ test 内で実行）.
 
   python3 estimate_noise.py <bag> [--out <出力の接頭辞>] [--truth] [オプション]
 
@@ -9,7 +9,7 @@
   観測ノイズとみなす。残差は当てはめの自由度の分だけ小さく出るので、てこ比 h で r / sqrt(1 - h) に直してから分散を取る。
 - オドメトリ：v・omega（--scale を掛けた後。推定器に入るのと同じ値）の残差 → R_odom [v, omega]
 - NDT：LiDAR の姿勢を取付（/tf_static か --mount）で車体の姿勢に直して局所 1 次式を当て、それを LiDAR に戻した姿勢との差
-  （map 座標の x, y, z と roll, pitch, yaw）→ R_ndt [x, y, z, roll, pitch, yaw]（ekf_localizer・robot_localization_adapter の並び）
+  （map 座標の x, y, z と roll, pitch, yaw）→ R_ndt [x, y, z, roll, pitch, yaw]（ekf_localizer の並び）
 - 区間は 停止 / 旋回 / 直進 に分ける。R の推奨値は「動いている区間（旋回 + 直進）」をまとめた分散（停止は参考）
 - 時間的なつながりの補正（既定で有効、--no-correlation で無効）：EKF は観測ノイズを毎回独立とみなすが、実際の誤差は
   つながっている（同じ情報が何度も来るのと同じ）。長めの窓（--corr-window）の残差の自己相関 rho_k から
@@ -31,7 +31,7 @@ import yaml
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]   # plot_spin などを import する
 from plot_spin import read_bag  # noqa: E402
-from robot_localization_adapter import (matrix_to_vec, pose_msg_to_matrix,  # noqa: E402
+from pose_math import (matrix_to_vec, pose_msg_to_matrix,  # noqa: E402
                                         transform_msg_to_matrix, vec_to_matrix)
 
 CLASSES = ('stopped', 'turning', 'straight', 'curve')
@@ -317,7 +317,6 @@ def main():
     snippet = {
         'odom_covariance': {'R_odom': [float(f'{x:.3g}') for x in r_odom]},
         'ekf_localizer': {'R_ndt': [float(f'{x:.3g}') for x in r_ndt]},
-        'robot_localization_adapter': {'R_ndt': [float(f'{x:.3g}') for x in r_ndt]},
     }
     print('\n# R（動いている区間の残差の分散' + ('' if args.no_correlation else ' x 積分相関時間') + '）。env の parameters に入れる\n' + yaml.safe_dump(snippet, sort_keys=False))
     os.makedirs(os.path.dirname(args.out) or '.', exist_ok=True)

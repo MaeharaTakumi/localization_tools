@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""推定器の比較：録画を再生して推定器を動かし、どの動きにも使える指標を出す（test_maehara 内で実行）.
+"""推定の比較：録画を再生して推定器（ekf_localizer）を動かし、どの動きにも使える指標を出す（test 内で実行）.
 
-  python3 compare_run.py run <入力 bag> <試行名> <estimator> ['<parameters の JSON>']   再生して指標（1 行 JSON）
+  python3 compare_run.py run <入力 bag> <試行名> ['<parameters の JSON>']               再生して指標（1 行 JSON）
   python3 compare_run.py eval <出力 bag> [<姿勢のトピック>]                              再生済みの bag の指標だけ
   python3 compare_run.py batch <設定の JSON> <結果の jsonl>                              まとめて再生
   python3 compare_run.py reeval <結果の jsonl>                                           残っている bag から指標を計算し直す
-  python3 compare_run.py table <結果の jsonl>                                            動き・推定器ごとの表（RANGE=1 で幅も）
-    設定の JSON: [{"motion": "accel", "bag": "/root/ros2_ws/bags/gazebo/drive_accel", "estimator": "ekf_localizer", "runs": 4,
-                  "params": {...}, "label": "..."}, ...]（試行名は <motion>_<label>_<回>。label の既定は estimator）
+  python3 compare_run.py table <結果の jsonl>                                            動き・label ごとの表（RANGE=1 で幅も）
+    設定の JSON: [{"motion": "accel", "bag": "/root/ros2_ws/bags/gazebo/drive_accel", "runs": 4,
+                  "params": {...}, "label": "..."}, ...]（試行名は <motion>_<label>_<回>。label の既定は ekf_localizer）
 
 再生は tune_run.py の replay（最初の動作の 8 秒前から最後の動作の 4 秒後まで、ROS_DOMAIN_ID=99）。
 評価の区間は最初の動作から最後の動作（stop）の 2 秒後まで。真値の LiDAR は /wheelchair/pose（base_footprint）に URDF の取付。
@@ -32,7 +32,7 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]   # plot_spin などを import する
 from plot_spin import read_bag, URDF_MOUNT, wrap  # noqa: E402
-from robot_localization_adapter import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix  # noqa: E402
+from pose_math import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix  # noqa: E402
 from bag_paths import tune_bag  # noqa: E402
 
 MAP_OFFSET = np.array([0.041, -0.021])   # NDT − 真値（地図と Gazebo の座標のずれ）[m]
@@ -165,34 +165,34 @@ def series(bag, topic='/ekf_pose'):
             'phases': {k: v - t0 for k, v in phases.items()}, 'truth_t': tt - t0, 'truth': tv}
 
 
-def run(in_bag, name, estimator, params):
+def run(in_bag, name, params):
     from tune_run import replay
-    out_bag = replay(in_bag, name, estimator, params)
-    return {'name': name, 'estimator': estimator, 'out_bag': out_bag, **evaluate(out_bag)}
+    out_bag = replay(in_bag, name, params)
+    return {'name': name, 'estimator': 'ekf_localizer', 'out_bag': out_bag, **evaluate(out_bag)}
 
 
 def main():
     cmd = sys.argv[1]
     if cmd == 'run':
-        in_bag, name, estimator = sys.argv[2:5]
-        params = json.loads(sys.argv[5]) if len(sys.argv) > 5 else {}
-        print(json.dumps(run(in_bag, name, estimator, params)))
+        in_bag, name = sys.argv[2:4]
+        params = json.loads(sys.argv[4]) if len(sys.argv) > 4 else {}
+        print(json.dumps(run(in_bag, name, params)))
     elif cmd == 'eval':
         print(json.dumps(evaluate(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else '/ekf_pose')))
     elif cmd == 'batch':
         configs_path, results_path = sys.argv[2:4]
         with open(configs_path) as f:
             configs = json.load(f)
-        # 回ごとに推定器を交互に流す（時間とともに変わる条件があっても片方に偏らない）
+        # 回ごとに候補を交互に流す（時間とともに変わる条件があっても片方に偏らない）
         jobs = []
         for i in range(max(c.get('runs', 1) for c in configs)):
             for c in configs:
                 if i < c.get('runs', 1):
                     jobs.append((c, i + 1))
         for c, i in jobs:
-            label = c.get('label', c['estimator'])
+            label = c.get('label', 'ekf_localizer')
             name = f"{c['motion']}_{label}_{i}"
-            p = subprocess.run(['python3', os.path.abspath(__file__), 'run', c['bag'], name, c['estimator'],
+            p = subprocess.run(['python3', os.path.abspath(__file__), 'run', c['bag'], name,
                                 json.dumps(c.get('params', {}))], capture_output=True, text=True)
             last = [line for line in p.stdout.splitlines() if line.startswith('{')]
             result = json.loads(last[-1]) if last else {'name': name, 'error': p.stderr[-800:]}

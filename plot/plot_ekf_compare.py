@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gazebo のオドメトリの移動平均を変えたときの ekf_localizer の比較の図（test_maehara 内で実行）.
+"""Gazebo のオドメトリの移動平均を変えたときの ekf_localizer の比較の図（コンテナ test 内で実行）.
 
   python3 plot_ekf_compare.py <出力の接頭辞> <results の jsonl> [<条件の JSON>]
 

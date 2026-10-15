@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""速度が急に変わる瞬間（回転開始・反転・回転→前進・停止）ごとに、yaw 誤差を測る（test_maehara 内で実行）.
+"""速度が急に変わる瞬間（回転開始・反転・回転→前進・停止）ごとに、yaw 誤差を測る（コンテナ test 内で実行）.
 
   python3 transition_eval.py [--json] <名前>=<bag>[@<姿勢のトピック>] ...
 

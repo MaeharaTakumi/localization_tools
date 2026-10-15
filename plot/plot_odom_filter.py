@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gazebo のオドメトリの「移動平均の変更」と「倍率の補正」の図（test_maehara 内で実行）.
+"""Gazebo のオドメトリの「移動平均の変更」と「倍率の補正」の図（コンテナ test 内で実行）.
 
   python3 plot_odom_filter.py <移動平均 1 の bag> <出力ディレクトリ>
 

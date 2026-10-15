@@ -1,7 +1,6 @@
 [
  {
   "name": "rcv_ekf_1",
-  "estimator": "ekf_localizer",
   "params": {
    "ekf_localizer": {
     "time_source": "receipt"
@@ -10,7 +9,6 @@
  },
  {
   "name": "rcv_ekf_2",
-  "estimator": "ekf_localizer",
   "params": {
    "ekf_localizer": {
     "time_source": "receipt"
@@ -19,7 +17,6 @@
  },
  {
   "name": "rcv_ekf_3",
-  "estimator": "ekf_localizer",
   "params": {
    "ekf_localizer": {
     "time_source": "receipt"
@@ -28,7 +25,6 @@
  },
  {
   "name": "rcv_ekf_4",
-  "estimator": "ekf_localizer",
   "params": {
    "ekf_localizer": {
     "time_source": "receipt"
@@ -37,12 +33,10 @@
  },
  {
   "name": "gz_upd_ekf_1",
-  "estimator": "ekf_localizer",
   "params": {}
  },
  {
   "name": "gz_upd_ekf_2",
-  "estimator": "ekf_localizer",
   "params": {}
  }
 ]

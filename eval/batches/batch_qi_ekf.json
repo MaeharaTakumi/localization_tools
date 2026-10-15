@@ -1,7 +1,6 @@
 [
  {
   "name": "qi_ekf_initR_1",
-  "estimator": "ekf_localizer",
   "params": {
    "ekf_localizer": {
     "R_ndt": [
@@ -17,7 +16,6 @@
  },
  {
   "name": "qi_ekf_initR_odomEff_1",
-  "estimator": "ekf_localizer",
   "params": {
    "ekf_localizer": {
     "R_ndt": [
@@ -39,7 +37,6 @@
  },
  {
   "name": "qi_ekf_initR_2",
-  "estimator": "ekf_localizer",
   "params": {
    "ekf_localizer": {
     "R_ndt": [
@@ -55,7 +52,6 @@
  },
  {
   "name": "qi_ekf_initR_odomEff_2",
-  "estimator": "ekf_localizer",
   "params": {
    "ekf_localizer": {
     "R_ndt": [

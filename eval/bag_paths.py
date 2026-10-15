@@ -1,4 +1,4 @@
-"""録画（bag）の置き場所（test_maehara 内）.
+"""録画（bag）の置き場所（コンテナ test 内）.
 
   /root/ros2_ws/bags/gazebo/<名前>          Gazebo の録画（<名前>_phases.txt：動作の開始時刻、<名前>_drive.log：走行のログ、
                                             <名前>_info.yaml：録画の情報）
