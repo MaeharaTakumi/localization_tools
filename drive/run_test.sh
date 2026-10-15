@@ -6,15 +6,16 @@
 #     始めに sync.sh push でホストの localization_tools をコンテナの /root/ros2_ws/localization_tools に写す
 #   - 自己位置推定のコンテナの中（docker が無い）：その場で直接動かす。このスクリプトのある localization_tools を使う
 #
-#   drive/run_test.sh gazebo <動き> <bag 名> [launch の追加引数（例 use_ekf:=false）]
+#   drive/run_test.sh gazebo <動き> [<bag 名> [launch の追加引数（例 use_ekf:=false）]]
 #     自己位置推定（NDT + ekf_localizer）を起動して走らせる。ホストからなら Gazebo を起動し直して車椅子を初期位置に戻す
 #     （コンテナの中からは Gazebo を起動し直せないので、Gazebo が動いていて車椅子が初期位置にあること）。
 #     録画は /root/ros2_ws/bags/gazebo/<bag 名>（同じ名前があれば上書き）
-#   drive/run_test.sh <red|blue|white> <動き> <bag 名>
+#   drive/run_test.sh <red|blue|white> <動き> [<bag 名>]
 #     実機の車椅子（色）。自己位置推定（/ekf_pose。launch の env:=<色> と同じ色）・whill_driver・LiDAR が動いていること
 #     （推定の起動は自分で行う。地図・初期姿勢が要るため）。走り出す前に計画を表示して確認するので、端末から実行する。
 #     録画は /root/ros2_ws/bags/real/<bag 名>（同じ名前は止める）
 #
+#   <bag 名> を省くと <target>_<動き>_<年月日_時分秒>（例 red_spin5_20261015_153012）にする。
 #   <bag 名> を check/<名前> にすると bags/<gazebo|real>/check/ に録る（ツールの動作確認など、比較・調整に使わない録画）。
 #   <動き> は drive/profiles.yaml（spin・spin5・stops・accel・curve・slalom・reverse。drive/drive_test.py <target> --list）。
 #   速さの上限・走ってよい範囲・トピックは drive/config/<target>.yaml。
@@ -25,7 +26,8 @@ set -u
 # ros2 topic の CLI は --no-daemon で使う。timeout の中で最初の ros2 が CLI のデーモンを起動すると、デーモンが timeout の
 # プロセスグループに入り、時間切れのシグナルで壊れる（以後 ros2 topic が「!rclpy.ok()」で落ちる。2026-10-14 に起きた）
 # --no-daemon のときトピックを探す時間は既定 0.5 s で、見つけ損ねると待たずに失敗する（10 回に 1 回）ので --spin-time 3 にする
-target=${1:?gazebo・red・blue・white のどれか}; profile=${2:?動き}; bag=${3:?bag 名}
+target=${1:?gazebo・red・blue・white のどれか}; profile=${2:?動き}; bag=${3:-${1}_${2}_$(date +%Y%m%d_%H%M%S)}
+echo "== bag: $bag"
 tag=${bag//\//_}   # /tmp のログの名前（bag 名に check/ などの下のディレクトリを書いてもよい）
 case $target in gazebo) source=gazebo;; red|blue|white) source=real;; *) echo "target は gazebo・red・blue・white のどれか"; exit 1;; esac
 here=$(cd "$(dirname "$0")" && pwd)

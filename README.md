@@ -110,13 +110,13 @@ python3 plot/plot_motion_compare.py report /root/ros2_ws/fig/compare eval/result
 Gazebo のときは Gazebo が動いていて車椅子が初期位置にあること。
 
 ```bash
-localization_tools/drive/run_test.sh gazebo <動き> <bag 名> [launch の追加引数]   # ホストかコンテナの中
-localization_tools/drive/run_test.sh <red|blue|white> <動き> <bag 名>              # 実機。端末から（確認がある）
+localization_tools/drive/run_test.sh gazebo <動き> [<bag 名> [launch の追加引数]]   # ホストかコンテナの中
+localization_tools/drive/run_test.sh <red|blue|white> <動き> [<bag 名>]              # 実機。端末から（確認がある）
 python3 drive/drive_test.py <gazebo|red|blue|white> --list               # 動きの一覧
 python3 drive/drive_test.py <gazebo|red|blue|white> <動き> --simulate    # 計算した軌跡と範囲（ROS 不要）
 ```
 
-コンテナの中では、`test_drive`（= `drive/run_test.sh`）・`test_list`（動きの一覧。`test_list red spin5` で計画）・`bags_list`（録画の一覧。`bags_list real` で実機だけ）
+コンテナの中では、`drive`（= `drive/run_test.sh`。bag 名を省くと `<target>_<動き>_<日時>`）・`drive_list`（動きの一覧。`drive_list red spin5` で計画）・`bags_list`（録画の一覧。`bags_list real` で実機だけ）
 のコマンドでも呼べる（localizer_docker の `src/aliases.txt`）。
 
 - **動き**（`profiles.yaml`）：`spin`（その場で左右 1 周 + 3 秒前進）、`spin5`（その場で左に 5 周 → 右に 5 周 + 3 秒前進）、`stops`（13 か所で止まる）、`accel`（加減速・停止、8.5 m）、
