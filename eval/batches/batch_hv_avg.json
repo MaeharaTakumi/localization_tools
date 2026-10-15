@@ -9,7 +9,7 @@
     },
     "joint_state_odometry": null
    },
-   "odom_covariance": {
+   "ekf_localizer": {
     "odom_delay": 0.09
    }
   }
@@ -24,7 +24,7 @@
     },
     "joint_state_odometry": null
    },
-   "odom_covariance": {
+   "ekf_localizer": {
     "odom_delay": 0.09
    }
   }

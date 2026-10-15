@@ -2,9 +2,6 @@
  {
   "name": "ekf_d0.09_Qw10_b",
   "params": {
-   "odom_covariance": {
-    "odom_delay": 0.09
-   },
    "ekf_localizer": {
     "Q": [
      0.05,
@@ -15,7 +12,8 @@
      0.05,
      0.05,
      10.0
-    ]
+    ],
+    "odom_delay": 0.09
    }
   }
  },
@@ -23,7 +21,6 @@
   "name": "ekf_d0.09_Qw10_Rw1e-3",
   "params": {
    "odom_covariance": {
-    "odom_delay": 0.09,
     "R_odom": [
      0.0025,
      0.001
@@ -39,16 +36,14 @@
      0.05,
      0.05,
      10.0
-    ]
+    ],
+    "odom_delay": 0.09
    }
   }
  },
  {
   "name": "ekf_d0.05_Qw10",
   "params": {
-   "odom_covariance": {
-    "odom_delay": 0.05
-   },
    "ekf_localizer": {
     "Q": [
      0.05,
@@ -59,16 +54,14 @@
      0.05,
      0.05,
      10.0
-    ]
+    ],
+    "odom_delay": 0.05
    }
   }
  },
  {
   "name": "ekf_d0.13_Qw10",
   "params": {
-   "odom_covariance": {
-    "odom_delay": 0.13
-   },
    "ekf_localizer": {
     "Q": [
      0.05,
@@ -79,16 +72,14 @@
      0.05,
      0.05,
      10.0
-    ]
+    ],
+    "odom_delay": 0.13
    }
   }
  },
  {
   "name": "ekf_d0.09_Qw100",
   "params": {
-   "odom_covariance": {
-    "odom_delay": 0.09
-   },
    "ekf_localizer": {
     "Q": [
      0.05,
@@ -99,7 +90,8 @@
      0.05,
      0.05,
      100.0
-    ]
+    ],
+    "odom_delay": 0.09
    }
   }
  },

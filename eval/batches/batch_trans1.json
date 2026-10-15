@@ -10,7 +10,7 @@
  {
   "name": "ekf_d0.05",
   "params": {
-   "odom_covariance": {
+   "ekf_localizer": {
     "odom_delay": 0.05
    }
   }
@@ -18,7 +18,7 @@
  {
   "name": "ekf_d0.09",
   "params": {
-   "odom_covariance": {
+   "ekf_localizer": {
     "odom_delay": 0.09
    }
   }
@@ -26,7 +26,7 @@
  {
   "name": "ekf_d0.13",
   "params": {
-   "odom_covariance": {
+   "ekf_localizer": {
     "odom_delay": 0.13
    }
   }
@@ -68,11 +68,13 @@
   "name": "ekf_d0.09acc0.09",
   "params": {
    "odom_covariance": {
-    "odom_delay": 0.09,
     "accel_noise_tau": [
      0.09,
      0.09
     ]
+   },
+   "ekf_localizer": {
+    "odom_delay": 0.09
    }
   }
  }

@@ -2,7 +2,7 @@
  {
   "name": "nodelay_ekf_1",
   "params": {
-   "odom_covariance": {
+   "ekf_localizer": {
     "odom_delay": 0.0
    }
   }
@@ -10,7 +10,7 @@
  {
   "name": "nodelay_ekf_2",
   "params": {
-   "odom_covariance": {
+   "ekf_localizer": {
     "odom_delay": 0.0
    }
   }

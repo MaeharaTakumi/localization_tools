@@ -2,7 +2,7 @@
  {
   "name": "ekf_d0.09_b",
   "params": {
-   "odom_covariance": {
+   "ekf_localizer": {
     "odom_delay": 0.09
    }
   }
@@ -10,9 +10,6 @@
  {
   "name": "ekf_Qw0.1",
   "params": {
-   "odom_covariance": {
-    "odom_delay": 0.09
-   },
    "ekf_localizer": {
     "Q": [
      0.05,
@@ -23,16 +20,14 @@
      0.05,
      0.05,
      0.1
-    ]
+    ],
+    "odom_delay": 0.09
    }
   }
  },
  {
   "name": "ekf_Qw1",
   "params": {
-   "odom_covariance": {
-    "odom_delay": 0.09
-   },
    "ekf_localizer": {
     "Q": [
      0.05,
@@ -43,16 +38,14 @@
      0.05,
      0.05,
      1.0
-    ]
+    ],
+    "odom_delay": 0.09
    }
   }
  },
  {
   "name": "ekf_Qw10",
   "params": {
-   "odom_covariance": {
-    "odom_delay": 0.09
-   },
    "ekf_localizer": {
     "Q": [
      0.05,
@@ -63,16 +56,14 @@
      0.05,
      0.05,
      10.0
-    ]
+    ],
+    "odom_delay": 0.09
    }
   }
  },
  {
   "name": "ekf_Qv0.5",
   "params": {
-   "odom_covariance": {
-    "odom_delay": 0.09
-   },
    "ekf_localizer": {
     "Q": [
      0.05,
@@ -83,16 +74,14 @@
      0.05,
      0.5,
      0.01
-    ]
+    ],
+    "odom_delay": 0.09
    }
   }
  },
  {
   "name": "ekf_Qv5",
   "params": {
-   "odom_covariance": {
-    "odom_delay": 0.09
-   },
    "ekf_localizer": {
     "Q": [
      0.05,
@@ -103,7 +92,8 @@
      0.05,
      5.0,
      0.01
-    ]
+    ],
+    "odom_delay": 0.09
    }
   }
  },
@@ -111,11 +101,13 @@
   "name": "ekf_Rw1e-3",
   "params": {
    "odom_covariance": {
-    "odom_delay": 0.09,
     "R_odom": [
      0.0025,
      0.001
     ]
+   },
+   "ekf_localizer": {
+    "odom_delay": 0.09
    }
   }
  },
@@ -123,11 +115,13 @@
   "name": "ekf_Rw2e-2",
   "params": {
    "odom_covariance": {
-    "odom_delay": 0.09,
     "R_odom": [
      0.0025,
      0.02
     ]
+   },
+   "ekf_localizer": {
+    "odom_delay": 0.09
    }
   }
  },
@@ -135,11 +129,13 @@
   "name": "ekf_Rv5e-4",
   "params": {
    "odom_covariance": {
-    "odom_delay": 0.09,
     "R_odom": [
      0.0005,
      0.005
     ]
+   },
+   "ekf_localizer": {
+    "odom_delay": 0.09
    }
   }
  },
@@ -147,11 +143,13 @@
   "name": "ekf_Rv1e-2",
   "params": {
    "odom_covariance": {
-    "odom_delay": 0.09,
     "R_odom": [
      0.01,
      0.005
     ]
+   },
+   "ekf_localizer": {
+    "odom_delay": 0.09
    }
   }
  }
