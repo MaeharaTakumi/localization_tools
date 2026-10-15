@@ -10,9 +10,9 @@
 target: real
 use_sim_time: false
 
-# 車椅子の色（blue・red・white）。トピックの {whill} が Drp5_whill_<色> になる。
-# drive_test.py --whill <色>、run_test.sh なら環境変数 WHILL=<色> で変える（自己位置推定の launch の whill:=<色> と合わせる）
-whill: blue
+# 車椅子の色（red・blue・white）。トピックの {whill} が Drp5_whill_<色> になる。
+# drive_test.py --whill <色>、run_test.sh なら環境変数 WHILL=<色> で変える（自己位置推定の launch の env:=<色> と合わせる。既定はどちらも red）
+whill: red
 
 # 速さの上限（profiles.yaml の速さはこれに対する割合）[m/s]、[rad/s]（ユーザー指示の既定）
 limits: {v_max: 0.5, v_reverse_max: 0.3, w_max: 0.5}
@@ -25,7 +25,7 @@ sim_omega_scale: 1.0      # 実機の旋回の倍率は未校正
 # 速度の指令（whill_driver）
 command: {topic: "/{whill}/whill_node/cmd_vel", type: twist, rate: 50.0}
 # 走行中の車体の姿勢：自己位置推定の /ekf_pose（map -> LiDAR）を取付で車体（base_link）に直す。
-# mount は base_link -> velodyne（localization_bringup の param/env/real.yaml の static_tfs と同じにする）
+# mount は base_link -> velodyne（localization_bringup の param/env/red.yaml などの static_tfs と同じにする）
 feedback:
   topic: /ekf_pose
   type: pose_with_covariance

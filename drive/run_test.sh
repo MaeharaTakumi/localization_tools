@@ -18,7 +18,7 @@
 #   <動き> は drive/profiles.yaml（spin・spin5・stops・accel・curve・slalom・reverse。drive/drive_test.py <target> --list）。
 #   速さの上限・走ってよい範囲・トピックは drive/config/<target>.yaml。
 #   環境変数：PURPOSE（録画の用途。<bag 名>_info.yaml に書く）、CONFIG（設定の yaml のコンテナ内のパス。既定は target の設定）、
-#             WHILL（実機の車椅子の色 blue・red・white。既定は設定の whill。自己位置推定の launch の whill:=<色> と合わせる）
+#             WHILL（実機の車椅子の色 red・blue・white。既定は設定の whill（red）。自己位置推定の launch の env:=<色> と合わせる）
 #   録画の隣に <bag 名>_phases.txt（動作の開始時刻）、<bag 名>_drive.log（drive_test.py の出力）、<bag 名>_info.yaml（eval/bag_info.py）を書く。
 set -u
 # ros2 topic の CLI は --no-daemon で使う。timeout の中で最初の ros2 が CLI のデーモンを起動すると、デーモンが timeout の
@@ -111,7 +111,7 @@ else
   cmd=$(cx "$DT --command-topic" | tail -1)
   subs=$(cx "ros2 topic info --no-daemon --spin-time 3 $cmd" | sed -n 's/Subscription count: //p')
   if [ "${subs:-0}" -lt 1 ]; then
-    echo "$cmd を受けるノード（whill_driver）が無い。車椅子の色（WHILL=blue|red|white）を確かめる。見つかった車椅子："
+    echo "$cmd を受けるノード（whill_driver）が無い。車椅子の色（WHILL=red|blue|white）を確かめる。見つかった車椅子："
     cx "ros2 topic list --no-daemon --spin-time 3" | grep "whill_node/cmd_vel" | sed 's/^/  /'
     exit 1
   fi

@@ -128,7 +128,7 @@ python3 drive/drive_test.py <gazebo|real> <動き> --simulate    # 計算した�
 - **Gazebo**：起動し直して車椅子を初期位置に戻し、推定器を起動して走らせ、`/root/ros2_ws/bags/gazebo/<bag 名>` に録る。
 - **実機**：自己位置推定（`/ekf_pose`）・whill_driver・LiDAR が動いていることを確かめてから、`/root/ros2_ws/bags/real/<bag 名>` に録る
   （推定の起動は自分で行う。地図と初期姿勢が要るため）。test の `.bashrc` の通信設定を実機用にしておく。
-  車椅子は `WHILL=blue|red|white`（既定は `config/real.yaml` の `whill: blue`。自己位置推定の launch の `whill:=<色>` と合わせる。
+  車椅子は `WHILL=red|blue|white`（既定は `config/real.yaml` の `whill: red`。自己位置推定の launch の `env:=<色>` と合わせる。
   選んだ色の `cmd_vel` を受けるノードが無ければ、見つかった車椅子を表示して止める）。録画するのは点群・`motor_speed_ts`・
   `cmd_vel`・バッテリーと推定の出力（`motor_angle_ts`・`joy_ts`・`speed_mode`・GNSS は録らない）。
 
