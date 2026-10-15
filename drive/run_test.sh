@@ -10,23 +10,24 @@
 #     自己位置推定（NDT + ekf_localizer）を起動して走らせる。ホストからなら Gazebo を起動し直して車椅子を初期位置に戻す
 #     （コンテナの中からは Gazebo を起動し直せないので、Gazebo が動いていて車椅子が初期位置にあること）。
 #     録画は /root/ros2_ws/bags/gazebo/<bag 名>（同じ名前があれば上書き）
-#   drive/run_test.sh real <動き> <bag 名>
-#     実機。自己位置推定（/ekf_pose）・whill_driver・LiDAR が動いていること（推定の起動は自分で行う。地図・初期姿勢が要るため）。
-#     走り出す前に計画を表示して確認するので、端末から実行する。録画は /root/ros2_ws/bags/real/<bag 名>（同じ名前は止める）
+#   drive/run_test.sh <red|blue|white> <動き> <bag 名>
+#     実機の車椅子（色）。自己位置推定（/ekf_pose。launch の env:=<色> と同じ色）・whill_driver・LiDAR が動いていること
+#     （推定の起動は自分で行う。地図・初期姿勢が要るため）。走り出す前に計画を表示して確認するので、端末から実行する。
+#     録画は /root/ros2_ws/bags/real/<bag 名>（同じ名前は止める）
 #
-#   <bag 名> を check/<名前> にすると bags/<target>/check/ に録る（ツールの動作確認など、比較・調整に使わない録画）。
+#   <bag 名> を check/<名前> にすると bags/<gazebo|real>/check/ に録る（ツールの動作確認など、比較・調整に使わない録画）。
 #   <動き> は drive/profiles.yaml（spin・spin5・stops・accel・curve・slalom・reverse。drive/drive_test.py <target> --list）。
 #   速さの上限・走ってよい範囲・トピックは drive/config/<target>.yaml。
-#   環境変数：PURPOSE（録画の用途。<bag 名>_info.yaml に書く）、CONFIG（設定の yaml のコンテナ内のパス。既定は target の設定）、
-#             WHILL（実機の車椅子の色 red・blue・white。既定は設定の whill（red）。自己位置推定の launch の env:=<色> と合わせる）
+#   環境変数：PURPOSE（録画の用途。<bag 名>_info.yaml に書く）、CONFIG（設定の yaml のコンテナ内のパス。既定は target の設定。
+#             例 CONFIG=real_in_gazebo で実機の設定を Gazebo で試す）
 #   録画の隣に <bag 名>_phases.txt（動作の開始時刻）、<bag 名>_drive.log（drive_test.py の出力）、<bag 名>_info.yaml（eval/bag_info.py）を書く。
 set -u
 # ros2 topic の CLI は --no-daemon で使う。timeout の中で最初の ros2 が CLI のデーモンを起動すると、デーモンが timeout の
 # プロセスグループに入り、時間切れのシグナルで壊れる（以後 ros2 topic が「!rclpy.ok()」で落ちる。2026-10-14 に起きた）
 # --no-daemon のときトピックを探す時間は既定 0.5 s で、見つけ損ねると待たずに失敗する（10 回に 1 回）ので --spin-time 3 にする
-target=${1:?gazebo か real}; profile=${2:?動き}; bag=${3:?bag 名}
+target=${1:?gazebo・red・blue・white のどれか}; profile=${2:?動き}; bag=${3:?bag 名}
 tag=${bag//\//_}   # /tmp のログの名前（bag 名に check/ などの下のディレクトリを書いてもよい）
-case $target in gazebo|real) ;; *) echo "target は gazebo か real"; exit 1;; esac
+case $target in gazebo) source=gazebo;; red|blue|white) source=real;; *) echo "target は gazebo・red・blue・white のどれか"; exit 1;; esac
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(dirname "$here")   # localization_tools
 LOC=${LOC:-test}; GZ=20261002
@@ -37,8 +38,8 @@ else
   command -v ros2 > /dev/null 2>&1 || { echo "ros2 が見つからない（ROS の環境を読み込んだ端末で実行する）"; exit 1; }
 fi
 CFG=${CONFIG:-$target}
-DT="python3 $T/drive/drive_test.py $CFG ${WHILL:+--whill $WHILL}"
-BAGS=/root/ros2_ws/bags/$target
+DT="python3 $T/drive/drive_test.py $CFG"
+BAGS=/root/ros2_ws/bags/$source
 
 # コンテナの中でコマンドを動かす（ホストからは docker exec、コンテナの中では直接）。終了コードはコマンドのもの
 cx() {
@@ -111,7 +112,7 @@ else
   cmd=$(cx "$DT --command-topic" | tail -1)
   subs=$(cx "ros2 topic info --no-daemon --spin-time 3 $cmd" | sed -n 's/Subscription count: //p')
   if [ "${subs:-0}" -lt 1 ]; then
-    echo "$cmd を受けるノード（whill_driver）が無い。車椅子の色（WHILL=red|blue|white）を確かめる。見つかった車椅子："
+    echo "$cmd を受けるノード（whill_driver）が無い。車椅子の色（run_test.sh <red|blue|white>）と自己位置推定の env:=<色> を確かめる。見つかった車椅子："
     cx "ros2 topic list --no-daemon --spin-time 3" | grep "whill_node/cmd_vel" | sed 's/^/  /'
     exit 1
   fi
@@ -141,5 +142,5 @@ else
 fi
 notes=$(cx "$DT $profile --describe" | tail -1)
 [ "$status" = 0 ] || notes="走行を途中で止めた（drive_test.py の終了コード $status、ログ $(basename $bag)_drive.log）。$notes"
-cx "python3 $T/eval/bag_info.py write $BAGS/$bag --source $target --drive 'drive/drive_test.py $profile' --purpose '${PURPOSE:-}' --notes '$notes'"
+cx "python3 $T/eval/bag_info.py write $BAGS/$bag --source $source --drive 'drive/drive_test.py $target $profile' --purpose '${PURPOSE:-}' --notes '$notes'"
 exit $status

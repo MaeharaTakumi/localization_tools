@@ -39,7 +39,7 @@ python3 eval/bag_info.py write <bag> --source gazebo|real --drive '...' --purpos
 | `calib/` | **LiDAR の取付位置とオドメトリの倍率を推定する**（`estimate_calibration.py`、真値なし。図は `plot_calibration.py`） |
 | `eval/` | 録画の再生・評価・パラメータの調整（`tune_run.py`、`tune_batch.py`、`summarize.py`、`transition_eval.py`、`make_window_bag.py`）。候補は `batches/`、結果は `results/` |
 | `plot/` | 図（`plot_*.py`、`check_*.py`）。`plot_spin.py` は bag の読み込みや図の共通部品も持つ。`rerender_results.sh` で `workspace/results` の図を全部描き直す（NDT の R の図は計算に約 9 分かかるので `FULL=1` のときだけ） |
-| `drive/` | **テスト走行と録画（Gazebo・実機共通）**：`run_test.sh`（ホストかコンテナの中で実行）、`drive_test.py`（走らせる）、`profiles.yaml`（動き）、`config/gazebo.yaml`・`config/real.yaml`（速さの上限・走ってよい範囲・トピック・録画するトピック）、`config/real_in_gazebo.yaml`（実機の設定を Gazebo で試す） |
+| `drive/` | **テスト走行と録画（Gazebo・実機共通）**：`run_test.sh`（ホストかコンテナの中で実行）、`drive_test.py`（走らせる）、`profiles.yaml`（動き）、`config/gazebo.yaml`・`config/red.yaml`・`blue.yaml`・`white.yaml`（実機の車椅子ごと。速さの上限・走ってよい範囲・トピック・録画するトピック）、`config/real_in_gazebo.yaml`（実機の設定を Gazebo で試す） |
 
 ## R を求める（`noise/estimate_noise.py`）
 
@@ -111,9 +111,9 @@ Gazebo のときは Gazebo が動いていて車椅子が初期位置にある�
 
 ```bash
 localization_tools/drive/run_test.sh gazebo <動き> <bag 名> [launch の追加引数]   # ホストかコンテナの中
-localization_tools/drive/run_test.sh real <動き> <bag 名>                                    # 端末から（確認がある）
-python3 drive/drive_test.py <gazebo|real> --list               # 動きの一覧
-python3 drive/drive_test.py <gazebo|real> <動き> --simulate    # 計算した軌跡と範囲（ROS 不要）
+localization_tools/drive/run_test.sh <red|blue|white> <動き> <bag 名>              # 実機。端末から（確認がある）
+python3 drive/drive_test.py <gazebo|red|blue|white> --list               # 動きの一覧
+python3 drive/drive_test.py <gazebo|red|blue|white> <動き> --simulate    # 計算した軌跡と範囲（ROS 不要）
 ```
 
 - **動き**（`profiles.yaml`）：`spin`（その場で左右 1 周 + 3 秒前進）、`spin5`（その場で左に 5 周 → 右に 5 周 + 3 秒前進）、`stops`（13 か所で止まる）、`accel`（加減速・停止、8.5 m）、
@@ -128,12 +128,12 @@ python3 drive/drive_test.py <gazebo|real> <動き> --simulate    # 計算した�
 - **Gazebo**：起動し直して車椅子を初期位置に戻し、推定器を起動して走らせ、`/root/ros2_ws/bags/gazebo/<bag 名>` に録る。
 - **実機**：自己位置推定（`/ekf_pose`）・whill_driver・LiDAR が動いていることを確かめてから、`/root/ros2_ws/bags/real/<bag 名>` に録る
   （推定の起動は自分で行う。地図と初期姿勢が要るため）。test の `.bashrc` の通信設定を実機用にしておく。
-  車椅子は `WHILL=red|blue|white`（既定は `config/real.yaml` の `whill: red`。自己位置推定の launch の `env:=<色>` と合わせる。
+  車椅子は `run_test.sh <red|blue|white>` の色で選ぶ（`config/<色>.yaml`。自己位置推定の launch の `env:=<色>` と同じ色にする。
   選んだ色の `cmd_vel` を受けるノードが無ければ、見つかった車椅子を表示して止める）。録画するのは点群・`motor_speed_ts`・
   `cmd_vel`・バッテリーと推定の出力（`motor_angle_ts`・`joy_ts`・`speed_mode`・GNSS は録らない）。
 
   ```bash
-  WHILL=red localization_tools/drive/run_test.sh real spin real_red_spin_01
+  localization_tools/drive/run_test.sh red spin real_red_spin_01
   ```
 - **予行演習**：`CONFIG=real_in_gazebo drive/run_test.sh gazebo <動き> <bag 名>` で、実機の上限・`/ekf_pose`・ジョイスティックの
   監視（`/test/joy_ts`）を Gazebo で試せる。

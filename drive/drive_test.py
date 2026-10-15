@@ -5,8 +5,7 @@
   python3 drive_test.py <target> <動き> --simulate                  計算した軌跡と範囲の確認だけ（ROS 不要）
   python3 drive_test.py <target> --list                             動きの一覧
   python3 drive_test.py <target> --record-topics                    録画するトピック（run_test.sh が使う）
-    target：gazebo か real（drive/config/<target>.yaml）、または設定の yaml のパス
-    --whill <色>：実機の車椅子（blue・red・white）。設定の whill を変え、トピックの {whill} を Drp5_whill_<色> にする
+    target：gazebo、実機の車椅子 red・blue・white（drive/config/<target>.yaml）、または設定の yaml のパス
 
 走る前に、出発時の姿勢を基準に計算した軌跡が範囲（area。plan_margin の余裕込み）に収まるかを確かめ、収まらなければ走らない。
 走行中は次のどれかで止める（0 の指令を出して終わる。終了コード 1）：
@@ -38,30 +37,13 @@ def config_path(target):
     return target if target.endswith('.yaml') else os.path.join(HERE, 'config', f'{target}.yaml')
 
 
-WHILL_COLORS = ('blue', 'red', 'white')
-
-
-def load_config(target, whill=None):
-    """設定を読み、トピックの {whill} を Drp5_whill_<色>（--whill か設定の whill）にする."""
-    cfg = load_yaml(config_path(target))
-    color = whill or cfg.get('whill')
-    if color:
-        if color not in WHILL_COLORS:
-            raise SystemExit(f'車椅子の色は {", ".join(WHILL_COLORS)} のどれか: {color}')
-        cfg['whill'] = color
-
-    def fill(v):
-        if isinstance(v, str):
-            if '{whill}' in v and not color:
-                raise SystemExit(f'設定に whill（車椅子の色）が無い: {v}')
-            return v.replace('{whill}', f'Drp5_whill_{color}') if color else v
-        if isinstance(v, list):
-            return [fill(x) for x in v]
-        if isinstance(v, dict):
-            return {k: fill(x) for k, x in v.items()}
-        return v
-
-    return fill(cfg)
+def load_config(target):
+    """設定（drive/config/<target>.yaml かそのパス）を読む."""
+    path = config_path(target)
+    if not os.path.isfile(path):
+        names = sorted(f[:-5] for f in os.listdir(os.path.join(HERE, 'config')) if f.endswith('.yaml'))
+        raise SystemExit(f'設定が無い：{path}（使えるのは {"・".join(names)}、または設定の yaml のパス）')
+    return load_yaml(path)
 
 
 # ---------------------------------------------------------------------------
@@ -195,8 +177,7 @@ def inside(area, x, y, margin=0.0):
 def plan_report(cfg, segs, name):
     rows, pts = simulate(segs, cfg.get('sim_omega_scale', 1.0))
     area, margin = cfg['area'], cfg.get('plan_margin', 0.0)
-    who = f"、車椅子 Drp5_whill_{cfg['whill']}" if cfg.get('whill') else ''
-    lines = [f"動き {name}（{cfg['target']}{who}、上限 v {cfg['limits']['v_max']} m/s・後退 {cfg['limits']['v_reverse_max']} m/s・"
+    lines = [f"動き {name}（{cfg['target']}、上限 v {cfg['limits']['v_max']} m/s・後退 {cfg['limits']['v_reverse_max']} m/s・"
              f"omega {cfg['limits']['w_max']} rad/s）"]
     for s, t, x, y, yaw in rows:
         kind, target = s['end']
@@ -427,12 +408,11 @@ def main():
     ap.add_argument('--list', action='store_true')
     ap.add_argument('--record-topics', action='store_true')
     ap.add_argument('--describe', action='store_true', help='動きと設定を 1 行で（録画の情報ファイル用）')
-    ap.add_argument('--whill', default=None, help='実機の車椅子の色（blue・red・white）。既定は設定の whill')
     ap.add_argument('--command-topic', action='store_true', help='指令のトピック（run_test.sh が使う）')
-    # run_test.sh は「<target> --whill <色> <動き>」の順に渡す。parse_args は省略できる位置引数（動き）がオプションの後にあると
-    # 受け取れない（unrecognized arguments になる）ので、混ざっていても読めるようにする
+    # parse_args は省略できる位置引数（動き）がオプションの後にあると受け取れない（unrecognized arguments になる）ので、
+    # オプションと位置引数が混ざっていても読めるようにする
     args = ap.parse_intermixed_args()
-    cfg = load_config(args.target, args.whill)
+    cfg = load_config(args.target)
     if args.command_topic:
         print(cfg['command']['topic'])
         return 0
@@ -447,7 +427,7 @@ def main():
     segs = build(cfg, profiles, args.profile)
     if args.describe:
         lim, area = cfg['limits'], cfg['area']
-        who = f"車椅子 Drp5_whill_{cfg['whill']}。" if cfg.get('whill') else ''
+        who = f"車椅子 {cfg['target']}。" if cfg['target'] != 'gazebo' else ''
         print(f"{who}{profiles[args.profile].get('description', '')}。上限 v {lim['v_max']}・後退 {lim['v_reverse_max']} m/s・"
               f"omega {lim['w_max']} rad/s、範囲 前 {area['forward']}・後ろ {area['behind']}・左 {area['left']}・"
               f"右 {area['right']} m（出発時の車体を基準）")
