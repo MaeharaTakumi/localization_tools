@@ -11,14 +11,14 @@
 - v の倍率：直進の区間ごとに、NDT の LiDAR の移動距離 / オドメトリの v の積分（向きが一定なので LiDAR と車体の移動は同じ）
 - 取付の水平位置 (x, y)：その場の旋回では車体（回転の中心）が動かないので、LiDAR の位置 p = c + R(yaw_L) m'
   （c は区間ごとの回転の中心、ゆっくりした移動も 1 次で許す）を最小二乗で解く。m' = R(-yaw_m) m
-- 取付の yaw：直進の区間で、LiDAR の yaw - 車体の進む向き（横滑りしないと仮定）。
-  オドメトリの v が安定してから（v が区間の後半の平均の --steady-tol 以内に入ってから）の区間で、オドメトリの平均の v・omega
-  （区間全体で 1 つずつ。omega は推定した倍率を掛ける。オドメトリの振動に左右されないように平均にする）で動く円弧
-  p_B(t) = p0 + R(theta0) c(t) を車体の位置に最小二乗で当てはめ（p0・theta0 と長さの倍率。線形）、進む向き theta0 + omega t を求める。
-  車体の位置は p_L - R(yaw_L) m'（m' は旋回で求めた取付。取付の yaw に左右されない）。少し曲がって進んでも偏らない。
-  各時刻の yaw_L - (theta0 + omega t) を平均して取付の yaw とする（図 <出力>_yaw.png に各時刻の値と最終値）。
-  （各時刻の向きを平滑化して外れ値を除く方法、始点と終点を結ぶ方法、Censi ほか（IEEE T-RO 2013）の同時推定とも比べ、2026-10-16 に
-  ユーザー指示でこの方法に決めた）
+- 取付の yaw：直進の区間で、LiDAR の yaw - 車体の進む向き（横滑りしないと仮定）を各時刻で求め、RANSAC で外れ値を除いて平均する。
+  車体の位置 p_L - R(yaw_L) m'（m' は旋回で求めた取付。取付の yaw に左右されない）と LiDAR の yaw を前後 --yaw-window/2 秒の局所 1 次式で
+  平滑化し、各時刻の進む向き（位置の傾き）と LiDAR の yaw の差を求める。オドメトリの v（同じ窓で平滑化）が区間の後半の平均の
+  --steady-tol 以内でない時刻は使わない。RANSAC：各時刻の値を 1 つ選んで仮の値とし、そこから --ransac-threshold 度以内の時刻
+  （インライア）を数えることを --ransac-iterations 回くり返し、インライアが最も多いものを選ぶ。そのインライアの平均（定数の最小二乗）を
+  取付の yaw とする（平均のまわりでインライアを選び直してもう一度平均する）。図 <出力>_yaw.png に各時刻の値・外れ値・最終値。
+  （区間全体の円弧の当てはめ、始点と終点を結ぶ方法、Censi ほか（IEEE T-RO 2013）の同時推定とも比べ、2026-10-16 にユーザー指示で
+  この方法に決めた）
 - 取付の z・roll・pitch（参考）：止まっている区間の NDT の roll・pitch（床が水平と仮定）と、--map の地図から求めた
   床の高さとの差（地図の床が正しいと仮定）
 - --truth（Gazebo だけ）：/tf_static の取付と、真値の yaw の変化・移動距離から求めた倍率を並べて出す
@@ -110,36 +110,55 @@ def fit_offset(turns):
     return x[:2], np.sqrt(np.diag(cov)[:2]), float(np.sqrt(res @ res / dof)), x
 
 
-def straight_yaw(row, m_rot, w_scale, tol):
-    """直進の区間の取付の yaw：平均の v・omega の円弧を車体の位置に当てはめ、LiDAR の yaw - 進む向きの平均."""
-    nt, nv, ot, ov, ow = row['_nt'], row['_nv'], row['_ot'], row['_ov'], row['_ow']
-    half = ot >= ot[0] + (ot[-1] - ot[0]) / 2
-    v_ref = ov[half].mean()
-    ok = np.abs(ov - v_ref) <= tol * abs(v_ref)
-    t_steady = float(ot[np.argmax(ok)]) if ok.any() else float(ot[0])
-    mo, mn = ot >= t_steady, nt >= t_steady
-    v_mean, w_mean = float(ov[mo].mean()), float(ow[mo].mean() * w_scale)
-    t = nt[mn] - t_steady
-    yaw_l = nv[mn, 5]
-    p_b = nv[mn, :2] - np.array([rot(y) @ m_rot for y in yaw_l])   # 車体の位置（取付の yaw に左右されない）
-    if abs(w_mean) > 1e-9:
-        c = np.stack([np.sin(w_mean * t), 1 - np.cos(w_mean * t)], axis=1) * (v_mean / w_mean)
-    else:
-        c = np.stack([v_mean * t, np.zeros_like(t)], axis=1)
-    # p_B = p0 + [[a, -b], [b, a]] c（a = s cos theta0, b = s sin theta0）を最小二乗で
-    n = len(t)
-    a_mat = np.zeros((2 * n, 4))
-    a_mat[0::2] = np.stack([np.ones(n), np.zeros(n), c[:, 0], -c[:, 1]], axis=1)
-    a_mat[1::2] = np.stack([np.zeros(n), np.ones(n), c[:, 1], c[:, 0]], axis=1)
-    rhs = p_b.reshape(-1)
-    sol, *_ = np.linalg.lstsq(a_mat, rhs, rcond=None)
-    theta0 = math.atan2(sol[3], sol[2])
-    res = rhs - a_mat @ sol
-    d = yaw_l - (theta0 + w_mean * t)
-    d = np.arctan2(np.sin(d), np.cos(d))
-    return {'t_steady': t_steady, 'v_mean': v_mean, 'w_mean': w_mean, 'length_scale': float(math.hypot(sol[2], sol[3])),
-            'fit_rms': float(np.sqrt(np.mean(res ** 2))), 'dyaw_ndt': float(yaw_l[-1] - yaw_l[0]),
-            'yaw_m': float(d.mean()), 'yaw_sd': float(d.std()), '_yaw_series': (t, d)}
+def local_fit(t, y, half):
+    """各時刻で前後 half 秒の局所 1 次式の値と傾き（点が 3 未満なら nan）."""
+    val, slope = np.full(len(t), np.nan), np.full(len(t), np.nan)
+    for i, ti in enumerate(t):
+        m = np.abs(t - ti) <= half
+        if m.sum() < 3:
+            continue
+        slope[i], val[i] = np.polyfit(t[m] - ti, y[m], 1)
+    return val, slope
+
+
+def wrap_angle(a):
+    return np.arctan2(np.sin(a), np.cos(a))
+
+
+def ransac_constant(d, threshold, iterations, seed=0):
+    """一定の値のモデルを RANSAC で当てはめる：インライアの印と、インライアの平均（定数の最小二乗）."""
+    rng = np.random.default_rng(seed)
+    best, best_score = None, None
+    for i in rng.integers(0, len(d), iterations):   # 1 点を選んで仮の値に
+        inl = np.abs(wrap_angle(d - d[i])) <= threshold
+        score = (int(inl.sum()), -float(np.abs(wrap_angle(d[inl] - d[i])).sum()))   # インライアの数、同じなら残差の小さいほう
+        if best_score is None or score > best_score:
+            best, best_score = inl, score
+    center = float(d[best].mean())
+    inl = np.abs(wrap_angle(d - center)) <= threshold   # 平均のまわりで選び直す
+    return inl, float(d[inl].mean())
+
+
+def straight_yaw(row, m_rot, window, tol, threshold, iterations):
+    """直進の区間の取付の yaw：平滑化した車体の進む向きと LiDAR の yaw の差を各時刻で求め、RANSAC で外れ値を除いて平均."""
+    nt, nv, ot, ov = row['_nt'], row['_nv'], row['_ot'], row['_ov']
+    half = window / 2.0
+    v_ref = ov[ot >= ot[0] + (ot[-1] - ot[0]) / 2].mean()
+    yaw_l = nv[:, 5]
+    p_b = nv[:, :2] - np.array([rot(y) @ m_rot for y in yaw_l])   # 車体の位置（取付の yaw に左右されない）
+    _, vx = local_fit(nt, p_b[:, 0], half)
+    _, vy = local_fit(nt, p_b[:, 1], half)
+    yaw_s, _ = local_fit(nt, yaw_l, half)
+    v_odom = np.array([ov[np.abs(ot - ti) <= half].mean() if (np.abs(ot - ti) <= half).any() else np.nan for ti in nt])
+    edge = (nt >= nt[0] + half) & (nt <= nt[-1] - half)   # 窓が区間に収まる時刻だけ
+    ok = edge & np.isfinite(vx) & (np.abs(v_odom - v_ref) <= tol * abs(v_ref))
+    heading = np.arctan2(vy, vx) + (math.pi if v_ref < 0 else 0.0)
+    d = wrap_angle(yaw_s - heading)[ok]
+    if len(d) == 0:
+        return {'yaw_m': float('nan'), 'yaw_sd': float('nan'), 'n_inlier': 0, 'n_outlier': 0}
+    inl, yaw_m = ransac_constant(d, threshold, iterations)
+    return {'yaw_m': yaw_m, 'yaw_sd': float(d[inl].std()), 'n_inlier': int(inl.sum()), 'n_outlier': int((~inl).sum()),
+            'v_mean': float(v_ref), 'dyaw_ndt': float(yaw_l[-1] - yaw_l[0]), '_yaw_series': (nt[ok] - nt[0], d, inl)}
 
 
 def read_pcd_xyz(path):
@@ -203,6 +222,10 @@ def main():
     ap.add_argument('--cmd-timeout', type=float, default=seg['cmd_timeout'])
     ap.add_argument('--steady-tol', type=float, default=ms['steady_tol'],
                     help='直進でオドメトリの v が安定したとみなす、後半の平均からの割合')
+    ap.add_argument('--yaw-window', type=float, default=ms['yaw_window'], help='取付の yaw：平滑化の窓 [s]')
+    ap.add_argument('--ransac-threshold', type=float, default=ms['ransac_threshold_deg'],
+                    help='取付の yaw：RANSAC のインライアとみなす差 [deg]')
+    ap.add_argument('--ransac-iterations', type=int, default=ms['ransac_iterations'], help='取付の yaw：RANSAC の回数')
     ap.add_argument('--current-scale', default='1.0,0.922', help='今の odom_scale [v, omega]（比べるだけ）')
     ap.add_argument('--map', default='', help='地図の pcd（取付の z を床の高さから求めるとき）')
     ap.add_argument('--truth', action='store_true', help='Gazebo の真値でも同じ量を求めて並べる（比較だけ）')
@@ -272,19 +295,19 @@ def main():
         m_rot, m_sd, rms, sol = fit_offset(turns)
     else:   # 旋回が無ければ今の取付
         m_rot = rot(-now[5]) @ now[:2] if np.isfinite(now).all() else np.zeros(2)
-    w_scale = out.get('omega_scale', cur_w)
     yaw_m = 0.0
     yaw_series = []
     if v_rows:
-        print(f'\nLiDAR mount yaw from straight segments (steady after |v - mean| <= {args.steady_tol:.0%}, '
-              f'arc with the mean odometry v and omega x {w_scale:.4f}):')
+        print(f'\nLiDAR mount yaw from straight segments (each time, window {args.yaw_window} s, steady |v - mean| <= '
+              f'{args.steady_tol:.0%}; RANSAC threshold {args.ransac_threshold} deg, {args.ransac_iterations} iterations):')
         for x in v_rows:
-            x.update(straight_yaw(x, m_rot, w_scale, args.steady_tol))
-            print(f"  {x['bag']:<18} {x['t_steady']:8.2f}-{x['t1']:8.2f}  v {x['v_mean']:+.4f} m/s, omega {x['w_mean']:+.5f} rad/s "
-                  f"(NDT yaw change {math.degrees(x['dyaw_ndt']):+.3f} deg), arc fit rms {x['fit_rms'] * 1000:.1f} mm  "
-                  f"-> mount yaw {math.degrees(x['yaw_m']):+.3f} deg (sd over time {math.degrees(x['yaw_sd']):.3f})")
+            x.update(straight_yaw(x, m_rot, args.yaw_window, args.steady_tol, math.radians(args.ransac_threshold),
+                                  args.ransac_iterations))
+            print(f"  {x['bag']:<18} {x['t0']:8.2f}-{x['t1']:8.2f}  {x['n_inlier']} inliers, {x['n_outlier']} outliers "
+                  f"(NDT yaw change {math.degrees(x['dyaw_ndt']):+.3f} deg)  -> mount yaw {math.degrees(x['yaw_m']):+.3f} deg "
+                  f"(sd of inliers {math.degrees(x['yaw_sd']):.3f})")
         yaw_m = float(np.mean([x['yaw_m'] for x in v_rows]))
-        yaw_series = [(x['bag'], *x['_yaw_series'], x['yaw_m']) for x in v_rows]
+        yaw_series = [(x['bag'], *x['_yaw_series'], x['yaw_m']) for x in v_rows if '_yaw_series' in x]
         for x in v_rows:
             for k in [k for k in x if k.startswith('_')]:
                 del x[k]

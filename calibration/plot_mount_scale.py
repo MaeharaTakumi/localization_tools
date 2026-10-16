@@ -3,7 +3,7 @@
 
   左：その場の旋回の LiDAR の位置（回転の中心からの位置）と、推定した取付・今の取付の円
   中・右：区間ごとの omega・v の倍率（推定値と今の設定の線。--truth なら真値からの倍率の点）
-plot_mount_yaw：直進の区間の各時刻の取付の yaw と、最終的な取付の yaw（<出力>_yaw.png）
+plot_mount_yaw：直進の区間の各時刻の取付の yaw（RANSAC のインライア・外れ値）と、最終的な取付の yaw（<出力>_yaw.png）
 """
 import math
 import os
@@ -20,7 +20,7 @@ from plot_noise import box_on  # noqa: E402
 from plot_spin import (capitalize_labels, GRID, INK, INK2, SURFACE, TRUTH_COLOR,  # noqa: E402
                        TRUTH_LW)
 
-C_EST, C_SEG, C_TRUTH = '#2a78d6', '#1baf7a', '#eb6834'
+C_EST, C_SEG, C_TRUTH, C_OUT = '#2a78d6', '#1baf7a', '#eb6834', '#eda100'
 
 
 def style(ax):
@@ -100,9 +100,9 @@ def plot_mount_scale(path, turns, sol, out, now):
 
 
 def plot_mount_yaw(path, yaw_series, out, now):
-    """直進の区間の各時刻の取付の yaw（LiDAR の yaw - 当てはめた円弧の進む向き）と、最終的な取付の yaw.
+    """直進の区間の各時刻の取付の yaw（RANSAC のインライア・外れ値）と、最終的な取付の yaw.
 
-    yaw_series：[(録画, 安定してからの時刻, 各時刻の yaw, 区間の yaw), ...]（calibrate_mount_scale.py）。区間は横に並べる。
+    yaw_series：[(録画, 区間の始めからの時刻, 各時刻の yaw, インライアの印, 区間の yaw), ...]（calibrate_mount_scale.py）。区間は横に並べる。
     """
     setup()
     fig, ax = plt.subplots(figsize=(11, 5.4), facecolor=SURFACE)
@@ -111,15 +111,17 @@ def plot_mount_yaw(path, yaw_series, out, now):
     ax.axhline(math.degrees(now[5]), color=TRUTH_COLOR, lw=TRUTH_LW, zorder=2,
                label=f'Current mount yaw (TF) {math.degrees(now[5]):+.3f} deg')
     t_shift = 0.0
-    for j, (bag, t, d, yaw_seg) in enumerate(yaw_series):
+    for j, (bag, t, d, inl, yaw_seg) in enumerate(yaw_series):
         x = t + t_shift
-        ax.scatter(x, np.degrees(d), s=10, color=C_SEG, alpha=0.7, lw=0, zorder=3,
-                   label='Each time (LiDAR yaw - heading of the fitted arc)' if j == 0 else None)
+        ax.scatter(x[inl], np.degrees(d[inl]), s=10, color=C_SEG, alpha=0.7, lw=0, zorder=3,
+                   label='Each time, RANSAC inlier' if j == 0 else None)
+        ax.scatter(x[~inl], np.degrees(d[~inl]), s=18, color=C_OUT, lw=0, zorder=4,
+                   label='Each time, outlier (removed)' if j == 0 and (~inl).any() else None)
         t_shift = x.max() + 1.0
     ax.axhline(math.degrees(final), color=C_EST, lw=1.6, zorder=5,
-               label=f'Final mount yaw {math.degrees(final):+.3f} deg (mean)')
-    ax.set_xlabel('Time from the steady start of the straight segment [s]')
-    ax.set_ylabel('Mount yaw [deg]')
+               label=f'Final mount yaw {math.degrees(final):+.3f} deg (mean of inliers)')
+    ax.set_xlabel('Time from the start of the straight segment [s]')
+    ax.set_ylabel('Mount yaw (LiDAR yaw - heading of the base) [deg]')
     ax.set_title('LiDAR mount yaw on the straight segment: each time and the final value')
     ax.legend(loc='upper left', bbox_to_anchor=(1.01, 1.0), frameon=False, fontsize=8.5)
     fig.tight_layout()

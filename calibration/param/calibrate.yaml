@@ -18,7 +18,10 @@ noise:
 
 # LiDAR の取付とオドメトリの倍率（calibrate_mount_scale.py）
 mount_scale:
-  steady_tol: 0.05     # 直進でオドメトリの v が安定したとみなす、区間の後半の平均からの割合（取付の yaw は安定してからの区間で求める）
+  steady_tol: 0.05     # 取付の yaw：オドメトリの v が区間の後半の平均からこの割合以内の時刻だけ使う
+  yaw_window: 1.0      # 取付の yaw：車体の位置・LiDAR の yaw・オドメトリを平滑化する窓 [s]（前後 0.5 s）
+  ransac_threshold_deg: 0.3   # 取付の yaw：RANSAC で仮の値からこの差 [deg] 以内をインライアとする
+  ransac_iterations: 200      # 取付の yaw：RANSAC の回数（1 点を選んで仮の値にする）
 
 # （参考。calibrate.py では使わない）NDT の R を「真値 + ノイズ」の初期値で NDT を計算し直して求める
 # （calibrate_ndt_noise.py を単独で使うとき。Gazebo だけ。止まる区間だけを流す）
