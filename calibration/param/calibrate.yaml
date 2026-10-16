@@ -1,0 +1,31 @@
+# パラメータ推定の設定（calibration の各プログラムのオプションの既定値。コマンド行のオプションで上書きできる）。
+# 推定用の動きは motion.yaml。
+
+# 指令が一定の区間の取り方（calibrate_noise.py・calibrate_mount_scale.py）
+segments:
+  settle: 0.5          # 指令が変わってから使わない時間 [s]
+  margin: 0.1          # 次の変化の前に使わない時間 [s]
+  min_len: 1.0         # 使う区間の最短 [s]
+  cmd_timeout: 0.5     # 指令が途切れてから止まるまで [s]（controller が止める）
+
+# 観測ノイズ R（calibrate_noise.py）
+noise:
+  window: 1.0          # 局所 1 次式の窓 [s]
+  corr_window: 3.0     # 時間的なつながりを測るときの局所 1 次式の窓 [s]
+  max_lag: 2.0         # 自己相関を足す最大の遅れ [s]
+  gazebo_tread: 0.492  # Gazebo のオドメトリの車輪の間隔 [m]（diff_drive_controller の wheel_separation。R_omega = 4 R_v / b^2 に使う。
+                       # 実機は whill_odometry の tread_width を読む）
+
+# LiDAR の取付とオドメトリの倍率（calibrate_mount_scale.py）
+mount_scale:
+  steady_tol: 0.05     # 直進でオドメトリの v が安定したとみなす、区間の後半の平均からの割合（取付の yaw は安定してからの区間で求める）
+
+# （参考。calibrate.py では使わない）NDT の R を「真値 + ノイズ」の初期値で NDT を計算し直して求める
+# （calibrate_ndt_noise.py を単独で使うとき。Gazebo だけ。止まる区間だけを流す）
+ndt_noise:
+  settle: 1.0          # 止まってから使わない時間 [s]
+  use_time: 10.0       # 使う時間 [s]（止まる区間ごと。止まる時間が短ければその分だけ）
+  lead: 1.0            # 使う区間の前から流す時間 [s]（NDT を真値の初期値でならす）
+  passes: 3            # ノイズありで流す回数（このほかにノイズなしを 1 回）
+  # 初期値に足すノイズ：6 軸それぞれ正規分布 N(0, sigma^2)（運用中の EKF の誤差の rms の 2〜4 倍）
+  sigma: {x: 0.02, y: 0.02, z: 0.01, roll_deg: 0.3, pitch_deg: 0.3, yaw_deg: 1.0}   # [m], [deg]

@@ -7,7 +7,7 @@
   今の設定（alpha 0）と dev_log.md の 24. で試した alpha で描く（加速度の項は 0）
 - 点：指令が一定の区間（オドメトリが指令の変化の半分まで応答した 0.5 s 後〜次の変化の 0.1 s 前、1 s 以上）ごとに、
   （応答から数えるのは、最初の指令が届くまで遅れることがあるため。後退の録画では 0.7 s 遅れて動き出した）
-  - 真値なし：オドメトリ（odom_scale 後）から前後 0.5 s の局所 1 次式を除いた残差の分散（estimate_noise.py と同じ）
+  - 真値なし：オドメトリ（odom_scale 後）から前後 0.5 s の局所 1 次式を除いた残差の分散（calibrate_noise.py と同じ）
   - 真値との差：オドメトリと真値（/wheelchair/pose の微分）の差の 2 乗平均（一定のずれも含む。Gazebo だけ）
   横軸は区間の指令の |v|・|omega|
 """
@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]
-from estimate_noise import command_segments, odom_residuals, stamp  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]
+from calibrate_noise import command_segments, odom_residuals, stamp  # noqa: E402
 from plot_spin import capitalize_labels, GRID, INK2, read_bag, SERIES, SURFACE  # noqa: E402
 from plot_velocity import truth_velocity  # noqa: E402
 

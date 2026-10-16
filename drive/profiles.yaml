@@ -6,7 +6,7 @@
 # 区間の終わり（どれか 1 つ）：
 #   time [s]、yaw [deg]（向きの変化。符号は w と同じ）、distance [m]（車体の中心が進んだ道のり）
 #   stop [s]：止まる。label を書くと動作の開始時刻の記録が stop_<label>_start / stop_<label>_end になる
-#     （noise/ndt_init_noise.py が止まった区間として使う）
+#     （calibration/calibrate_ndt_noise.py が止まった区間として使う）
 #   slalom：{v, wavelength [m], amplitude [m], cycles}。向きを正弦波で変え、横に amplitude だけ振れる。
 #     最初と最後の半周期は振幅半分（向きの平均が初めの向きになり、終わりで元の向きに戻る）。長さは wavelength x (cycles + 1)
 # repeat: n と segments で繰り返す（name・label の {i} は 0 から n-1）
@@ -91,7 +91,3 @@ reverse:
     - {name: forward 2, v: 0.333, distance: 1.5}
     - {name: reverse fast, v: -1.0, distance: 1.5}
 
-# パラメータ推定用（calib/run_calib.sh がこの動きで走って推定する）。速度・角速度・秒数・周回数などは param/calib.yaml の motion
-calib:
-  description: パラメータ推定用（止まる → その場で左右に旋回 → 片道の直進。速さ・回数・秒数は param/calib.yaml）
-  generate: calib

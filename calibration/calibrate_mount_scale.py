@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
 """LiDAR の取付位置とオドメトリの倍率を、NDT の解とオドメトリから推定する（真値なし。コンテナ test 内で実行）.
 
-  python3 estimate_calibration.py <bag> [<bag> ...] [--out /root/ros2_ws/fig/calib] [--truth] [--map <地図の pcd>]
+  python3 calibrate_mount_scale.py <bag> [<bag> ...] [--out /root/ros2_ws/fig/mount_scale] [--truth] [--map <地図の pcd>]
 
 使う走行：その場の旋回（取付位置・omega の倍率）と直進（v の倍率・取付の yaw）。区間は指令（cmd_vel）が一定のところ
-（変化の --settle 秒後から次の変化の --margin 秒前まで）。drive/profiles.yaml の spin・stops の走行で求まる。
+（変化の --settle 秒後から次の変化の --margin 秒前まで）。パラメータ推定用の動き（calibration/param/motion.yaml）や drive の spin・stops の走行で求まる。
+オプションの既定値は param/calibrate.yaml。
 
 - omega の倍率：旋回の区間ごとに、NDT の yaw の変化 / オドメトリの omega の積分（全区間の絶対値の和の比）
 - v の倍率：直進の区間ごとに、NDT の LiDAR の移動距離 / オドメトリの v の積分（向きが一定なので LiDAR と車体の移動は同じ）
 - 取付の水平位置 (x, y)：その場の旋回では車体（回転の中心）が動かないので、LiDAR の位置 p = c + R(yaw_L) m'
   （c は区間ごとの回転の中心、ゆっくりした移動も 1 次で許す）を最小二乗で解く。m' = R(-yaw_m) m
-- 取付の yaw：直進の区間で、LiDAR の yaw - 進む向き atan2(dy, dx)（横滑りしないと仮定）
+- 取付の yaw：直進の区間で、LiDAR の yaw - 車体の進む向き（横滑りしないと仮定）。
+  オドメトリの v が安定してから（v が区間の後半の平均の --steady-tol 以内に入ってから）の区間で、オドメトリの平均の v・omega
+  （区間全体で 1 つずつ。omega は推定した倍率を掛ける。オドメトリの振動に左右されないように平均にする）で動く円弧
+  p_B(t) = p0 + R(theta0) c(t) を車体の位置に最小二乗で当てはめ（p0・theta0 と長さの倍率。線形）、進む向き theta0 + omega t を求める。
+  車体の位置は p_L - R(yaw_L) m'（m' は旋回で求めた取付。取付の yaw に左右されない）。少し曲がって進んでも偏らない。
+  各時刻の yaw_L - (theta0 + omega t) を平均して取付の yaw とする（図 <出力>_yaw.png に各時刻の値と最終値）。
+  （各時刻の向きを平滑化して外れ値を除く方法、始点と終点を結ぶ方法、Censi ほか（IEEE T-RO 2013）の同時推定とも比べ、2026-10-16 に
+  ユーザー指示でこの方法に決めた）
 - 取付の z・roll・pitch（参考）：止まっている区間の NDT の roll・pitch（床が水平と仮定）と、--map の地図から求めた
   床の高さとの差（地図の床が正しいと仮定）
 - --truth（Gazebo だけ）：/tf_static の取付と、真値の yaw の変化・移動距離から求めた倍率を並べて出す
@@ -26,8 +34,9 @@ import sys
 import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise', 'calib')]   # plot_spin などを import する
-from estimate_noise import classify, command_segments, mount_from_tf_static, stamp  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
+from calibrate_noise import classify, command_segments, mount_from_tf_static, stamp  # noqa: E402
+import params  # noqa: E402
 from plot_spin import read_bag  # noqa: E402
 from pose_math import matrix_to_vec, pose_msg_to_matrix  # noqa: E402
 
@@ -101,6 +110,38 @@ def fit_offset(turns):
     return x[:2], np.sqrt(np.diag(cov)[:2]), float(np.sqrt(res @ res / dof)), x
 
 
+def straight_yaw(row, m_rot, w_scale, tol):
+    """直進の区間の取付の yaw：平均の v・omega の円弧を車体の位置に当てはめ、LiDAR の yaw - 進む向きの平均."""
+    nt, nv, ot, ov, ow = row['_nt'], row['_nv'], row['_ot'], row['_ov'], row['_ow']
+    half = ot >= ot[0] + (ot[-1] - ot[0]) / 2
+    v_ref = ov[half].mean()
+    ok = np.abs(ov - v_ref) <= tol * abs(v_ref)
+    t_steady = float(ot[np.argmax(ok)]) if ok.any() else float(ot[0])
+    mo, mn = ot >= t_steady, nt >= t_steady
+    v_mean, w_mean = float(ov[mo].mean()), float(ow[mo].mean() * w_scale)
+    t = nt[mn] - t_steady
+    yaw_l = nv[mn, 5]
+    p_b = nv[mn, :2] - np.array([rot(y) @ m_rot for y in yaw_l])   # 車体の位置（取付の yaw に左右されない）
+    if abs(w_mean) > 1e-9:
+        c = np.stack([np.sin(w_mean * t), 1 - np.cos(w_mean * t)], axis=1) * (v_mean / w_mean)
+    else:
+        c = np.stack([v_mean * t, np.zeros_like(t)], axis=1)
+    # p_B = p0 + [[a, -b], [b, a]] c（a = s cos theta0, b = s sin theta0）を最小二乗で
+    n = len(t)
+    a_mat = np.zeros((2 * n, 4))
+    a_mat[0::2] = np.stack([np.ones(n), np.zeros(n), c[:, 0], -c[:, 1]], axis=1)
+    a_mat[1::2] = np.stack([np.zeros(n), np.ones(n), c[:, 1], c[:, 0]], axis=1)
+    rhs = p_b.reshape(-1)
+    sol, *_ = np.linalg.lstsq(a_mat, rhs, rcond=None)
+    theta0 = math.atan2(sol[3], sol[2])
+    res = rhs - a_mat @ sol
+    d = yaw_l - (theta0 + w_mean * t)
+    d = np.arctan2(np.sin(d), np.cos(d))
+    return {'t_steady': t_steady, 'v_mean': v_mean, 'w_mean': w_mean, 'length_scale': float(math.hypot(sol[2], sol[3])),
+            'fit_rms': float(np.sqrt(np.mean(res ** 2))), 'dyaw_ndt': float(yaw_l[-1] - yaw_l[0]),
+            'yaw_m': float(d.mean()), 'yaw_sd': float(d.std()), '_yaw_series': (t, d)}
+
+
 def read_pcd_xyz(path):
     """PCD（ascii / binary、x y z を含む）を読む."""
     with open(path, 'rb') as f:
@@ -147,17 +188,21 @@ def floor_height(points, xy, z_lidar, radius=1.0):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    settings = params.settings()   # オプションの既定値（param/calibrate.yaml）
+    seg, ms = settings['segments'], settings['mount_scale']
     ap.add_argument('bags', nargs='+')
-    ap.add_argument('--out', default='/root/ros2_ws/fig/calib')
+    ap.add_argument('--out', default='/root/ros2_ws/fig/mount_scale')
     ap.add_argument('--odom', default='/wheelchair/odom', help='倍率を掛ける前のオドメトリ')
     ap.add_argument('--ndt', default='/ndt_pose')
     ap.add_argument('--cmd', default='/wheelchair/diff_drive_controller/cmd_vel')
     ap.add_argument('--base', default='base_footprint')
     ap.add_argument('--lidar', default='velodyne')
-    ap.add_argument('--settle', type=float, default=0.5)
-    ap.add_argument('--margin', type=float, default=0.1)
-    ap.add_argument('--min-len', type=float, default=1.0)
-    ap.add_argument('--cmd-timeout', type=float, default=0.5)
+    ap.add_argument('--settle', type=float, default=seg['settle'])
+    ap.add_argument('--margin', type=float, default=seg['margin'])
+    ap.add_argument('--min-len', type=float, default=seg['min_len'])
+    ap.add_argument('--cmd-timeout', type=float, default=seg['cmd_timeout'])
+    ap.add_argument('--steady-tol', type=float, default=ms['steady_tol'],
+                    help='直進でオドメトリの v が安定したとみなす、後半の平均からの割合')
     ap.add_argument('--current-scale', default='1.0,0.922', help='今の odom_scale [v, omega]（比べるだけ）')
     ap.add_argument('--map', default='', help='地図の pcd（取付の z を床の高さから求めるとき）')
     ap.add_argument('--truth', action='store_true', help='Gazebo の真値でも同じ量を求めて並べる（比較だけ）')
@@ -195,11 +240,9 @@ def main():
             elif cls == 'straight':
                 dist = float(np.hypot(*(nv[-1, :2] - nv[0, :2])))
                 odom = integrate(r['ot'], r['ov'], ta, tb)
-                heading = math.atan2(nv[-1, 1] - nv[0, 1], nv[-1, 0] - nv[0, 0])
-                if odom < 0:   # 後退
-                    heading += math.pi
-                yaw_m = math.atan2(math.sin(nv[:, 5].mean() - heading), math.cos(nv[:, 5].mean() - heading))
-                row.update(dist=dist, odom=odom, ratio=dist / abs(odom), yaw_m=yaw_m)
+                mo = (r['ot'] >= a) & (r['ot'] <= b)
+                row.update(dist=dist, odom=odom, ratio=dist / abs(odom),
+                           _nt=nt, _nv=nv, _ot=r['ot'][mo], _ov=r['ov'][mo], _ow=r['ow'][mo])
                 if r['truth'] is not None:
                     row['truth_ratio'] = float(np.hypot(*(tru_b[:2] - tru_a[:2])) / abs(odom))
                 v_rows.append(row)
@@ -223,11 +266,31 @@ def main():
         for x in v_rows:
             extra = f"  truth {x['truth_ratio']:.4f}" if 'truth_ratio' in x else ''
             print(f"  {x['bag']:<18} {x['t0']:8.2f}-{x['t1']:8.2f}  {x['dist']:7.3f} m / {abs(x['odom']):7.3f} m = "
-                  f"{x['ratio']:.4f}  mount yaw {math.degrees(x['yaw_m']):+.2f} deg{extra}")
-    yaw_m = float(np.mean([x['yaw_m'] for x in v_rows])) if v_rows else 0.0
+                  f"{x['ratio']:.4f}{extra}")
     now = matrix_to_vec(mount_now) if mount_now is not None else np.full(6, np.nan)
     if turns:
         m_rot, m_sd, rms, sol = fit_offset(turns)
+    else:   # 旋回が無ければ今の取付
+        m_rot = rot(-now[5]) @ now[:2] if np.isfinite(now).all() else np.zeros(2)
+    w_scale = out.get('omega_scale', cur_w)
+    yaw_m = 0.0
+    yaw_series = []
+    if v_rows:
+        print(f'\nLiDAR mount yaw from straight segments (steady after |v - mean| <= {args.steady_tol:.0%}, '
+              f'arc with the mean odometry v and omega x {w_scale:.4f}):')
+        for x in v_rows:
+            x.update(straight_yaw(x, m_rot, w_scale, args.steady_tol))
+            print(f"  {x['bag']:<18} {x['t_steady']:8.2f}-{x['t1']:8.2f}  v {x['v_mean']:+.4f} m/s, omega {x['w_mean']:+.5f} rad/s "
+                  f"(NDT yaw change {math.degrees(x['dyaw_ndt']):+.3f} deg), arc fit rms {x['fit_rms'] * 1000:.1f} mm  "
+                  f"-> mount yaw {math.degrees(x['yaw_m']):+.3f} deg (sd over time {math.degrees(x['yaw_sd']):.3f})")
+        yaw_m = float(np.mean([x['yaw_m'] for x in v_rows]))
+        yaw_series = [(x['bag'], *x['_yaw_series'], x['yaw_m']) for x in v_rows]
+        for x in v_rows:
+            for k in [k for k in x if k.startswith('_')]:
+                del x[k]
+    if v_rows and not turns:
+        out['mount_yaw'] = yaw_m
+    if turns:
         m = rot(yaw_m) @ m_rot
         out.update(mount_xy=m.tolist(), mount_xy_sd=m_sd.tolist(), mount_yaw=yaw_m, fit_rms=rms)
         print(f'\nLiDAR mount (base -> LiDAR), from {len(turns)} turning segments (fit rms {rms * 1000:.1f} mm):')
@@ -261,8 +324,11 @@ def main():
         json.dump(out, f, indent=1)
     print(f'saved {args.out}.json')
     if turns:
-        from plot_calibration import plot_calibration
-        plot_calibration(args.out + '.png', turns, sol, out, now)
+        from plot_mount_scale import plot_mount_scale
+        plot_mount_scale(args.out + '.png', turns, sol, out, now)
+    if yaw_series:
+        from plot_mount_scale import plot_mount_yaw
+        plot_mount_yaw(args.out + '_yaw.png', yaw_series, out, now)
 
 
 if __name__ == '__main__':

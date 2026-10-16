@@ -27,7 +27,7 @@ from rosidl_runtime_py.utilities import get_message
 import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]   # plot_spin などを import する
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
 from plot_spin import load_run  # noqa: E402
 from transition_eval import evaluate as transition_metrics  # noqa: E402
 from bag_paths import tune_dir  # noqa: E402

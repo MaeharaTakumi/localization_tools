@@ -18,7 +18,7 @@ import rosbag2_py
 from rosidl_runtime_py.utilities import get_message
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]   # plot_odom_filter などを import する
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_odom_filter などを import する
 from plot_odom_filter import B, R  # noqa: E402
 
 TOPICS = ['/clock', '/velodyne_points', '/wheelchair/odom', '/wheelchair/joint_states', '/wheelchair/pose']

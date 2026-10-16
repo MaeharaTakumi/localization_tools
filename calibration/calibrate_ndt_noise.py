@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """NDT の観測ノイズ R_ndt を、「真値 + ノイズ」を初期値にして NDT を計算し直して求める（コンテナ test 内で実行）.
 
-  python3 ndt_init_noise.py <止まる走行の bag> [--out /root/ros2_ws/fig/ndt_init] [--passes 3] [--sigma ...]
-  python3 ndt_init_noise.py --from-json <出力の json> [--out ...]   # 計算し直さず図だけ描く
+  python3 calibrate_ndt_noise.py <止まる区間のある bag> [--out /root/ros2_ws/fig/ndt_noise] [--passes 3] [--sigma ...]
+  python3 calibrate_ndt_noise.py --from-json <出力の json> [--out ...]   # 計算し直さず図だけ描く
+  オプションの既定値は param/calibrate.yaml の ndt_noise
 
-- bag は drive/profiles.yaml の stops の走行（何か所かで止まる）。止まった区間は <bag>_phases.txt の stop_<名前>_start/_end。
-- 真値：止まった区間（始めの --settle 秒を除く）の /wheelchair/pose の平均（車体）に、取付（/tf_static）を掛けた LiDAR の姿勢。
+- bag は止まる区間のある Gazebo の走行（パラメータ推定用の動き calibration、drive の stops など）。止まった区間は
+  <bag>_phases.txt の stop_<名前>_start/_end。
+- 使うのは各区間の、止まってから --settle 秒後から --use-time 秒（区間が短ければ終わりまで）。
+- 真値：使う区間の /wheelchair/pose の平均（車体）に、取付（/tf_static）を掛けた LiDAR の姿勢。
   止まっているので真値の時刻のずれ（header なし）は効かない。
-- NDT（pcl_localization、Gazebo の設定）だけを ROS_DOMAIN_ID=99 で起動し、bag の点群を流す。点群が届くたびに、
-  止まった区間なら「真値 + 正規分布のノイズ」（--sigma、LiDAR の [x, y, z, roll, pitch, yaw]）を、それ以外は真値を
-  初期値として TF（map -> base、点群の stamp）で出す（NDT は use_tf_init_guess で引く）。
+- NDT（pcl_localization、Gazebo の設定）だけを ROS_DOMAIN_ID=99 で起動し、bag の点群を流す。**流すのは使う区間（と、その前の
+  --lead 秒）だけ**：区間ごとに ros2 bag play --start-offset で途中から流し、区間の終わりの点群が届いたら止める（速さは 1 倍）。
+  点群が届くたびに、使う区間なら「真値 + 正規分布のノイズ」（--sigma、LiDAR の [x, y, z, roll, pitch, yaw] それぞれの標準偏差）を、
+  それ以外（--lead の間）は真値を初期値として TF（map -> base、点群の stamp）で出す（NDT は use_tf_init_guess で引く）。
 - 1 回目はノイズなし（点群ごとのばらつきだけ）、2 回目以降はノイズあり（毎回違う乱数）。
 - NDT の解と真値の差から、区間ごとの平均（地図と Gazebo の一定のずれ）を引いたものの分散を R_ndt とする。
   初期値のずれが解に残る割合（傾き）も出す（1 なら初期値のまま、0 なら初期値に関係なく収束）。
@@ -36,6 +40,7 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
+import rosbag2_py
 from sensor_msgs.msg import PointCloud2
 from std_msgs.msg import Float32MultiArray
 from tf2_ros import StaticTransformBroadcaster
@@ -43,15 +48,15 @@ from tf2_ros import TransformBroadcaster
 import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]   # plot_spin などを import する
-from estimate_noise import mount_from_tf_static, NDT_KEYS, wrap  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
+from calibrate_noise import mount_from_tf_static, NDT_KEYS, wrap  # noqa: E402
+import params  # noqa: E402
 from plot_spin import read_bag  # noqa: E402
 from pose_math import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix  # noqa: E402
 
 SHARE = '/root/ros2_ws/install'
 NDT_PARAM = f'{SHARE}/pcl_localization_ros2/share/pcl_localization_ros2/param/localization.yaml'
 ENV = f'{SHARE}/localization_bringup/share/localization_bringup/param/env/gazebo.yaml'
-DEFAULT_SIGMA = '0.02,0.02,0.01,0.3,0.3,1.0'   # [m, m, m, deg, deg, deg]
 
 
 def matrix_to_quat(r):
@@ -82,7 +87,7 @@ class InitGuess(Node):
     """点群が届くたびに初期値（真値 + ノイズ）を TF で出し、NDT の解を集める."""
 
     def __init__(self, stops, truth_fn, mount, base, lidar, sigma):
-        super().__init__('ndt_init_noise')
+        super().__init__('ndt_noise_noise')
         self.stops, self.truth_fn, self.mount, self.sigma = stops, truth_fn, mount, sigma
         self.inv_mount = np.linalg.inv(mount)
         self.base, self.lidar = base, lidar
@@ -93,6 +98,7 @@ class InitGuess(Node):
         self.noisy = False
         self.pass_index = 0
         self.inits, self.results, self.debug = [], [], []
+        self.last_cloud_t = 0.0   # 最後に届いた点群の stamp（区間の終わりまで流したかを見る）
         self.create_subscription(PointCloud2, '/velodyne_points', self.on_cloud, qos_profile_sensor_data)
         self.create_subscription(PoseWithCovarianceStamped, '/ndt_pose', self.on_ndt, 10)
         self.create_subscription(Float32MultiArray, '/localization_debug', self.on_debug, 10)
@@ -105,6 +111,7 @@ class InitGuess(Node):
 
     def on_cloud(self, msg):
         t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+        self.last_cloud_t = t
         k = self.stop_of(t)
         if k >= 0:
             noise = self.rng.normal(0.0, self.sigma) if self.noisy else np.zeros(6)
@@ -148,7 +155,8 @@ def stop_proc(p):
             p.wait()
 
 
-def load_truth(d, stops_raw, settle, mount):
+def load_truth(d, stops_raw, settle, use_time, mount):
+    """止まった区間ごとに、使う区間 [始まり + settle, 始まり + settle + use_time]（区間の終わりまで）と真値."""
     clk = np.array([(t, m.clock.sec + m.clock.nanosec * 1e-9) for t, m in d['/clock']])
     pt = np.interp([t for t, _ in d['/wheelchair/pose']], clk[:, 0], clk[:, 1])
     pv = np.array([matrix_to_vec(pose_msg_to_matrix(m)) for _, m in d['/wheelchair/pose']])
@@ -156,11 +164,17 @@ def load_truth(d, stops_raw, settle, mount):
     pt, pv = pt[o], pv[o]
     pv[:, 5] = np.unwrap(pv[:, 5])
     stops = []
-    for name, a, b in stops_raw:
-        m = (pt >= a + settle) & (pt <= b)
+    for name, a, b in sorted(stops_raw, key=lambda x: x[1]):
+        wa, wb = a + settle, min(b, a + settle + use_time)
+        if wb - wa < 1.0:
+            print(f'  stop {name}: 使える時間が {wb - wa:.1f} s しかないので使わない')
+            continue
+        if wb - wa < use_time - 0.05:
+            print(f'  stop {name}: 止まる時間が短いので {wb - wa:.1f} s だけ使う（use_time {use_time} s）')
+        m = (pt >= wa) & (pt <= wb)
         mean = pv[m].mean(axis=0)   # 止まっているので平均（yaw は unwrap 済みなので平均してよい）
         spread = pv[m].std(axis=0)
-        stops.append((name, a + settle, b, vec_to_matrix(mean) @ mount, spread))
+        stops.append((name, wa, wb, vec_to_matrix(mean) @ mount, spread))
 
     def truth_fn(t):
         return vec_to_matrix([np.interp(t, pt, pv[:, i]) for i in range(6)])
@@ -200,14 +214,31 @@ def analyse(node, stops, sigma):
     return out
 
 
+def play_segment(node, bag, offset, t_end, length, log):
+    """bag を offset 秒（先頭から）から流し、stamp が t_end（sim time）を過ぎた点群が届いたら止める."""
+    node.last_cloud_t = 0.0
+    play = subprocess.Popen(['ros2', 'bag', 'play', bag, '--topics', '/clock', '/velodyne_points',
+                             '--start-offset', f'{offset:.3f}'], stdout=log, stderr=subprocess.STDOUT,
+                            start_new_session=True)
+    t0 = time.time()
+    while play.poll() is None and node.last_cloud_t < t_end + 0.05 and time.time() - t0 < length + 30.0:
+        time.sleep(0.05)
+    stop_proc(play)
+    time.sleep(0.3)   # 最後の NDT の解を待つ
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('bag', nargs='?')
-    ap.add_argument('--out', default='/root/ros2_ws/fig/ndt_init')
+    ap.add_argument('--out', default='/root/ros2_ws/fig/ndt_noise')
     ap.add_argument('--from-json', default='', help='前に出力した json から図（<out>.png・<out>_hist.png）だけ描く')
-    ap.add_argument('--passes', type=int, default=3, help='ノイズありで流す回数（このほかにノイズなしを 1 回）')
-    ap.add_argument('--sigma', default=DEFAULT_SIGMA, help='ノイズの標準偏差 x,y,z [m],roll,pitch,yaw [deg]')
-    ap.add_argument('--settle', type=float, default=1.0, help='止まり始めから使わない時間 [s]')
+    ni = params.settings()['ndt_noise']
+    ap.add_argument('--passes', type=int, default=ni['passes'], help='ノイズありで流す回数（このほかにノイズなしを 1 回）')
+    ap.add_argument('--sigma', default=','.join(f'{x:g}' for x in params.ndt_noise_sigma()),
+                    help='ノイズ（正規分布）の標準偏差 x,y,z [m],roll,pitch,yaw [deg]')
+    ap.add_argument('--settle', type=float, default=ni['settle'], help='止まり始めから使わない時間 [s]')
+    ap.add_argument('--use-time', type=float, default=ni['use_time'], help='止まった区間ごとに使う時間 [s]')
+    ap.add_argument('--lead', type=float, default=ni['lead'], help='使う区間の前から流す時間 [s]')
     ap.add_argument('--base', default='base_footprint')
     ap.add_argument('--lidar', default='velodyne')
     args = ap.parse_args()
@@ -228,9 +259,15 @@ def main():
             name, t = line.rsplit(' ', 1)
             ph[name] = float(t)
     stops_raw = [(n[5:-6], ph[n], ph[n[:-6] + '_end']) for n in ph if n.startswith('stop_') and n.endswith('_start')]
-    stops, truth_fn = load_truth(d, stops_raw, args.settle, mount)
-    print(f'{len(stops)} stops, mount {np.round(matrix_to_vec(mount), 4).tolist()}, '
-          f'sigma {np.round(sigma, 4).tolist()} [m, rad]')
+    stops, truth_fn = load_truth(d, stops_raw, args.settle, args.use_time, mount)
+    print(f'{len(stops)} stops (use {args.settle} s after stopping for {args.use_time} s), '
+          f'mount {np.round(matrix_to_vec(mount), 4).tolist()}, sigma {np.round(sigma, 4).tolist()} [m, rad]')
+    if not stops:
+        sys.exit('使える止まった区間が無い')
+    # 区間の始まり（sim time）を bag の先頭からの時間（受信時刻）に直す（ros2 bag play --start-offset）
+    clk = np.array([(t, m.clock.sec + m.clock.nanosec * 1e-9) for t, m in d['/clock']])
+    bag_start = rosbag2_py.Info().read_metadata(args.bag, 'sqlite3').starting_time.nanoseconds * 1e-9
+    offsets = [max(0.0, float(np.interp(s[1] - args.lead, clk[:, 1], clk[:, 0])) - bag_start) for s in stops]
 
     # NDT のパラメータ：パッケージの値 -> gazebo.yaml の pcl_localization -> この試験用（launch の ndt_params と同じ）
     env = yaml.safe_load(open(ENV))
@@ -238,7 +275,7 @@ def main():
     over.update({'base_frame_id': args.base, 'scan_time_source': 'message', 'publish_rviz_tf': False,
                  'publish_tf': False, 'use_tf_init_guess': True, 'tf_init_guess_timeout': 0.2,
                  'use_sim_time': True})
-    param_path = '/tmp/ndt_init_noise_params.yaml'
+    param_path = '/tmp/ndt_noise_noise_params.yaml'
     with open(param_path, 'w') as f:
         yaml.safe_dump({'/**': {'ros__parameters': over}}, f)
 
@@ -247,7 +284,7 @@ def main():
     node = InitGuess(stops, truth_fn, mount, args.base, args.lidar, sigma)
     spinner = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
     spinner.start()
-    log = open('/tmp/ndt_init_noise.log', 'w')
+    log = open('/tmp/ndt_noise_noise.log', 'w')
     for p in range(args.passes + 1):
         node.pass_index, node.noisy = p, p > 0
         node.rng = np.random.default_rng(p)
@@ -260,9 +297,9 @@ def main():
             change_state(node, Transition.TRANSITION_CONFIGURE)   # 地図の読み込み
             change_state(node, Transition.TRANSITION_ACTIVATE)
             time.sleep(1.0)
-            subprocess.run(['ros2', 'bag', 'play', args.bag, '--topics', '/clock', '/velodyne_points'],
-                           stdout=log, stderr=subprocess.STDOUT)
-            time.sleep(2.0)
+            for stop, offset in zip(stops, offsets):   # 使う区間だけ流す（速さは 1 倍）
+                play_segment(node, args.bag, offset, stop[2], args.lead + (stop[2] - stop[1]), log)
+            time.sleep(1.0)
         finally:
             stop_proc(ndt)
         n_init = sum(1 for r in node.inits if r['pass'] == p)
@@ -291,7 +328,7 @@ def main():
     print('\n# R_ndt（真値 + ノイズを初期値にした NDT の誤差の分散）\n' + yaml.safe_dump(snippet, sort_keys=False))
     os.makedirs(os.path.dirname(args.out) or '.', exist_ok=True)
     with open(args.out + '.yaml', 'w') as f:
-        f.write(f'# ndt_init_noise.py {args.bag} sigma {args.sigma}\n')
+        f.write(f'# calibrate_ndt_noise.py {args.bag} sigma {args.sigma}\n')
         yaml.safe_dump(snippet, f, sort_keys=False)
     with open(args.out + '.json', 'w') as f:
         json.dump({'bag': args.bag, 'sigma': sigma.tolist(), 'stops': [s[0] for s in stops],
@@ -302,20 +339,17 @@ def main():
 
 def plot_all(out, stats, sigma, old):
     """図：初期値のずれと解の誤差（<out>.png）、解の誤差のヒストグラムと正規分布（<out>_hist.png）."""
-    from plot_noise import C_EFF, C_STOP, plot_hist, plot_init_noise
+    from plot_noise import plot_hist, plot_init_noise
     plot_init_noise(out + '.png', stats, sigma, old)
     res = np.array(stats['noise']['res'])
     panels = []
     for i, key in enumerate(NDT_KEYS):
         f, unit = (1e3, 'mm') if i < 3 else (math.degrees(1.0), 'deg')
-        curves = [('Normal, R_ndt', math.sqrt(stats['noise']['var'][i]) * f, C_EFF)]
-        if 'no_noise' in stats:
-            curves.append(('Normal, initial guess = truth', math.sqrt(stats['no_noise']['var'][i]) * f, C_STOP))
-        panels.append({'title': f'NDT {key}', 'unit': unit, 'data': res[:, i] * f, 'curves': curves})
+        notes = [f"initial guess = truth {math.sqrt(stats['no_noise']['var'][i]) * f:.3g}"] if 'no_noise' in stats else []
+        panels.append({'title': f'NDT {key}', 'unit': unit, 'data': res[:, i] * f, 'notes': notes})
     sig = ', '.join(f'{s * f:.3g}' for s, f in zip(sigma, [1e3] * 3 + [math.degrees(1.0)] * 3))
     plot_hist(out + '_hist.png', panels, f'NDT error (stop mean removed) with the initial guess = truth + noise '
-                                         f'(noise sigma {sig} mm, deg)')
-
+                                         f'(noise sigma {sig} mm, deg)', share_y=[range(6)])   # 6 つの縦軸をそろえる
 
 if __name__ == '__main__':
     main()

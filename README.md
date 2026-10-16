@@ -36,17 +36,15 @@ python3 eval/bag_info.py write <bag> --source gazebo|real --drive '...' --purpos
 
 | フォルダ | 内容 |
 |---|---|
-| `noise/` | **観測ノイズ R を求める**：`estimate_noise.py`（真値なし、走行中の残差）、`ndt_init_noise.py`（NDT の R を「真値 + ノイズ」の初期値で計算し直して求める）。図は `plot_noise.py` |
-| `calib/` | **パラメータ推定**：`run_calib.sh`（推定用の動きで走って、続けて推定する）、`estimate_all.py`（録画から R・倍率・取付をまとめて推定）、`estimate_calibration.py`（LiDAR の取付位置とオドメトリの倍率、真値なし。図は `plot_calibration.py`） |
-| `param/` | `calib.yaml`：推定用の動き（`drive` の `calib`）の速度・角速度・秒数・周回数（Gazebo・実機で共通） |
+| `calibration/` | **パラメータ推定（プログラムとパラメータ）**：`run_calibration.sh`（推定用の動きで走って、続けて推定する）、`motion.py`（推定用の動き）、`calibrate.py`（録画から R・倍率・取付をまとめて推定）、`calibrate_noise.py`（観測ノイズ R、真値なし）、`calibrate_ndt_noise.py`（NDT の R を「真値 + ノイズ」の初期値で計算し直して求める。Gazebo）、`calibrate_mount_scale.py`（LiDAR の取付位置とオドメトリの倍率、真値なし）、図は `plot_noise.py`・`plot_mount_scale.py`。設定は `param/motion.yaml`（推定用の動き）と `param/calibrate.yaml`（推定。各プログラムのオプションの既定値） |
 | `eval/` | 録画の再生・評価・パラメータの調整（`tune_run.py`、`tune_batch.py`、`summarize.py`、`transition_eval.py`、`make_window_bag.py`）。候補は `batches/`、結果は `results/` |
 | `plot/` | 図（`plot_*.py`、`check_*.py`）。`plot_spin.py` は bag の読み込みや図の共通部品も持つ。`rerender_results.sh` で `workspace/results` の図を全部描き直す（NDT の R の図は計算に約 9 分かかるので `FULL=1` のときだけ） |
 | `drive/` | **テスト走行と録画（Gazebo・実機共通）**：`run_test.sh`（ホストかコンテナの中で実行）、`drive_test.py`（走らせる）、`profiles.yaml`（動き）、`config/gazebo.yaml`・`config/red.yaml`・`blue.yaml`・`white.yaml`（実機の車椅子ごと。速さの上限・走ってよい範囲・トピック・録画するトピック）、`config/real_in_gazebo.yaml`（実機の設定を Gazebo で試す） |
 
-## R を求める（`noise/estimate_noise.py`）
+## R を求める（`calibration/calibrate_noise.py`）
 
 ```bash
-python3 noise/estimate_noise.py /root/ros2_ws/bags/gazebo/<録画> --out /root/ros2_ws/fig/noise_<名前> [--truth]
+python3 calibration/calibrate_noise.py /root/ros2_ws/bags/gazebo/<録画> --out /root/ros2_ws/fig/noise_<名前> [--truth]
 ```
 
 - 指令（cmd_vel）が一定の区間（変化の 0.5 s 後から次の変化の 0.1 s 前まで、1 s 以上）だけを使う。
@@ -60,53 +58,73 @@ python3 noise/estimate_noise.py /root/ros2_ws/bags/gazebo/<録画> --out /root/r
 - `R_ndt` は動いている区間（旋回・直進）の分散。どれも残差の時間的なつながり（積分相関時間）を掛ける（`--no-correlation` で掛けない）。
   env の `parameters` に貼れる yaml を出す。
 - 図：`_segments.png`（区間と残差）、`_summary.png`（標準偏差の比較）、`_hist.png`（**残差のヒストグラムと正規分布**。v は直進、
-  omega は直進と旋回（R_v と車輪の間隔から求めた正規分布も重ねる）、NDT は動いている区間。尖度と ±4.5 σ の外の点の数も書く）。
+  omega は直進と旋回、NDT は動いている区間。尖度と ±4.5 σ の外の点の数も書く）。
+  - 縦軸は相対度数（Relative frequency。全体を 1 とした棒ごとの割合。範囲 ±4.5 σ を 45 本に分ける）。NDT の 6 つは縦軸の範囲をそろえる。
+    パラメータ推定の図は枠を 4 辺とも黒にする（box on）。
+  - 青の線は、外れた点に左右されない σ（1.4826 x 中央絶対偏差）の正規分布（同じ割合に直したもの）。
+    残差の σ（二乗平均の平方根。R に使う値）や、v と車輪の間隔から求めた omega の σ は図の上の文字で示す。
 - 真値は使わないので実機の録画にも使える（オドメトリ・NDT・指令・`/tf_static` を録っておく。トピック名はオプションで変える）。
   `--truth` は Gazebo だけで、真値との差の分散を並べて出す（比較用。R には使わない）。
 
-## NDT の R を「真値 + ノイズ」の初期値で求める（`noise/ndt_init_noise.py`）
+## NDT の R を「真値 + ノイズ」の初期値で求める（`calibration/calibrate_ndt_noise.py`、Gazebo）
 
 ```bash
-localization_tools/drive/run_test.sh gazebo stops stops_ekf                       # ホスト：止まる走行を録る
-python3 noise/ndt_init_noise.py /root/ros2_ws/bags/gazebo/stops_ekf --out /root/ros2_ws/fig/ndt_init_stops         # コンテナ（約 9 分）
+python3 calibration/calibrate_ndt_noise.py /root/ros2_ws/bags/gazebo/<止まる区間のある録画> --out /root/ros2_ws/fig/ndt_noise_<名前>   # コンテナ
+python3 calibration/calibrate_ndt_noise.py --from-json <出力の json> --out <...>   # 計算し直さず図だけ
 ```
 
-- 真値は止まった区間（始めの 1 s を除く）の `/wheelchair/pose` の平均（止まっているので真値の時刻のずれは効かない）。
-- NDT だけを Gazebo の設定で `ROS_DOMAIN_ID=99` に起動し、点群が届くたびに「真値 + ノイズ」を初期値として TF で出す。
-  1 回目はノイズなし、2 回目以降はノイズあり（`--passes`）。ノイズは `--sigma`（既定 x, y 0.02 m、z 0.01 m、roll, pitch 0.3°、
+- 録画は止まる区間のある Gazebo の走行（パラメータ推定用の動き、drive の `stops` など。区間は `<bag>_phases.txt` の `stop_*`）。
+  `calibration gazebo` の推定（`calibrate.py`）でも行う。
+- 使うのは各区間の、止まってから `settle`（1 s）後から `use_time`（10 s）。真値はその間の `/wheelchair/pose` の平均。
+- NDT だけを Gazebo の設定で `ROS_DOMAIN_ID=99` に起動し、**使う区間（とその前の `lead` 1 s）だけを**、区間ごとに
+  `ros2 bag play --start-offset` で途中から速さ 1 倍で流す（区間の終わりの点群が届いたら止める）。点群が届くたびに「真値 + ノイズ」を
+  初期値として TF で出す。1 回目はノイズなし、2 回目以降はノイズあり（`passes` 回）。
+- ノイズは 6 軸それぞれ正規分布 N(0, σ²)。σ は `param/calibrate.yaml` の `ndt_noise.sigma`（x, y 0.02 m、z 0.01 m、roll, pitch 0.3°、
   yaw 1.0°：運用中の EKF の誤差の rms の 2〜4 倍）。
+- 時間は 区間の数 x（`lead` + `use_time` + 約 1 s）x（`passes` + 1）。推定用の動き（3 区間）で約 2.5 分。
 - NDT の解と真値の差から、止まった区間ごとの平均（地図と Gazebo の一定のずれ）を引いた分散を R_ndt とする。
   初期値のずれが解に残る傾きと、図（初期値のずれと解の誤差の散布図 `.png`、誤差のヒストグラムと正規分布 `_hist.png`）も出す。
-  `--from-json <出力の json>` なら計算し直さずに図だけ描く。
 
-## パラメータ推定を走行とセットで（`calib/run_calib.sh`、コマンド `calib`）
+## パラメータ推定を走行とセットで（`calibration/run_calibration.sh`、コマンド `calibration`）
 
 ```bash
-calib/run_calib.sh <gazebo|red|blue|white> [<bag 名>]          # 走行 → 録画 → 推定（コマンド calib red など）
-python3 calib/estimate_all.py <gazebo|red|blue|white> <bag>    # 録画から推定だけ（コマンド calib_estimate）
+calibration/run_calibration.sh <gazebo|red|blue|white> [<bag 名>]          # 走行 → 録画 → 推定（コマンド calibration red など）
+python3 calibration/motion.py <gazebo|red|blue|white>                # 走る前の計画（コマンド calibration_plan）
+python3 calibration/calibrate.py <gazebo|red|blue|white> <bag>    # 録画から推定だけ（コマンド calibrate）
 ```
 
-- 動きは `drive` の `calib`（`drive/profiles.yaml` の `generate: calib`）。**速度・角速度・秒数・周回数は `param/calib.yaml` の `motion`**
-  （5 つ。Gazebo・実機で共通の 1 組。値は m/s・rad/s・s・周の絶対値で、`drive/config/<target>.yaml` の上限を超えると走る前に止める）：
-  止まる → その場で左に `spin_turns` 周 → 右に `spin_turns` 周 → 止まる → 直進 `straight_time` 秒（片道）→ 止まる。
-  走る前の計画は `drive_list <target> calib`。
-- 走行と録画は `drive/run_test.sh <target> calib <bag 名>`（bag 名を省くと `<target>_calib_<年月日_時分秒>`）。途中で止めたら推定しない。
-- 推定は `estimate_all.py`：`noise/estimate_noise.py`（R）と `calib/estimate_calibration.py`（倍率・取付）を、target に合わせた
-  トピック・フレーム・倍率・車輪の間隔で動かす（指令は `drive/config/<target>.yaml`、オドメトリ・フレーム・`odom_scale` は
-  localization_bringup の `param/env/<target>.yaml`、車輪の間隔は Gazebo が `drive/config/gazebo.yaml` の `tread`、実機が
-  whill_odometry の `tread_width`）。Gazebo は真値との比較（`--truth`）も出す。
-- 結果は `/root/ros2_ws/fig/calib/<bag 名>/`：`summary.yaml`（env に入れる候補 `candidate` と今の値。**env の yaml には書き込まない**）、
-  `noise.*`（`noise_hist.png` など）、`calib.*`。
+- 推定用の動きは 1 つ（drive の動きとは別）。**`param/motion.yaml` の 5 つ**（Gazebo・実機で共通の 1 組。値は m/s・rad/s・s・周の
+  絶対値で、`drive/config/<target>.yaml` の上限を超えると走る前に止める）：
+  その場で左に `spin_turns` 周（`spin_omega`）→ 止まる `stop_time` 秒 → 直進 `straight_v` x `straight_time` 秒（片道）→ 止まる。
+  今の値（0.4 rad/s で 4 周、5 s、0.4 m/s x 20 s）で実機の上限で約 1.5 分。
+- `motion.py` が動きを drive の動きのファイルの形にし、`drive/run_test.sh <target> calibration <bag 名>` に `PROFILES` で渡して走る
+  （bag 名を省くと `<target>_calibration_<年月日_時分秒>`）。途中で止めたら推定しない。
+- 推定は `calibrate.py`：`calibrate_noise.py`（R_odom・R_ndt とも走行中の残差から）、`calibrate_mount_scale.py`（倍率・取付）を、
+  target に合わせたトピック・フレーム・倍率・車輪の間隔で動かす（指令は `drive/config/<target>.yaml`、
+  オドメトリ・フレーム・`odom_scale` は localization_bringup の `param/env/<target>.yaml`、車輪の間隔は Gazebo が `param/calibrate.yaml` の
+  `noise.gazebo_tread`、実機が whill_odometry の `tread_width`）。Gazebo は真値との比較（`--truth`）も出す。
+- 推定の設定（区間の取り方・窓・直進の安定の判定など）は `param/calibrate.yaml`（各プログラムのオプションの既定値。オプションで上書きできる）。
+- 推定にかかる時間は数秒（252 s の録画で 8 s）。
+- 結果は 1 回ごとに `/root/ros2_ws/fig/calibration/<bag 名>/`：`summary.yaml`（env に入れる候補 `candidate` と今の値。**env の yaml には書き込まない**）、
+  `noise.*`（`noise_hist.png` など）、`mount_scale.*`・`mount_scale_yaw.png`。
+- NDT の R を「真値 + ノイズ」の初期値で求める `calibrate_ndt_noise.py`（Gazebo）は、2026-10-15 にユーザー指示で `calibrate.py` から外した（単独では使える）。
 
-## LiDAR の取付位置とオドメトリの倍率（`calib/estimate_calibration.py`）
+## LiDAR の取付位置とオドメトリの倍率（`calibration/calibrate_mount_scale.py`）
 
 ```bash
-python3 calib/estimate_calibration.py /root/ros2_ws/bags/gazebo/<録画> [...] --out /root/ros2_ws/fig/calib [--map <地図の pcd>] [--truth]
+python3 calibration/calibrate_mount_scale.py /root/ros2_ws/bags/gazebo/<録画> [...] --out /root/ros2_ws/fig/mount_scale [--map <地図の pcd>] [--truth]
 ```
 
 真値なしで、NDT の LiDAR の姿勢とオドメトリ（倍率を掛ける前）から求める。その場の旋回と直進が入った録画を使う。
-- omega の倍率：旋回の区間の NDT の yaw の変化 / オドメトリの omega の積分。v の倍率：直進の区間の移動距離 / v の積分
-- 取付の x, y：その場の旋回で LiDAR が回転の中心のまわりを回る円を最小二乗で当てはめる。取付の yaw：直進の向きと LiDAR の yaw の差
+- omega の倍率：旋回の区間の NDT の yaw の変化 / オドメトリの omega の積分（推定用の動きは左回りだけなので、左回りの値。
+  Gazebo では左回り 0.921〜0.924、右回り 0.913〜0.914 と向きで違った）。v の倍率：直進の区間の移動距離 / v の積分
+- 取付の x, y：その場の旋回で LiDAR が回転の中心のまわりを回る円を最小二乗で当てはめる。
+- 取付の yaw：直進の区間で、LiDAR の yaw − 車体の進む向き（横滑りしないと仮定）。車体の位置は LiDAR の位置 − R(yaw_L) m'（m' は旋回で求めた取付。
+  取付の yaw に左右されない）。オドメトリの v が安定してから（区間の後半の平均の `steady_tol` 5 % 以内）の区間で、平均の v・omega
+  （区間全体で 1 つずつ。オドメトリの振動に左右されない）で動く円弧を車体の位置に最小二乗で当てはめ、各時刻の進む向きを求める
+  （少し曲がって進んでも偏らない）。各時刻の「LiDAR の yaw − 進む向き」の平均を取付の yaw とする。図 `<出力>_yaw.png`（`mount_scale_yaw.png`）に
+  各時刻の値と最終値を描く。（各時刻の向きを平滑化して外れ値を除く方法、始点と終点を結ぶ方法、Censi ほか（IEEE T-RO 2013）の同時推定とも
+  比べ、2026-10-16 にこの方法に決めた。`dev_log.md` の 49・50）
 - 取付の roll・pitch（床が水平と仮定）、z（`--map` の地図の床の高さとの差。参考）
 
 ## 録画を再生して評価・調整する（`eval/`）

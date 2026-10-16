@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]
 from bag_paths import tune_bag  # noqa: E402
 from plot_spin import (BAND, capitalize_labels, GRID, INK, INK2, SERIES, SURFACE, TRUTH_COLOR,  # noqa: E402
                        widths_back_to_front)

@@ -17,10 +17,11 @@
 #
 #   <bag 名> を省くと <target>_<動き>_<年月日_時分秒>（例 red_spin5_20261015_153012）にする。
 #   <bag 名> を check/<名前> にすると bags/<gazebo|real>/check/ に録る（ツールの動作確認など、比較・調整に使わない録画）。
-#   <動き> は drive/profiles.yaml（spin・spin5・stops・accel・curve・slalom・reverse・calib。drive/drive_test.py <target> --list）。
-#   calib はパラメータ推定用（速さ・回数・秒数は param/calib.yaml。推定までまとめて行うなら calib/run_calib.sh）。
+#   <動き> は drive/profiles.yaml（spin・spin5・stops・accel・curve・slalom・reverse。drive/drive_test.py <target> --list）。
+#   パラメータ推定用の動きは calibration/run_calibration.sh が使う（drive の動きではない）。
 #   速さの上限・走ってよい範囲・トピックは drive/config/<target>.yaml。
-#   環境変数：PURPOSE（録画の用途。<bag 名>_info.yaml に書く）、CONFIG（設定の yaml のコンテナ内のパス。既定は target の設定。
+#   環境変数：PROFILES（動きのファイルのコンテナ内のパス。既定 drive/profiles.yaml。calibration/run_calibration.sh が使う）、
+#             PURPOSE（録画の用途。<bag 名>_info.yaml に書く）、CONFIG（設定の yaml のコンテナ内のパス。既定は target の設定。
 #             例 CONFIG=real_in_gazebo で実機の設定を Gazebo で試す）
 #   録画の隣に <bag 名>_phases.txt（動作の開始時刻）、<bag 名>_drive.log（drive_test.py の出力）、<bag 名>_info.yaml（eval/bag_info.py）を書く。
 set -u
@@ -41,7 +42,7 @@ else
   command -v ros2 > /dev/null 2>&1 || { echo "ros2 が見つからない（ROS の環境を読み込んだ端末で実行する）"; exit 1; }
 fi
 CFG=${CONFIG:-$target}
-DT="python3 $T/drive/drive_test.py $CFG"
+DT="python3 $T/drive/drive_test.py $CFG${PROFILES:+ --profiles $PROFILES}"
 BAGS=/root/ros2_ws/bags/$source
 
 # コンテナの中でコマンドを動かす（ホストからは docker exec、コンテナの中では直接）。終了コードはコマンドのもの

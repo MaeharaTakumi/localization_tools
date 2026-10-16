@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise', 'drive')]
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration', 'drive')]
 from drive_test import load_config, quat_matrix, rpy_matrix  # noqa: E402
 from plot_spin import BAND, capitalize_labels, GRID, INK, INK2, read_bag, SERIES, SURFACE  # noqa: E402
 from compare_run import phases_of  # noqa: E402

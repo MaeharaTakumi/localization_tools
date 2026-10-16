@@ -30,7 +30,7 @@ import sys
 import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]   # plot_spin などを import する
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
 from plot_spin import read_bag, URDF_MOUNT, wrap  # noqa: E402
 from pose_math import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix  # noqa: E402
 from bag_paths import tune_bag  # noqa: E402

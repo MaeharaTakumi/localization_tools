@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""estimate_noise.py の図（estimate_noise.py から呼ぶ）.
+"""calibrate_noise.py の図（calibrate_noise.py から呼ぶ）.
 
   plot_segments：使った区間（指令が一定）と、オドメトリ・NDT の残差の時間推移
   plot_summary ：標準偏差の比較（真値なしの推定：動いている区間・停止、--truth なら真値との差）
-  plot_hist    ：残差のヒストグラムと正規分布（estimate_noise.py・ndt_init_noise.py）
+  plot_hist    ：残差のヒストグラムと正規分布（calibrate_noise.py・calibrate_ndt_noise.py）
 """
 import math
 import os
@@ -15,14 +15,13 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]   # plot_spin などを import する
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
 from plot_spin import (BAND, capitalize_labels, GRID, INK, INK2, SURFACE,  # noqa: E402
                        widths_back_to_front)
 
 CLASS_LABEL = {'stopped': 'Stopped', 'turning': 'Turning', 'straight': 'Straight', 'curve': 'Curve'}
 C_OMEGA, C_V, C_YAW, C_X, C_Y = '#2a78d6', '#eb6834', '#4a3aa7', '#1baf7a', '#eda100'
 C_EST, C_EFF, C_STOP, C_TRUTH = '#2a78d6', '#4a3aa7', '#1baf7a', '#eb6834'
-C_MAD = '#eda100'   # ヒストグラムの頑健な sigma の正規分布
 
 
 def setup():
@@ -36,8 +35,15 @@ def style(ax):
     ax.set_facecolor(SURFACE)
     ax.grid(axis='y', color=GRID, lw=0.8)
     ax.set_axisbelow(True)
-    for spine in ('top', 'right'):
-        ax.spines[spine].set_visible(False)
+    box_on(ax)
+
+
+def box_on(ax):
+    """図の枠を 4 辺とも黒にする（MATLAB の box on。ユーザー指示）."""
+    for spine in ax.spines.values():
+        spine.set_visible(True)
+        spine.set_color('black')
+        spine.set_linewidth(0.8)
 
 
 def plot_segments(path, ot, ov, ow, nt, used, odom_rows, ndt_rows, segs, half):
@@ -85,12 +91,12 @@ def plot_segments(path, ot, ov, ow, nt, used, odom_rows, ndt_rows, segs, half):
     print(f'saved {path}')
 
 
-def plot_summary(path, est_odom, est_ndt, tru_odom, tru_ndt, tau=None):
+def plot_summary(path, var_odom, var_ndt, tru_odom, tru_ndt, tau=None):
     setup()
-    groups = [('Odometry v [m/s]', est_odom, tru_odom, [('v', 'V')], 1.0),
-              ('Odometry omega [rad/s]', est_odom, tru_odom, [('omega', 'Omega')], 1.0),
-              ('NDT position (map frame) [mm]', est_ndt, tru_ndt, [('x', 'X'), ('y', 'Y'), ('z', 'Z')], 1e3),
-              ('NDT angle [deg]', est_ndt, tru_ndt, [('roll', 'Roll'), ('pitch', 'Pitch'), ('yaw', 'Yaw')],
+    groups = [('Odometry v [m/s]', var_odom, tru_odom, [('v', 'V')], 1.0),
+              ('Odometry omega [rad/s]', var_odom, tru_odom, [('omega', 'Omega')], 1.0),
+              ('NDT position (map frame) [mm]', var_ndt, tru_ndt, [('x', 'X'), ('y', 'Y'), ('z', 'Z')], 1e3),
+              ('NDT angle [deg]', var_ndt, tru_ndt, [('roll', 'Roll'), ('pitch', 'Pitch'), ('yaw', 'Yaw')],
                math.degrees(1.0))]
     bars = [('No truth: moving', C_EST, lambda e, t, k: e['moving'][k][0]),
             ('No truth: stopped', C_STOP, lambda e, t, k: e['stopped'][k][0])]
@@ -102,12 +108,12 @@ def plot_summary(path, est_odom, est_ndt, tru_odom, tru_ndt, tau=None):
     fig, axes = plt.subplots(1, 4, figsize=(18, 4.8), facecolor=SURFACE,
                              gridspec_kw={'width_ratios': [1.3, 1.3, 2.4, 2.4]})
     width = 0.8 / len(bars)
-    for ax, (title, est, tru, keys, f) in zip(axes, groups):
+    for ax, (title, var_cls, tru, keys, f) in zip(axes, groups):
         style(ax)
         top = 0.0
         for j, (label, color, get) in enumerate(bars):
             for i, (k, _) in enumerate(keys):
-                var = get(est, tru, k)
+                var = get(var_cls, tru, k)
                 s = math.sqrt(var) * f if np.isfinite(var) else 0.0
                 x = i + (j - (len(bars) - 1) / 2) * width
                 ax.bar(x, s, width * 0.92, color=color, zorder=3, label=label if i == 0 else None)
@@ -130,7 +136,7 @@ def plot_summary(path, est_odom, est_ndt, tru_odom, tru_ndt, tau=None):
 
 
 def plot_init_noise(path, stats, sigma, old):
-    """ndt_init_noise.py の図：初期値のずれと NDT の誤差の散布図（6 成分）と、標準偏差の比較."""
+    """calibrate_ndt_noise.py の図：初期値のずれと NDT の誤差の散布図（6 成分）と、標準偏差の比較."""
     setup()
     names = ['X', 'Y', 'Z', 'Roll', 'Pitch', 'Yaw']
     scale = [1e3] * 3 + [math.degrees(1.0)] * 3
@@ -186,53 +192,59 @@ def plot_init_noise(path, stats, sigma, old):
     print(f'saved {path}')
 
 
-def plot_hist(path, panels, title):
-    """残差のヒストグラム（確率密度）と正規分布 N(0, sigma^2) の比較.
+def plot_hist(path, panels, title, share_y=()):
+    """残差のヒストグラム（相対度数：全体を 1 とした棒ごとの割合）と、外れ値に左右されない sigma の正規分布.
 
-    panels：[{'title', 'unit', 'data'（表示の単位）, 'curves': [(凡例, sigma（表示の単位）, 色), ...]}]。
-    curves の 1 つ目は残差そのものの sigma（二乗平均の平方根。R に使う値）。範囲は +-4.5 sigma（外れた点の数を書く）。
-    外れた点に左右されない sigma（1.4826 x 中央絶対偏差。正規分布なら sigma と同じ）の正規分布も重ねる（裾の重さを見る）。
+    panels：[{'title', 'unit', 'data'（表示の単位）, 'notes': [追記する文字列, ...]}]。
+    棒は ±4.5 sigma（sigma は残差の二乗平均の平方根。R に使う値）を 45 本に分ける。縦軸は「その棒に入るサンプルの数 / 全体の数」
+    （範囲の外の点も全体に数える）。正規分布 N(0, sigma_robust^2)（sigma_robust = 1.4826 x 中央絶対偏差。正規分布なら sigma と同じ）は
+    棒の幅を掛けて同じ割合に直す。share_y：縦軸の範囲をそろえる図の番号の組（例 [range(3, 9)]）。
     """
     setup()
     ncol = 3
     nrow = (len(panels) + ncol - 1) // ncol
-    fig, axes = plt.subplots(nrow, ncol, figsize=(15, 3.9 * nrow), facecolor=SURFACE, squeeze=False)
+    fig, axes = plt.subplots(nrow, ncol, figsize=(15, 4.1 * nrow), facecolor=SURFACE, squeeze=False)
     for ax in axes.flat[len(panels):]:
         ax.set_visible(False)
+    tops = []
     for ax, p in zip(axes.flat, panels):
         style(ax)
         x = np.asarray(p['data'], float)
         x = x[np.isfinite(x)]
-        ax.set_title(p['title'], fontsize=9.5, pad=15)
+        ax.set_title(p['title'], fontsize=9.5, pad=27)
         ax.set_xlabel(f"Residual [{p['unit']}]")
         if len(x) < 5:
             ax.text(0.5, 0.5, 'No data', transform=ax.transAxes, ha='center', va='center', color=INK2)
+            tops.append(0.0)
             continue
         s0 = float(np.sqrt(np.mean(x ** 2)))
         lim = 4.5 * s0 if s0 > 0 else 1.0
         out = int((np.abs(x) > lim).sum())
-        dens, _, _ = ax.hist(x[np.abs(x) <= lim], bins=np.linspace(-lim, lim, 46), density=True, color=C_EST,
-                             alpha=0.35, edgecolor=SURFACE, lw=0.6, zorder=2, label=f'Residuals (n {len(x)})')
-        # 縦軸はヒストグラムと（残差の sigma・頑健な sigma の）正規分布の山の高いほうまで。それより細い分布は上が切れる
+        edges = np.linspace(-lim, lim, 46)
+        width = edges[1] - edges[0]
+        inside = x[np.abs(x) <= lim]
+        frac, _, _ = ax.hist(inside, bins=edges, weights=np.full(len(inside), 1.0 / len(x)), color=C_EST, alpha=0.35,
+                             edgecolor=SURFACE, lw=0.6, zorder=2, label=f'Residuals (n {len(x)})')
         robust = 1.4826 * float(np.median(np.abs(x - np.median(x))))
-        curves = list(p['curves'][:1]) + ([('Normal, robust sigma (1.4826 MAD)', robust, C_MAD)] if robust > 0 else []) \
-            + list(p['curves'][1:])
-        peak = max([float(dens.max())] + [1.0 / (sg * math.sqrt(2 * math.pi)) for _, sg, _ in curves[:2] if sg > 0])
-        grid = np.linspace(-lim, lim, 400)
-        widths = widths_back_to_front(len(curves))
-        for i, (label, sigma, color) in enumerate(curves):
-            if not (np.isfinite(sigma) and sigma > 0):
-                continue
-            pdf = np.exp(-0.5 * (grid / sigma) ** 2) / (sigma * math.sqrt(2 * math.pi))
-            ax.plot(grid, np.minimum(pdf, 1.08 * peak), color=color, lw=widths[i], zorder=3 + i,
-                    label=f'{label} (sigma {sigma:.3g})')
-        ax.set_ylim(0, 1.15 * peak)
+        peak = float(frac.max())
+        if robust > 0:
+            grid = np.linspace(-lim, lim, 400)
+            share = width * np.exp(-0.5 * (grid / robust) ** 2) / (robust * math.sqrt(2 * math.pi))   # 棒 1 本の幅に入る割合
+            ax.plot(grid, share, color=C_EST, lw=2.0, zorder=3, label=f'Normal, robust sigma {robust:.3g} (1.4826 MAD)')
+            peak = max(peak, float(share.max()))
+        tops.append(1.15 * peak)
         m = x - x.mean()
         kurt = float(np.mean(m ** 4) / np.mean(m ** 2) ** 2 - 3.0) if np.mean(m ** 2) > 0 else float('nan')
-        note = f'mean {x.mean():.2g}, excess kurtosis {kurt:.1f}' + (f', {out} outside +-4.5 sigma' if out else '')
-        ax.text(0.0, 1.015, note, transform=ax.transAxes, ha='left', va='bottom', fontsize=8, color=INK2)
+        note = (f'RMS sigma {s0:.3g} (R), mean {x.mean():.2g}' + ''.join(f', {n}' for n in p.get('notes', []))
+                + f'\nexcess kurtosis {kurt:.1f}' + (f', {out} outside +-4.5 sigma' if out else ''))
+        ax.text(0.0, 1.015, note, transform=ax.transAxes, ha='left', va='bottom', fontsize=8, color=INK2,
+                linespacing=1.3).set_in_layout(False)   # 配置の計算に入れない（図が細くならないように）
         ax.legend(loc='upper left', frameon=False, fontsize=7.8)
-    axes[0][0].set_ylabel('Probability density')
+    for k, ax in enumerate(axes.flat[:len(panels)]):   # 縦軸の範囲（そろえる組は組の中の最大）
+        group = next((list(g) for g in share_y if k in g), [k])
+        ax.set_ylim(0, max(tops[i] for i in group) or 1.0)
+    for row in axes:
+        row[0].set_ylabel('Relative frequency')
     fig.suptitle(title, x=0.02, ha='left', fontsize=12, fontweight='bold', color=INK, y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.96))
     capitalize_labels(fig)   # 頭文字を大文字に（識別子はそのまま）

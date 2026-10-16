@@ -28,7 +28,7 @@ import numpy as np
 import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'noise')]
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]
 from bag_paths import CHECK, SOURCES, source_dir  # noqa: E402
 
 WHEEL_RADIUS, WHEEL_SEPARATION = 0.1325, 0.492   # Gazebo の URDF（diff_drive_controller と同じ）

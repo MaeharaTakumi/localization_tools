@@ -22,14 +22,22 @@ run python3 plot_drive_paths.py $O/drive_paths_gazebo.png gazebo spin=$B/test_sp
 for c in qr_ekf qi_ekf legacy rk2 receipt bobs; do run python3 plot_ekf_compare.py $O/$c $R/results_qrv.jsonl configs/$c.json; done
 PLOT_COLORS="#2a78d6,#eb6834" run python3 plot_spin.py $O/qr_unstable.png "EKF, R from data + previous Q, replay 1=$T/qe_ekf_oldQ_1" "EKF, R from data + previous Q, replay 2 (same settings)=$T/qe_ekf_oldQ_2"
 # 真値なしの R（dev_log.md の 13）、取付位置とオドメトリの倍率（16）
-for b in spin360_w1_ekf spin360_w1_ekf2; do run python3 ../noise/estimate_noise.py $B/$b --out $O/noise_$b --truth; done
-run python3 ../calib/estimate_calibration.py $B/spin360_w1_ekf $B/spin360_w1_ekf2 $B/stops_ekf --out $O/calib --truth --map /root/ros2_ws/map/SC10_4_0.05.pcd
+for b in spin360_w1_ekf spin360_w1_ekf2; do run python3 ../calibration/calibrate_noise.py $B/$b --out $O/noise_$b --truth; done
+run python3 ../calibration/calibrate_mount_scale.py $B/spin360_w1_ekf $B/spin360_w1_ekf2 $B/stops_ekf --out $O/calib --truth --map /root/ros2_ws/map/SC10_4_0.05.pcd
 # run_test.sh の確認（33）
 run python3 plot_drive_paths.py $O/runner_paths.png gazebo "From the host (spin)=$B/check/runner_host_spin" "Inside the container (spin)=$B/check/runner_inside_spin" "Inside, real-robot flow (real limits)=$B/check/runner_inside_realflow"
 # NDT の R を「真値 + ノイズ」の初期値で求める（15）
-[ "${FULL:-0}" = 1 ] && run python3 ../noise/ndt_init_noise.py $B/stops_ekf --out $O/ndt_init_stops
+[ "${FULL:-0}" = 1 ] && run python3 ../calibration/calibrate_ndt_noise.py $B/stops_ekf --out $O/ndt_init_stops
 # FULL=1 でなければ、前の結果（json）から図とヒストグラムだけ描き直す
-[ "${FULL:-0}" = 1 ] || [ ! -f $O/ndt_init_stops.json ] || run python3 ../noise/ndt_init_noise.py --from-json $O/ndt_init_stops.json --out $O/ndt_init_stops
-# パラメータ推定用の動き（calib）で走った録画から、R・倍率・取付をまとめて推定する（46）
-run python3 ../calib/estimate_all.py gazebo $B/gazebo_calib_test --out $O/calib_gazebo
+[ "${FULL:-0}" = 1 ] || [ ! -f $O/ndt_init_stops.json ] || run python3 ../calibration/calibrate_ndt_noise.py --from-json $O/ndt_init_stops.json --out $O/ndt_init_stops
+# パラメータ推定用の動き（当時の calib）で走った録画から、R・倍率・取付をまとめて推定する（46）
+run python3 ../calibration/calibrate.py gazebo $B/gazebo_calib_test --out $O/calib_gazebo
+# 推定用の動き（4 方向に 12 s ずつ止まる・片道。47）。NDT の R（calibrate_ndt_noise.py、約 5 分）は FULL=1 のときだけ
+run python3 ../calibration/calibrate.py gazebo $B/gazebo_calib --out $O/calib_gazebo2
+[ "${FULL:-0}" = 1 ] && run python3 ../calibration/calibrate_ndt_noise.py $B/gazebo_calib --out $O/calib_gazebo2/ndt_noise
+# 推定用の動き（止まる → 左に 4 周 → 片道。48）。NDT の R（約 2.5 分）は FULL=1 のときだけ
+run python3 ../calibration/calibrate.py gazebo $B/gazebo_calibration --out $O/calibration_gazebo
+[ "${FULL:-0}" = 1 ] && run python3 ../calibration/calibrate_ndt_noise.py $B/gazebo_calibration --out $O/calibration_gazebo/ndt_noise
+# LiDAR を 5° 回した Gazebo での取付の yaw の試験（49）
+run python3 ../calibration/calibrate.py gazebo $B/gazebo_calibration_yaw5 --out $O/calibration_gazebo_yaw5
 ls $O
