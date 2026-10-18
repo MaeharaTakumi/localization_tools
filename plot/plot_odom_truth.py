@@ -6,7 +6,8 @@
 drive/profiles_velocity.yaml の動き（前後に止まる区間 stop_before・stop_after）の録画を想定する。
 真値は /wheelchair/pose（base_footprint）を ±0.03 s の差分で微分したもの（plot_velocity.py の truth_velocity。
 v は車体の前方向成分）、オドメトリは /wheelchair/odom を stamp の時刻で描く。横軸は動き出しの指令からの時間（sim time）。
-動いている区間の、動き出しの 2 s 後から止まる指令までの平均（定常値）と、その比（真値 / オドメトリ）を図に書き、表示もする。
+動いている区間の、動き出しの 2 s 後から止まる指令までの平均（定常値）を凡例に書く（Truth (Avg. 0.448) など）。
+平均・標準偏差・比（真値 / オドメトリ）は表示する。
 """
 import os
 import sys
@@ -56,15 +57,10 @@ def main():
     for t, y, color, lw, z in ((tt, truth, TRUTH_COLOR, TRUTH_LW, 2), (ot, odom, C_ODOM, 1.4, 3)):
         m = (t - t0 >= lo) & (t - t0 <= hi)
         ax.plot(t[m] - t0, y[m], color=color, lw=lw, zorder=z)
-    unit = 'rad/s' if key == 'omega' else 'm/s'
-    handles = [plt.Line2D([], [], color=TRUTH_COLOR, lw=TRUTH_LW, label='Truth (d/dt of /wheelchair/pose)'),
-               plt.Line2D([], [], color=C_ODOM, lw=1.4, label='Odometry (/wheelchair/odom)')]
+    # 凡例に定常値（動き出しの 2 s 後から止まる指令までの平均）を書く（ユーザー指示。図の中の注記は書かない）
+    handles = [plt.Line2D([], [], color=TRUTH_COLOR, lw=TRUTH_LW, label=f'Truth (Avg. {tm:.3f})'),
+               plt.Line2D([], [], color=C_ODOM, lw=1.4, label=f'Odometry (Avg. {om:.3f})')]
     ax.legend(handles=handles, loc='lower center', frameon=False, ncol=2)
-    ax.text(0.5, 0.30,   # 動いている間の真ん中の高さは線が無い（立ち上がり・停止の線とも重ならない）
-            f'Mean from {SETTLE:.0f} s after start to stop command:\n'
-            f'truth {tm:.3f} {unit} (sd {ts:.3f}), odometry {om:.3f} {unit} (sd {os_:.3f})\n'
-            f'truth / odometry = {tm / om:.3f}',
-            transform=ax.transAxes, ha='center', va='bottom', fontsize=9, color=INK2)
     ax.set_xlim(lo, hi)
     ax.set_xlabel('Time from start command [s] (sim time)')
     ax.set_ylabel('Angular velocity [rad/s]' if key == 'omega' else 'Linear velocity [m/s]')
