@@ -39,6 +39,7 @@ python3 eval/bag_info.py write <bag> --source gazebo|real --drive '...' --purpos
 | `calibration/` | **パラメータ推定（プログラムとパラメータ）**：`run_calibration.sh`（推定用の動きで走って、続けて推定する）、`motion.py`（推定用の動き）、`calibrate.py`（録画から R・倍率・取付をまとめて推定）、`calibrate_noise.py`（観測ノイズ R、真値なし）、`calibrate_ndt_noise.py`（NDT の R を「真値 + ノイズ」の初期値で計算し直して求める。Gazebo）、`calibrate_mount_scale.py`（LiDAR の取付位置とオドメトリの倍率、真値なし）、図は `plot_noise.py`・`plot_mount_scale.py`。設定は `param/motion.yaml`（推定用の動き）と `param/calibrate.yaml`（推定。各プログラムのオプションの既定値） |
 | `eval/` | 録画の再生・評価・パラメータの調整（`tune_run.py`、`tune_batch.py`、`summarize.py`、`transition_eval.py`、`make_window_bag.py`）。候補は `batches/`、結果は `results/` |
 | `plot/` | 図（`plot_*.py`、`check_*.py`）。`plot_spin.py` は bag の読み込みや図の共通部品も持つ。`rerender_results.sh` で `workspace/results` の図を全部描き直す（NDT の R の図は計算に約 9 分かかるので `FULL=1` のときだけ） |
+| `record_rviz.sh` | **RViz の画面の録画（ホストで実行）**。下の「RViz の画面の録画」 |
 | `drive/` | **テスト走行と録画（Gazebo・実機共通）**：`run_test.sh`（ホストかコンテナの中で実行）、`drive_test.py`（走らせる）、`profiles.yaml`（動き）、`config/gazebo.yaml`・`config/red.yaml`・`blue.yaml`・`white.yaml`（実機の車椅子ごと。速さの上限・走ってよい範囲・トピック・録画するトピック）、`config/real_in_gazebo.yaml`（実機の設定を Gazebo で試す） |
 
 ## R を求める（`calibration/calibrate_noise.py`）
@@ -196,6 +197,26 @@ python3 drive/drive_test.py <gazebo|red|blue|white> <動き> --simulate    # 計
   ```
 - **予行演習**：`CONFIG=real_in_gazebo drive/run_test.sh gazebo <動き> <bag 名>` で、実機の上限・`/ekf_pose`・ジョイスティックの
   監視（`/test/joy_ts`）を Gazebo で試せる。
+
+## RViz の画面の録画（`record_rviz.sh`、ホスト）
+
+コンテナの RViz はホストの X に描いているので、ホストの ffmpeg で RViz の窓を探して録画する（X11 のセッションだけ。
+ホストに `ffmpeg`・`xdotool`・`xwininfo`（x11-utils）が要る。コンテナには ffmpeg が無い）。
+
+```bash
+./record_rviz.sh                          # 開いている RViz の窓を Ctrl-C まで録る（./rviz_<日時>.mp4）
+./record_rviz.sh -t 60 -o ~/Videos/run.mp4  # 60 s だけ、出力を指定
+./record_rviz.sh --new                    # この後に開く RViz の窓を待って録る（起動の直前に実行しておく）
+./record_rviz.sh --list                   # RViz の窓の一覧（ID・大きさ・題名）
+./record_rviz.sh --select                 # 録る窓をクリックで選ぶ
+./record_rviz.sh --id <ID>                # 窓の ID で選ぶ
+```
+
+- 窓を指定しなければ、RViz の窓が 1 つならそれ、複数なら前面の窓が RViz ならそれを録る（そうでなければ一覧を出して止まる）。
+- 窓の中身だけを録る（x11grab の `-window_id`）。窓を動かしても、画面からはみ出していても録れる。録画中に窓の大きさを変えると止まる。
+  他の窓が上に重なるとその部分も写る。RViz を閉じると録画も止まる。
+- 出力は断片化した MP4（15 fps、H.264）なので、途中で止まっても再生できる。1 分で約 4 MB。
+- 録画した bag を再生して RViz を録ることもできる（実機の走行中に録らなくてよい）。
 
 ## 図
 
