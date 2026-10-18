@@ -40,7 +40,7 @@ python3 eval/bag_info.py write <bag> --source gazebo|real --drive '...' --purpos
 | `eval/` | 録画の再生・評価・パラメータの調整（`tune_run.py`、`tune_batch.py`、`summarize.py`、`transition_eval.py`、`make_window_bag.py`）。候補は `batches/`、結果は `results/` |
 | `plot/` | 図（`plot_*.py`、`check_*.py`）。`plot_spin.py` は bag の読み込みや図の共通部品も持つ。`rerender_results.sh` で `workspace/results` の図を全部描き直す（NDT の R の図は計算に約 9 分かかるので `FULL=1` のときだけ） |
 | `record_rviz.sh` | **RViz の画面の録画（ホストで実行）**。下の「RViz の画面の録画」 |
-| `drive/` | **テスト走行と録画（Gazebo・実機共通）**：`run_test.sh`（ホストかコンテナの中で実行）、`drive_test.py`（走らせる）、`profiles.yaml`（動き）、`config/gazebo.yaml`・`config/red.yaml`・`blue.yaml`・`white.yaml`（実機の車椅子ごと。速さの上限・走ってよい範囲・トピック・録画するトピック）、`config/real_in_gazebo.yaml`（実機の設定を Gazebo で試す） |
+| `drive/` | **テスト走行と録画（Gazebo・実機共通）**：`run_test.sh`（ホストかコンテナの中で実行）、`drive_test.py`（走らせる）、`profiles.yaml`（動き）、`config/gazebo.yaml`・`config/red.yaml`・`blue.yaml`・`white.yaml`（実機の車椅子ごと。速さの上限・走ってよい範囲・トピック・録画するトピック）、`config/real_in_gazebo.yaml`（実機の設定を Gazebo で試す）、`config/gazebo_ground.yaml` と `profiles_velocity.yaml`（Gazebo の地面でオドメトリと真値の速度を比べる） |
 
 ## R を求める（`calibration/calibrate_noise.py`）
 
@@ -197,6 +197,16 @@ python3 drive/drive_test.py <gazebo|red|blue|white> <動き> --simulate    # 計
   ```
 - **予行演習**：`CONFIG=real_in_gazebo drive/run_test.sh gazebo <動き> <bag 名>` で、実機の上限・`/ekf_pose`・ジョイスティックの
   監視（`/test/joy_ts`）を Gazebo で試せる。
+- **地面でオドメトリと真値の速度を比べる**（Gazebo）：`config/gazebo_ground.yaml` は車椅子を世界の原点（建物の外の ground_plane、
+  z −0.4 から落とす。yaw 0）に置き、自己位置推定は起動しない（設定の `gazebo_launch_args` を Gazebo の launch に渡し、
+  `localization: false` で推定を起動しない）。上限は v 1.0 m/s・ω 1.0 rad/s、範囲の前は 15 m。動きは `profiles_velocity.yaml`
+  （`spin5_w05`・`spin5_w10`：その場で左に 5 周、`straight_v05`・`straight_v10`：10 s 直進。前後に止まる）。図は `plot/plot_odom_truth.py`。
+
+  ```bash
+  CONFIG=gazebo_ground PROFILES=/root/ros2_ws/localization_tools/drive/profiles_velocity.yaml \
+    drive/run_test.sh gazebo spin5_w05 gazebo_ground_spin5_w05
+  python3 plot/plot_odom_truth.py /root/ros2_ws/bags/gazebo/gazebo_ground_spin5_w05 /root/ros2_ws/fig/odom_truth/odom_truth_spin_w05.png omega   # コンテナ
+  ```
 
 ## RViz の画面の録画（`record_rviz.sh`、ホスト）
 

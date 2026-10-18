@@ -1,0 +1,34 @@
+# テスト走行の設定：Gazebo の地面（建物の外の ground_plane）で、オドメトリと真値の速度を比べる（2026-10-19、ユーザー指示）
+#   CONFIG=gazebo_ground PROFILES=/root/ros2_ws/localization_tools/drive/profiles_velocity.yaml \
+#     drive/run_test.sh gazebo <動き> で使う（動きは profiles_velocity.yaml）。
+#   車椅子は世界の原点 x 0・y 0、ground_plane（z −0.7 m）の 0.3 m 上（z −0.4）、yaw 0 に置く。周りに障害物は無い
+#   （ground_plane は 100 m 四方。建物の 4 階の床は z 11.2 m より上）。地図が無いので自己位置推定は起動しない。
+#   上限は v 1.0 m/s・omega 1.0 rad/s にして、動きの割合がそのまま m/s・rad/s になるようにする。
+#   1 m/s で 10 秒（10 m）走るので、範囲の前を 15 m にする（この試験だけ。ユーザー指示）
+target: gazebo
+use_sim_time: true
+limits: {v_max: 1.0, v_reverse_max: 0.8, w_max: 1.0}
+area: {forward: 15.0, behind: 1.0, left: 2.0, right: 2.0}
+plan_margin: 0.2
+sim_omega_scale: 0.92
+
+# run_test.sh が Gazebo を起動し直すときの launch の引数（車椅子の初期位置）と、自己位置推定を起動するか
+gazebo_launch_args: "x:=0 y:=0 z:=-0.4 yaw:=0"
+localization: false
+
+command: {topic: /wheelchair/diff_drive_controller/cmd_vel, type: twist_stamped, frame_id: base_link, rate: 50.0}
+feedback: {topic: /wheelchair/pose, type: pose}
+feedback_timeout: 0.5
+max_segment_time: 60.0
+confirm: false
+joystick: null
+
+record_topics:
+  - /clock
+  - /velodyne_points
+  - /wheelchair/odom
+  - /wheelchair/joint_states
+  - /wheelchair/pose
+  - /wheelchair/diff_drive_controller/cmd_vel
+  - /tf_static
+  - /tf

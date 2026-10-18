@@ -23,6 +23,8 @@
 #   環境変数：PROFILES（動きのファイルのコンテナ内のパス。既定 drive/profiles.yaml。calibration/run_calibration.sh が使う）、
 #             PURPOSE（録画の用途。<bag 名>_info.yaml に書く）、CONFIG（設定の yaml のコンテナ内のパス。既定は target の設定。
 #             例 CONFIG=real_in_gazebo で実機の設定を Gazebo で試す）
+#   設定の gazebo_launch_args（Gazebo の launch の引数。例 "x:=0 y:=0 z:=-0.4 yaw:=0" で車椅子の初期位置を変える）と
+#   localization（false なら自己位置推定を起動しない）は Gazebo だけ（例 CONFIG=gazebo_ground。地図の無い地面で走る）
 #   録画の隣に <bag 名>_phases.txt（動作の開始時刻）、<bag 名>_drive.log（drive_test.py の出力）、<bag 名>_info.yaml（eval/bag_info.py）を書く。
 set -u
 # ros2 topic の CLI は --no-daemon で使う。timeout の中で最初の ros2 が CLI のデーモンを起動すると、デーモンが timeout の
@@ -81,15 +83,17 @@ cx "mkdir -p $(dirname $BAGS/$bag) && touch $(dirname $BAGS)/COLCON_IGNORE"
 
 if [ "$target" = gazebo ]; then
   extra=${4:-}
+  gz_args=$(cx "$DT --get gazebo_launch_args" | tail -1)
+  use_loc=$(cx "$DT --get localization" | tail -1)
   if [ $INSIDE = 0 ]; then
-    echo "== restart Gazebo"
+    echo "== restart Gazebo ${gz_args:+($gz_args)}"
     docker exec $GZ bash -c 'pkill -INT -f "[r]os2 launch connection_wheelchair"'
     for _ in $(seq 30); do
       [ "$(docker exec $GZ bash -c 'pgrep -c -x gzserver; pgrep -c -x gzclient' | paste -sd+ | bc)" = 0 ] && break
       sleep 1
     done
     docker exec $GZ pkill -KILL -x gzserver 2>/dev/null; docker exec $GZ pkill -KILL -x gzclient 2>/dev/null
-    docker exec -d $GZ bash -ic 'ros2 launch connection_wheelchair connection_wheelchair.launch.py > /tmp/claude_gazebo_launch.log 2>&1'
+    docker exec -d $GZ bash -ic "ros2 launch connection_wheelchair connection_wheelchair.launch.py $gz_args > /tmp/claude_gazebo_launch.log 2>&1"
     for _ in $(seq 60); do
       cx 'timeout 5 ros2 topic echo --once --no-daemon --spin-time 3 /wheelchair/odom > /dev/null 2>&1' && break
       sleep 2
@@ -99,13 +103,19 @@ if [ "$target" = gazebo ]; then
     echo "== コンテナの中なので Gazebo は起動し直さない（Gazebo が動いていて、車椅子が初期位置にあること）"
     cx 'timeout 8 ros2 topic echo --once --no-daemon --spin-time 3 /wheelchair/odom > /dev/null 2>&1' || { echo "Gazebo（/wheelchair/odom）が見えない"; exit 1; }
   fi
-  echo "== start recording and localization ${extra:+($extra)}"
   [ "$(count_loc)" = 0 ] || { echo "localization processes are still running in ${WHERE:-this container}"; exit 1; }
   cx "rm -rf $BAGS/$bag $BAGS/${bag}_phases.txt $BAGS/${bag}_drive.log $BAGS/${bag}_info.yaml"
-  cbg "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$tag.log 2>&1"
-  sleep 3
-  cbg "ros2 launch localization_bringup localization.launch.py env:=gazebo rviz:=false $extra > /tmp/launch_$tag.log 2>&1"
-  sleep 25   # 地図の読み込みと NDT の収束を待つ
+  if [ "$use_loc" = false ]; then
+    echo "== start recording（自己位置推定は起動しない）"
+    cbg "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$tag.log 2>&1"
+    sleep 5
+  else
+    echo "== start recording and localization ${extra:+($extra)}"
+    cbg "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$tag.log 2>&1"
+    sleep 3
+    cbg "ros2 launch localization_bringup localization.launch.py env:=gazebo rviz:=false $extra > /tmp/launch_$tag.log 2>&1"
+    sleep 25   # 地図の読み込みと NDT の収束を待つ
+  fi
   echo "== drive"
   cx "$DT $profile --yes 2>&1 | tee /tmp/drive_$tag.log; exit \${PIPESTATUS[0]}"
   status=$?
@@ -136,7 +146,7 @@ cx "cp /tmp/drive_phases.txt $BAGS/${bag}_phases.txt; cp /tmp/drive_$tag.log $BA
 sleep 3
 echo "== stop"
 stop_bg "ros2 bag record -o $BAGS/$bag"
-if [ "$target" = gazebo ]; then
+if [ "$target" = gazebo ] && [ "$use_loc" != false ]; then
   stop_bg "ros2 launch localization_bringup"
   sleep 8
   echo "remaining localization processes: $(count_loc)"
@@ -146,5 +156,5 @@ else
 fi
 notes=$(cx "$DT $profile --describe" | tail -1)
 [ "$status" = 0 ] || notes="走行を途中で止めた（drive_test.py の終了コード $status、ログ $(basename $bag)_drive.log）。$notes"
-cx "python3 $T/eval/bag_info.py write $BAGS/$bag --source $source --drive 'drive/drive_test.py $target $profile' --purpose '${PURPOSE:-}' --notes '$notes'"
+cx "python3 $T/eval/bag_info.py write $BAGS/$bag --source $source --drive 'drive/drive_test.py $CFG${PROFILES:+ --profiles $(basename $PROFILES)} $profile' --purpose '${PURPOSE:-}' --notes '$notes'"
 exit $status

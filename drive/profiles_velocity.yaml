@@ -1,0 +1,36 @@
+# オドメトリと真値の速度を比べる動き（2026-10-19、ユーザー指示。drive_test.py）
+#   設定 drive/config/gazebo_ground.yaml（上限 v 1.0 m/s・omega 1.0 rad/s）で使うので、割合がそのまま m/s・rad/s になる。
+#   図は plot/plot_odom_truth.py。前後に 2 s 止まり、立ち上がりと停止も描く。
+#   回転は 1 周ずつの区間（0.5 rad/s で 5 周を 1 区間にすると約 63 s で max_segment_time 60 s を超える）
+
+spin5_w05:
+  description: 2 s 止まる → その場で左に 0.5 rad/s で 5 周（向きで 360° x 5）→ 3 s 止まる
+  segments:
+    - {stop: 2.0, label: before}
+    - repeat: 5
+      segments:
+        - {name: "left turn lap {i}", w: 0.5, yaw: 360}
+    - {stop: 3.0, label: after}
+
+spin5_w10:
+  description: 2 s 止まる → その場で左に 1.0 rad/s で 5 周（向きで 360° x 5）→ 3 s 止まる
+  segments:
+    - {stop: 2.0, label: before}
+    - repeat: 5
+      segments:
+        - {name: "left turn lap {i}", w: 1.0, yaw: 360}
+    - {stop: 3.0, label: after}
+
+straight_v05:
+  description: 2 s 止まる → 0.5 m/s で 10 s 直進（5 m）→ 3 s 止まる
+  segments:
+    - {stop: 2.0, label: before}
+    - {name: forward, v: 0.5, time: 10.0}
+    - {stop: 3.0, label: after}
+
+straight_v10:
+  description: 2 s 止まる → 1.0 m/s で 10 s 直進（10 m）→ 3 s 止まる
+  segments:
+    - {stop: 2.0, label: before}
+    - {name: forward, v: 1.0, time: 10.0}
+    - {stop: 3.0, label: after}

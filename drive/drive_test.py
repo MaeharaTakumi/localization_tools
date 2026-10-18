@@ -410,12 +410,17 @@ def main():
     ap.add_argument('--record-topics', action='store_true')
     ap.add_argument('--describe', action='store_true', help='動きと設定を 1 行で（録画の情報ファイル用）')
     ap.add_argument('--command-topic', action='store_true', help='指令のトピック（run_test.sh が使う）')
+    ap.add_argument('--get', metavar='KEY', help='設定の値（無ければ空。run_test.sh が gazebo_launch_args・localization に使う）')
     # parse_args は省略できる位置引数（動き）がオプションの後にあると受け取れない（unrecognized arguments になる）ので、
     # オプションと位置引数が混ざっていても読めるようにする
     args = ap.parse_intermixed_args()
     cfg = load_config(args.target)
     if args.command_topic:
         print(cfg['command']['topic'])
+        return 0
+    if args.get:
+        v = cfg.get(args.get, '')
+        print(str(v).lower() if isinstance(v, bool) else v)
         return 0
     profiles = load_yaml(args.profiles)
     if args.record_topics:
