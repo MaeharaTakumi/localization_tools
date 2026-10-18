@@ -26,6 +26,8 @@ for b in spin360_w1_ekf spin360_w1_ekf2; do run python3 ../calibration/calibrate
 run python3 ../calibration/calibrate_mount_scale.py $B/spin360_w1_ekf $B/spin360_w1_ekf2 $B/stops_ekf --out $O/calib --truth --map /root/ros2_ws/map/SC10_4_0.05.pcd
 # run_test.sh の確認（33）
 run python3 plot_drive_paths.py $O/runner_paths.png gazebo "From the host (spin)=$B/check/runner_host_spin" "Inside the container (spin)=$B/check/runner_inside_spin" "Inside, real-robot flow (real limits)=$B/check/runner_inside_realflow"
+# RViz の点群の表示：EKF の予測値と NDT の解の差（実機 blue、53）
+for b in blue_spin5_20261016_160557 blue_calibration_20261016_141128; do run python3 plot_prior_posterior.py /root/ros2_ws/bags/real/$b $O/prior_posterior_${b%%_2026*}.png; done
 # NDT の R を「真値 + ノイズ」の初期値で求める（15）
 [ "${FULL:-0}" = 1 ] && run python3 ../calibration/calibrate_ndt_noise.py $B/stops_ekf --out $O/ndt_init_stops
 # FULL=1 でなければ、前の結果（json）から図とヒストグラムだけ描き直す

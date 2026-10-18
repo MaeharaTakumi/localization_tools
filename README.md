@@ -148,6 +148,13 @@ RANGE=1 python3 eval/compare_run.py table eval/results/results_compare.jsonl    
 python3 plot/plot_motion_compare.py report /root/ros2_ws/fig/compare eval/results/results_compare.jsonl        # 軌跡・まとめ・時間推移の図
 ```
 
+RViz の点群の表示に使う姿勢の違い（同じ点群の時刻の、EKF の予測値（TF。`/velodyne_points` の表示）と NDT の解（`/aligned_points` の表示）の差。
+`publish_trigger: cloud` の録画。実機でもよい。`dev_log.md` の 53）：
+
+```bash
+python3 plot/plot_prior_posterior.py /root/ros2_ws/bags/real/blue_spin5_20261016_160557 /root/ros2_ws/fig/prior_posterior_blue_spin5.png
+```
+
 指標は stamp の時刻の 6 軸の誤差、実時間の誤差（100 Hz の各時刻に受信済みの最新の `/ekf_pose` とその時刻の真値の差）、
 切り替え時（指令が変わる瞬間の 0.1 s 前〜1 s 後）の yaw、推定の古さ。xy は地図と Gazebo の座標のずれ（場所で変わる）を含む。
 
