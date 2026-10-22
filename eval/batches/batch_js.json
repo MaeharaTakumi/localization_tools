@@ -7,10 +7,6 @@
   "name": "avg_ekf_1",
   "params": {
    "__env__": {
-    "topics": {
-     "points": "/velodyne_points",
-     "odom": "/wheelchair/odom"
-    },
     "joint_state_odometry": null
    },
    "ekf_localizer": {
@@ -26,10 +22,6 @@
   "name": "avg_ekf_2",
   "params": {
    "__env__": {
-    "topics": {
-     "points": "/velodyne_points",
-     "odom": "/wheelchair/odom"
-    },
     "joint_state_odometry": null
    },
    "ekf_localizer": {

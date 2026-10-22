@@ -61,7 +61,7 @@ def main():
         tread_from = odo_path
         if 'tread_width' in (env_params.get('whill_odometry') or {}):
             tread, tread_from = env_params['whill_odometry']['tread_width'], env_path
-    common = ['--odom', env['topics']['odom'], '--cmd', cfg['command']['topic'],
+    common = ['--odom', env['nodes']['odom_covariance']['topics']['odom'], '--cmd', cfg['command']['topic'],
               '--base', env['base_frame_id'], '--lidar', env['lidar_frame_id']]
     truth = ['--truth'] if args.target == 'gazebo' else []
     sc = f'{scale[0]},{scale[1]}'

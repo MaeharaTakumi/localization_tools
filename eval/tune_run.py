@@ -7,7 +7,7 @@
 - 入力 bag は最初の動作（<bag>_phases.txt の最も早い時刻。左右 1 周なら「左回転」）の LEAD 秒前から、最後（stop）の TAIL 秒後まで再生する。/tf_static が流れないので、調整用の env にだけ
   URDF と同じ取付（base_footprint -> base_link -> velodyne_base_link -> velodyne）を static_tfs で書く
 - parameters の JSON は env の parameters にそのまま入れる。キー "__env__" の中身は env の最上位を上書きする
-  （例 {"__env__": {"topics": {...}, "joint_state_odometry": null}}。null の項目は消す）
+  （例 {"__env__": {"stamp_mode": "auto"}}。null の項目は消す。nodes などは節ごと置き換わる）
 - 推定器は ekf_localizer（launch の追加引数 use_ekf:=false なら NDT 単体。結果の estimator は ndt_only）
 - 出力：入力と同じ側の tune/<試行名>（/root/ros2_ws/bags/gazebo/tune か /root/ros2_ws/bags/real/tune。bag_paths.py）と、
   指標の 1 行 JSON（標準出力の最後の行。out_bag に出力の bag のパス）

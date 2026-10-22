@@ -1,4 +1,4 @@
 [
- {"name": "w1cmp_ekf_w10_1", "params": {"__env__": {"topics": {"points": "/velodyne_points", "odom": "/wheelchair/odom"}, "joint_state_odometry": null}}},
- {"name": "w1cmp_ekf_w10_2", "params": {"__env__": {"topics": {"points": "/velodyne_points", "odom": "/wheelchair/odom"}, "joint_state_odometry": null}}}
+ {"name": "w1cmp_ekf_w10_1", "params": {"__env__": {"joint_state_odometry": null}}},
+ {"name": "w1cmp_ekf_w10_2", "params": {"__env__": {"joint_state_odometry": null}}}
 ]
