@@ -156,6 +156,19 @@ RViz の点群の表示に使う姿勢の違い（同じ点群の時刻の、EKF
 python3 plot/plot_prior_posterior.py /root/ros2_ws/bags/real/blue_spin5_20261016_160557 /root/ros2_ws/fig/prior_posterior_blue_spin5.png
 ```
 
+MATLAB 用の出力（ekf_localizer の `/localization/base_pose`・`vlp16_pose`・`vlp16_points`）を確かめる（`dev_log.md` の 61）。
+`eval/replay_outputs.py` で録画全体を再生して出力を録り（`ROS_DOMAIN_ID=99`。実機の録画は環境の名前と地図も渡す）、
+`plot/plot_matlab_outputs.py` で base_pose の周期、vlp16_pose が `/tf_ndt_update` × 取付と同じか、vlp16_points に同じ stamp の
+vlp16_pose があるか・入力の点群と中身が同じか、届くまでの時間を出し、図（届くまでの時間の分布、点群の時刻の base_pose と NDT で更新した直後の値の差）を描く：
+
+```bash
+python3 eval/replay_outputs.py /root/ros2_ws/bags/gazebo/gazebo_spin5_20261016_111637 vlp16_check_spin5
+python3 eval/replay_outputs.py /root/ros2_ws/bags/real/blue_spin5_20261016_160557 vlp16_check_blue_spin5 blue /root/ros2_ws/map/10build_4F_C_20260414.pcd
+python3 plot/plot_matlab_outputs.py /root/ros2_ws/bags/gazebo/tune/vlp16_check_spin5 /root/ros2_ws/fig/matlab_outputs/gazebo_spin5.png /root/ros2_ws/bags/gazebo/gazebo_spin5_20261016_111637
+```
+
+実機の録画をコンテナの中で再生すると、大きい点群が受け取る側で落ちる（blue では NDT が解いたのが半分ほど。出力を止めても同じ）。
+
 指標は stamp の時刻の 6 軸の誤差、実時間の誤差（100 Hz の各時刻に受信済みの最新の `/ekf_pose` とその時刻の真値の差）、
 切り替え時（指令が変わる瞬間の 0.1 s 前〜1 s 後）の yaw、推定の古さ。xy は地図と Gazebo の座標のずれ（場所で変わる）を含む。
 

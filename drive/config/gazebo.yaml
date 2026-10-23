@@ -33,5 +33,7 @@ record_topics:
   - /localization/odom
   - /ekf_pose
   - /ekf_odom
+  - /localization/base_pose      # MATLAB 用の出力（vlp16_points は /velodyne_points と同じ中身なので録らない）
+  - /localization/vlp16_pose
   - /ndt_pose
   - /localization_debug
