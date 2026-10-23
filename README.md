@@ -2,17 +2,17 @@
 
 自己位置推定（`localization_bringup`、NDT + ekf_localizer）の検証・調整・描画・テスト走行のプログラム。
 robot_localization と比べる機能（再生・合成データのテスト・比較の図）は 2026-10-15 に廃止した（git の履歴に残っている）。
-**編集はホスト（`workspace/localization_tools`）、実行は自己位置推定コンテナ `test` の `/root/ros2_ws/localization_tools`**
+**編集はホスト（`Docker/localization/src/localization_tools`）、実行は自己位置推定コンテナ `test` の `/root/ros2_ws/localization_tools`**
 （ROS のパッケージではないので `src` の外。colcon が中を探さないよう `COLCON_IGNORE` を置いている）。
 
 ```bash
 ./sync.sh push   # ホスト -> コンテナ（eval/results の既存のファイルはコンテナ側を残す）
-./sync.sh pull   # コンテナ -> ホスト（eval/results と /root/ros2_ws/fig の図を workspace/results へ）
+./sync.sh pull   # コンテナ -> ホスト（eval/results と /root/ros2_ws/fig の図を Docker/localization/results へ）
 ```
 
 コンテナ内のコマンドは ROS の環境が要るので `docker exec test bash -ic '...'` で実行する。
 録画（bag）は `test:/root/ros2_ws/bags` の下に、**Gazebo と実機で分けて**置く（`eval/bag_paths.py`）。図は `/root/ros2_ws/fig`。
-どちらも地図（`/root/ros2_ws/map`）も、ホストの `localizer_docker/data/{bags,fig,map}` を割り当てたもの（2026-10-14 から。コンテナを作り直しても消えない。
+どちらも地図（`/root/ros2_ws/map`）も、ホストの `Docker/localization/docker/data/{bags,fig,map}` を割り当てたもの（2026-10-14 から。コンテナを作り直しても消えない。
 コンテナの中で作ったファイルはホストでは root の持ち物になる）。
 
 | 場所 | 中身 |
@@ -31,14 +31,14 @@ python3 eval/bag_info.py list                         # 録画の一覧
 python3 eval/bag_info.py write <bag> --source gazebo|real --drive '...' --purpose '...' [--notes '...']
 ```
 
-録画と図（`/root/ros2_ws/bags`・`/root/ros2_ws/fig`。どちらにも `COLCON_IGNORE` を置く）は、ホストの `localizer_docker/data/{bags,fig}` を
+録画と図（`/root/ros2_ws/bags`・`/root/ros2_ws/fig`。どちらにも `COLCON_IGNORE` を置く）は、ホストの `Docker/localization/docker/data/{bags,fig}` を
 割り当てたものなので、コンテナを作り直しても消えない。
 
 | フォルダ | 内容 |
 |---|---|
 | `calibration/` | **パラメータ推定（プログラムとパラメータ）**：`run_calibration.sh`（推定用の動きで走って、続けて推定する）、`motion.py`（推定用の動き）、`calibrate.py`（録画から R・倍率・取付をまとめて推定）、`calibrate_noise.py`（観測ノイズ R、真値なし）、`calibrate_ndt_noise.py`（NDT の R を「真値 + ノイズ」の初期値で計算し直して求める。Gazebo）、`calibrate_mount_scale.py`（LiDAR の取付位置とオドメトリの倍率、真値なし）、図は `plot_noise.py`・`plot_mount_scale.py`。設定は `param/motion.yaml`（推定用の動き）と `param/calibrate.yaml`（推定。各プログラムのオプションの既定値） |
 | `eval/` | 録画の再生・評価・パラメータの調整（`tune_run.py`、`tune_batch.py`、`summarize.py`、`transition_eval.py`、`make_window_bag.py`）。候補は `batches/`、結果は `results/` |
-| `plot/` | 図（`plot_*.py`、`check_*.py`）。`plot_spin.py` は bag の読み込みや図の共通部品も持つ。`rerender_results.sh` で `workspace/results` の図を全部描き直す（NDT の R の図は計算に約 9 分かかるので `FULL=1` のときだけ） |
+| `plot/` | 図（`plot_*.py`、`check_*.py`）。`plot_spin.py` は bag の読み込みや図の共通部品も持つ。`rerender_results.sh` で `Docker/localization/results` の図を全部描き直す（NDT の R の図は計算に約 9 分かかるので `FULL=1` のときだけ） |
 | `record_rviz.sh` | **RViz の画面の録画（ホストで実行）**。下の「RViz の画面の録画」 |
 | `drive/` | **テスト走行と録画（Gazebo・実機共通）**：`run_test.sh`（ホストかコンテナの中で実行）、`drive_test.py`（走らせる）、`profiles.yaml`（動き）、`config/gazebo.yaml`・`config/red.yaml`・`blue.yaml`・`white.yaml`（実機の車椅子ごと。速さの上限・走ってよい範囲・トピック・録画するトピック）、`config/real_in_gazebo.yaml`（実機の設定を Gazebo で試す）、`config/gazebo_ground.yaml` と `profiles_velocity.yaml`（Gazebo の地面でオドメトリと真値の速度を比べる） |
 
@@ -230,5 +230,5 @@ python3 drive/drive_test.py <gazebo|red|blue|white> <動き> --simulate    # 計
 
 ## 図
 
-描いた図は `workspace/results/`、作業の記録は `workspace/dev_log.md`（図を埋め込む）。図のルール：後方の線ほど太く、
+描いた図は `Docker/localization/results/`、作業の記録は `Docker/localization/dev_log.md`（図を埋め込む）。図のルール：後方の線ほど太く、
 点線は使わない、真値は一番後ろの太い灰色、題・軸ラベル・凡例の頭文字は大文字（保存前に `plot_spin.capitalize_labels`）。
