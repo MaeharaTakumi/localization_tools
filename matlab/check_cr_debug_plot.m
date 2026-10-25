@@ -1,9 +1,9 @@
 % whill_common_matlab の CR_debug を main.m と同じ流れ（Estimate2・Control2・DataLogger）で記録し、
-% plotter.DataPlotter・plotter.myplotResult で図を描く。指令は配信しない。
+% plotter.DataPlotter・plotter.myplotResult で図を、plotter.myplotPointCloudVideo で動画を作る。指令は配信しない。
 % ホストで MATLAB を -batch で動かす。コンテナで eval/replay_outputs.py を動かしている間に（dev_log.md の 63）：
-%   REPO=<whill_common_matlab のフォルダ> TEST_DURATION=40 TEST_OUT_DIR=<記録と図のフォルダ> \
+%   REPO=<whill_common_matlab のフォルダ> TEST_DURATION=40 TEST_OUT_DIR=<記録と図のフォルダ> MAP=<点群地図（.pcd）> \
 %     matlab -batch "run('<localization_tools>/matlab/check_cr_debug_plot.m')"
-% 記録は TEST_OUT_DIR の userLocal_tmp.mat・userLocal.mat、図は TEST_OUT_DIR/result。
+% 記録は TEST_OUT_DIR の userLocal_tmp.mat・userLocal.mat、図と動画は TEST_OUT_DIR/result（MAP が空なら地図なしの動画）。
 repo = getenv("REPO");
 addpath(repo)
 setenv("RMW_IMPLEMENTATION", "rmw_fastrtps_cpp")
@@ -48,4 +48,5 @@ dlog.stop();
 fprintf("cycles: %d\n", cnt);
 plotter.DataPlotter(outDir, cfg)
 plotter.myplotResult(outDir, cfg)
+plotter.myplotPointCloudVideo(outDir, getenv("MAP"))
 disp(dir(fullfile(outDir, "result", "jpeg")))

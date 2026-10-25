@@ -178,11 +178,11 @@ REPO="<whill_common_matlab のフォルダ>" TEST_DURATION=70 TEST_OUT=/tmp/cr_d
 python3 plot/plot_cr_debug_pairs.py /root/ros2_ws/fig/matlab_outputs/cr_debug_gazebo_spin5.mat /root/ros2_ws/fig/matlab_outputs/cr_debug_gazebo_spin5.png   # コンテナ（.mat を写して）
 ```
 
-main.m と同じ流れ（Estimate2・Control2・DataLogger。指令は配信しない）で記録し、`plotter.DataPlotter`・`plotter.myplotResult` の図
-（`TEST_OUT_DIR/result`）まで描くのは `matlab/check_cr_debug_plot.m`（`dev_log.md` の 63）：
+main.m と同じ流れ（Estimate2・Control2・DataLogger。指令は配信しない）で記録し、`plotter.DataPlotter`・`plotter.myplotResult` の図と
+`plotter.myplotPointCloudVideo` の動画（`TEST_OUT_DIR/result`。地図は `MAP`）まで作るのは `matlab/check_cr_debug_plot.m`（`dev_log.md` の 63・64）：
 
 ```bash
-REPO="<whill_common_matlab のフォルダ>" TEST_DURATION=50 TEST_OUT_DIR=/tmp/cr_debug_plot \
+REPO="<whill_common_matlab のフォルダ>" TEST_DURATION=50 TEST_OUT_DIR=/tmp/cr_debug_plot MAP=<点群地図（.pcd）> \
   matlab -batch "run('<localization_tools>/matlab/check_cr_debug_plot.m')"                                   # ホスト
 ```
 
