@@ -169,6 +169,15 @@ python3 plot/plot_matlab_outputs.py /root/ros2_ws/bags/gazebo/tune/vlp16_check_s
 
 実機の録画をコンテナの中で再生すると、大きい点群が受け取る側で落ちる（blue では NDT が解いたのが半分ほど。出力を止めても同じ）。
 
+MATLAB（`MaeharaTakumi/whill_common_matlab` の `cr_debug` ブランチの CR_debug）がこれらを受け取って組にできるかは、`replay_outputs.py` で
+再生している間に、ホストで MATLAB を `-batch` で動かして確かめる（`ROS_DOMAIN_ID=99`、Fast DDS の localhost のプロファイル。`dev_log.md` の 62）：
+
+```bash
+REPO="<whill_common_matlab のフォルダ>" TEST_DURATION=70 TEST_OUT=/tmp/cr_debug.mat \
+  matlab -batch "run('<localization_tools>/matlab/check_cr_debug.m')"                                        # ホスト
+python3 plot/plot_cr_debug_pairs.py /root/ros2_ws/fig/matlab_outputs/cr_debug_gazebo_spin5.mat /root/ros2_ws/fig/matlab_outputs/cr_debug_gazebo_spin5.png   # コンテナ（.mat を写して）
+```
+
 指標は stamp の時刻の 6 軸の誤差、実時間の誤差（100 Hz の各時刻に受信済みの最新の `/ekf_pose` とその時刻の真値の差）、
 切り替え時（指令が変わる瞬間の 0.1 s 前〜1 s 後）の yaw、推定の古さ。xy は地図と Gazebo の座標のずれ（場所で変わる）を含む。
 
