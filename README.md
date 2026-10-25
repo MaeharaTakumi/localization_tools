@@ -186,6 +186,15 @@ REPO="<whill_common_matlab のフォルダ>" TEST_DURATION=50 TEST_OUT_DIR=/tmp/
   matlab -batch "run('<localization_tools>/matlab/check_cr_debug_plot.m')"                                   # ホスト
 ```
 
+録画の再生（自己位置推定）・MATLAB・図と動画を 1 回で行うのは `matlab/replay_matlab.sh`（ホストで実行。`dev_log.md` の 65）。
+MATLAB を先に起動して購読ができてから録画を再生し（`RECORD=0` の `replay_outputs.py`）、新しい組が `STOP_IDLE`（既定 5）秒
+来なくなったら MATLAB が止まって図と動画を作る。ROS の時刻は録画の `/clock`（`SIM_TIME=1`）なので、点群の古さ（`LiDAR_age`）も録画の時刻で出る：
+
+```bash
+matlab/replay_matlab.sh /root/ros2_ws/bags/gazebo/gazebo_spin5_20261016_111637 ../../results/matlab_outputs/replay_gazebo_spin5
+matlab/replay_matlab.sh /root/ros2_ws/bags/real/blue_spin5_20261016_160557 ../../results/matlab_outputs/replay_blue_spin5 blue /root/ros2_ws/map/10build_4F_C_20260414.pcd
+```
+
 指標は stamp の時刻の 6 軸の誤差、実時間の誤差（100 Hz の各時刻に受信済みの最新の `/ekf_pose` とその時刻の真値の差）、
 切り替え時（指令が変わる瞬間の 0.1 s 前〜1 s 後）の yaw、推定の古さ。xy は地図と Gazebo の座標のずれ（場所で変わる）を含む。
 
