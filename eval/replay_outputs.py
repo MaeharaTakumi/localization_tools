@@ -10,7 +10,8 @@
           --clock で流す。RATE（環境変数、既定 1.0）で再生の速さを変えられる。
 RECORD=0（環境変数）なら出力を録らない（Gazebo は tune_run が /clock だけ録る。MATLAB で確かめるとき。matlab/replay_matlab.sh）。
 大きい点群をコンテナの中で流すと、受け取る側で点群が落ちることがある（実機 blue の録画では NDT が解いたのは
-半分ほど。出力を止めても同じ。dev_log.md の 61）。
+半分ほど。ソケットの受信バッファ 208 kB に 314 kB の点群が収まらないため。ホストの net.core.rmem_max・rmem_default を
+8 MB にすると 1527 個中 1515 個を解く。dev_log.md の 61・66・67）。
 """
 import os
 import subprocess

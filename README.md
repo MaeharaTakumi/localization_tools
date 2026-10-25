@@ -167,7 +167,7 @@ python3 eval/replay_outputs.py /root/ros2_ws/bags/real/blue_spin5_20261016_16055
 python3 plot/plot_matlab_outputs.py /root/ros2_ws/bags/gazebo/tune/vlp16_check_spin5 /root/ros2_ws/fig/matlab_outputs/gazebo_spin5.png /root/ros2_ws/bags/gazebo/gazebo_spin5_20261016_111637
 ```
 
-実機の録画をコンテナの中で再生すると、大きい点群が受け取る側で落ちる（blue では NDT が解いたのが半分ほど。出力を止めても同じ）。
+実機の録画をコンテナの中で再生すると、大きい点群が受け取る側で落ちることがある（blue では NDT が解いたのが半分ほど）（ソケットの受信バッファ 208 kB に 314 kB の点群が収まらないため。ホストの net.core.rmem_max・rmem_default を 8 MB にすると全部届く。dev_log.md の 66・67）。
 
 MATLAB（`MaeharaTakumi/whill_common_matlab` の `cr_debug` ブランチの CR_debug）がこれらを受け取って組にできるかは、`replay_outputs.py` で
 再生している間に、ホストで MATLAB を `-batch` で動かして確かめる（`ROS_DOMAIN_ID=99`、Fast DDS の localhost のプロファイル。`dev_log.md` の 62）：

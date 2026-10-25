@@ -7,7 +7,7 @@
 # DataPlotter・myplotResult・myplotPointCloudVideo で図と動画を作る（出力のフォルダの result）。
 # 環境変数：REPO（whill_common_matlab のフォルダ）、MATLAB（matlab の実行ファイル）、MAP（動画の地図。ホストのパス）、
 #   STOP_IDLE（既定 5）、RATE（再生の速さ。実機の録画だけ）
-# 実機の録画をコンテナの中で再生すると、大きい点群が受け取る側で落ちることがある（dev_log.md の 61）。
+# 実機の録画は、ホストの net.core.rmem_max・rmem_default が 208 kB のままだと点群が半分ほど落ちる。8 MB にしておく（dev_log.md の 66・67）。
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 ws=$(cd "$here/../../.." && pwd)    # localization_workspace（Docker/localization）
