@@ -29,6 +29,10 @@ run python3 plot_drive_paths.py $O/runner_paths.png gazebo "From the host (spin)
 # RViz の点群の表示：EKF の予測値・NDT の更新値・NDT の解の差（実機 blue、53・54。tune は再生の出力）
 run python3 plot_prior_posterior.py /root/ros2_ws/bags/real/tune/ndt_update_tf_blue_spin5 $O/ndt_update_tf_blue_spin5.png
 for b in blue_spin5_20261016_160557 blue_calibration_20261016_141128; do run python3 plot_prior_posterior.py /root/ros2_ws/bags/real/$b $O/prior_posterior_${b%%_2026*}.png; done
+# MATLAB が /tf から引く値：publish_trigger（Gazebo は update、実機は cloud）と 50 Hz の周期の比較（68。tune は再生の出力、4 回ずつ）
+tf4() { echo $1_1,$1_2,$1_3,$1_4; }
+run python3 plot_matlab_outputs.py compare $O/matlab_outputs/tf_compare_gazebo_spin5.png "Gazebo before (update)=$(tf4 $T/tfcmp_before_gazebo)" "Gazebo after (50 Hz)=$(tf4 $T/tfcmp_after_gazebo)"
+run python3 plot_matlab_outputs.py compare $O/matlab_outputs/tf_compare_blue_spin5.png "Blue before (cloud)=$(tf4 /root/ros2_ws/bags/real/tune/tfcmp_before_blue)" "Blue after (50 Hz)=$(tf4 /root/ros2_ws/bags/real/tune/tfcmp_after_blue)"
 # NDT の R を「真値 + ノイズ」の初期値で求める（15）
 [ "${FULL:-0}" = 1 ] && run python3 ../calibration/calibrate_ndt_noise.py $B/stops_ekf --out $O/ndt_init_stops
 # FULL=1 でなければ、前の結果（json）から図とヒストグラムだけ描き直す

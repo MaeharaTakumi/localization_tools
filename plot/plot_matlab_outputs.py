@@ -1,69 +1,44 @@
 #!/usr/bin/env python3
-"""MATLAB 用の出力（ekf_localizer の /localization/base_pose・vlp16_pose・vlp16_points）を録画で確かめ、図を描く.
+"""MATLAB が /tf から引く値（後輪間中心の最新の姿勢と、点群の stamp の時刻の LiDAR の姿勢）を録画で確かめ、図を描く.
 
-  python3 plot_matlab_outputs.py <出力を録った bag> <出力 png> [<入力の bag（点群を比べる）>]
+  python3 plot_matlab_outputs.py <出力を録った bag> <出力 png>                         1 回分の確かめと図
+  python3 plot_matlab_outputs.py compare <出力 png> <ラベル>=<bag>[,<bag>...] ...      ラベルごとの平均と幅、分布の図
 
-確かめること（結果は標準出力）：
-  base_pose    stamp の間隔（base_pose_rate の周期か）と、stamp から受信までの時間
-  vlp16_pose   /ndt_pose と同じ stamp（点群の取得時刻）か、/tf_ndt_update（map -> base）に /tf_static の取付を
-               掛けた値と一致するか、stamp から受信までの時間
-  vlp16_points 同じ stamp の vlp16_pose があるか、姿勢より後に届いたか、入力の bag の同じ stamp の
-               /velodyne_points と中身が同じか
-受信の時刻は bag の時刻（壁時計）。stamp は /clock で壁時計に直す（/clock が無ければ stamp を壁時計とみなす）。
-図：(1) stamp から受信までの時間の分布、(2)(3) 同じ点群の時刻の base_pose（予測。前後の値を補間）と、
-NDT で更新した直後の base（/tf_ndt_update）の差（水平の位置・yaw）。
+出力の bag は eval/replay_outputs.py で録ったもの（/tf・/tf_static・/tf_ndt_update・/ndt_pose・/clock。Gazebo は /wheelchair/pose も）。
+確かめること（結果は標準出力。最後の行は METRICS <1 行 JSON>）：
+  tf          map -> base の /tf の stamp の間隔（predict_rate の周期か）と、stamp から受信までの時間
+  tf_wait     点群の stamp（/ndt_pose の stamp）より後の /tf が届くまでの時間（点群の stamp から）。NDT と MATLAB が
+              点群の stamp の時刻の TF を引けるのはこれより後（点群は stamp から約 15 ms 後に届く）
+  prior       点群の stamp の時刻の /tf（tf2 と同じく前後の 2 つを補間。位置は線形、回転は slerp）に取付を掛けた
+              map -> LiDAR。MATLAB が点群の座標変換に使う値で、NDT の初期値と同じ
+  prior_ndt   prior − NDT の解（/ndt_pose）。NDT が初期値からどれだけ動いたか
+  prior_post  prior − NDT で更新した直後の値（/tf_ndt_update に取付）。2026-10-26 まで MATLAB が使っていた vlp16_pose との差
+  Gazebo だけ prior_truth・post_truth（真値の LiDAR との差。真値は /wheelchair/pose に URDF の取付）
+差は水平の位置 [mm] と |yaw| [deg]。受信の時刻は bag の時刻（壁時計）。stamp は /clock で壁時計に直す。
+図（1 回分）：(1) 点群の stamp から TF が届くまでの時間の分布、(2)(3) prior − NDT の解、prior − NDT で更新した直後の値の時間推移。
 """
-import hashlib
+import json
 import os
-import struct
 import sys
 
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
-from rclpy.serialization import deserialize_message  # noqa: E402
-import rosbag2_py  # noqa: E402
-from sensor_msgs.msg import PointCloud2  # noqa: E402
+from scipy.spatial.transform import Rotation, Slerp  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
 from plot_noise import box_on, setup, style  # noqa: E402
-from plot_spin import capitalize_labels, INK2, read_bag, SERIES, SURFACE, widths_back_to_front, wrap  # noqa: E402
+from plot_spin import capitalize_labels, INK2, read_bag, SERIES, SURFACE, widths_back_to_front  # noqa: E402
 from plot_velocity import phases_of  # noqa: E402
-from pose_math import matrix_to_rpy, pose_msg_to_matrix, transform_msg_to_matrix  # noqa: E402
+from pose_math import pose_msg_to_matrix, transform_msg_to_matrix, vec_to_matrix  # noqa: E402
 
-BASE, VLP16, POINTS = '/localization/base_pose', '/localization/vlp16_pose', '/localization/vlp16_points'
+LIDAR_FRAME = 'velodyne'   # 環境ファイルの lidar_frame_id
 
 
 def ns(stamp):
     return stamp.sec * 10**9 + stamp.nanosec
-
-
-def cloud_digest(data):
-    """点群の中身（header・形・フィールド・data）の md5。シリアライズしたバイト列は、配信した DDS によって
-    末尾の詰め物の長さが違う（実機のラズパイの点群は 3 バイト長い）ので、読み込んでから比べる."""
-    m = deserialize_message(data, PointCloud2)
-    h = hashlib.md5(repr((m.header, m.height, m.width, m.fields, m.is_bigendian, m.point_step, m.row_step,
-                          m.is_dense)).encode())
-    h.update(bytes(m.data))
-    return h.hexdigest()
-
-
-def raw_clouds(bag, topic, keys=None, digest=False):
-    """{stamp [ns]: (受信時刻 [s], 中身の md5（digest のときだけ）)}。CDR の先頭 4 バイトの後の header.stamp だけ読む."""
-    reader = rosbag2_py.SequentialReader()
-    reader.open(rosbag2_py.StorageOptions(uri=bag, storage_id='sqlite3'),
-                rosbag2_py.ConverterOptions('cdr', 'cdr'))
-    reader.set_filter(rosbag2_py.StorageFilter(topics=[topic]))
-    out = {}
-    while reader.has_next():
-        _, data, t = reader.read_next()
-        sec, nsec = struct.unpack_from('<iI', data, 4)
-        k = sec * 10**9 + nsec
-        if keys is None or k in keys:
-            out[k] = (t * 1e-9, cloud_digest(data) if digest else None)
-    return out
 
 
 def mount_of(static, base, lidar):
@@ -79,133 +54,196 @@ def mount_of(static, base, lidar):
     return T
 
 
+def diff(A, B):
+    """A − B の水平の位置 [m] と yaw [rad]（map 座標の差）."""
+    yaw = np.arctan2(A[1, 0], A[0, 0]) - np.arctan2(B[1, 0], B[0, 0])
+    return np.hypot(A[0, 3] - B[0, 3], A[1, 3] - B[1, 3]), np.arctan2(np.sin(yaw), np.cos(yaw))
+
+
 def stats(name, v, unit='ms'):
     v = np.asarray(v)
     if not len(v):
         print(f'  {name}: none')
-        return
-    print(f'  {name}: n={len(v)} min {v.min():.1f}  mean {v.mean():.1f}  50% {np.percentile(v, 50):.1f}  '
-          f'95% {np.percentile(v, 95):.1f}  max {v.max():.1f} {unit}')
+        return {}
+    print(f'  {name}: n={len(v)} min {v.min():.2f}  mean {v.mean():.2f}  50% {np.percentile(v, 50):.2f}  '
+          f'95% {np.percentile(v, 95):.2f}  max {v.max():.2f} {unit}')
+    return {'mean': float(v.mean()), 'p95': float(np.percentile(v, 95)), 'max': float(v.max())}
 
 
-def check(bag, in_bag=None):
-    d = read_bag(bag, ['/clock', '/tf_static', '/tf_ndt_update', '/ndt_pose', BASE, VLP16])
-    for topic in (BASE, VLP16):
-        if not d.get(topic):
-            raise RuntimeError(f'no {topic} in {bag}')
+class TfInterp:
+    """map -> base の /tf を、tf2 と同じく前後の 2 つで補間する（その時刻より後の TF が無ければ None）."""
+
+    def __init__(self, items):
+        items = sorted(items, key=lambda x: x[0])
+        self.k = np.array([k for k, _, _ in items])
+        self.recv = np.array([t for _, t, _ in items])
+        T = np.array([M for _, _, M in items])
+        self.p = T[:, :3, 3]
+        self.slerp = Slerp(self.k * 1e-9, Rotation.from_matrix(T[:, :3, :3]))
+
+    def at(self, k):
+        if not self.k[0] <= k <= self.k[-1]:
+            return None
+        T = np.eye(4)
+        T[:3, 3] = [np.interp(k, self.k, self.p[:, i]) for i in range(3)]
+        T[:3, :3] = self.slerp([k * 1e-9]).as_matrix()[0]
+        return T
+
+    def available(self, k):
+        """stamp k の TF を引けるようになる受信時刻 [s]（stamp が k 以上の最初の TF の受信時刻）."""
+        i = np.searchsorted(self.k, k)
+        return self.recv[i] if i < len(self.k) else None
+
+
+def check(bag):
+    d = read_bag(bag, ['/clock', '/tf', '/tf_static', '/tf_ndt_update', '/ndt_pose'])
     clk = np.array([(t, m.clock.sec + m.clock.nanosec * 1e-9) for t, m in d.get('/clock', [])])
 
     def to_wall(k):
         s = np.asarray(k) * 1e-9
         return np.interp(s, clk[:, 1], clk[:, 0]) if len(clk) else s
 
+    tf = [(ns(tr.header.stamp), t, tr.child_frame_id, transform_msg_to_matrix(tr.transform))
+          for t, m in d['/tf'] for tr in m.transforms if tr.header.frame_id == 'map']
+    if not tf:
+        raise RuntimeError(f'no /tf map -> base in {bag}')
+    base_frame = tf[0][2]
+    interp = TfInterp([(k, t, M) for k, t, _, M in tf])
+    mount = mount_of(d['/tf_static'], base_frame, LIDAR_FRAME)
     print(f'{bag}')
-    # base_pose
-    base_k = np.array([ns(m.header.stamp) for _, m in d[BASE]])
-    base_recv = np.array([t for t, _ in d[BASE]])
-    period = np.diff(base_k) * 1e-6
-    print(f'base_pose: {len(base_k)} msgs, {(len(base_k) - 1) / ((base_k[-1] - base_k[0]) * 1e-9):.1f} Hz')
-    stats('stamp interval', period)
-    stats('stamp -> receipt', (base_recv - to_wall(base_k)) * 1e3)
+    out = {'bag': bag}
 
-    # vlp16_pose
-    vlp = {ns(m.header.stamp): (t, pose_msg_to_matrix(m.pose.pose)) for t, m in d[VLP16]}
-    ndt = {ns(m.header.stamp) for _, m in d.get('/ndt_pose', [])}
-    print(f'vlp16_pose: {len(vlp)} msgs, /ndt_pose {len(ndt)}, same stamp as /ndt_pose: {len(set(vlp) & ndt)}')
-    stats('cloud stamp -> receipt', [(t - to_wall(k)) * 1e3 for k, (t, _) in vlp.items()])
-    update = {ns(tr.header.stamp): (tr.child_frame_id, transform_msg_to_matrix(tr.transform))
-              for _, m in d.get('/tf_ndt_update', []) for tr in m.transforms if tr.header.frame_id == 'map'}
-    base_update = {}
-    if update:
-        base_frame = next(iter(update.values()))[0]
-        lidar_frame = 'velodyne'   # 環境ファイルの lidar_frame_id（vlp16_pose のメッセージには書かれない）
-        mount = mount_of(d['/tf_static'], base_frame, lidar_frame)
-        dp, da = [], []
-        for k, (_, T) in vlp.items():
-            if k in update:
-                D = np.linalg.inv(update[k][1] @ mount) @ T
-                dp.append(np.linalg.norm(D[:3, 3]) * 1e3)
-                da.append(np.degrees(np.arccos(np.clip((np.trace(D[:3, :3]) - 1) / 2, -1, 1))))
-        print(f'  vs /tf_ndt_update x mount ({base_frame} -> {lidar_frame}): {len(dp)} stamps, '
-              f'position max {max(dp):.4f} mm, rotation max {max(da):.5f} deg')
-        base_update = {k: T for k, (_, T) in update.items()}
+    period = np.diff(interp.k) * 1e-6
+    rate = (len(interp.k) - 1) / ((interp.k[-1] - interp.k[0]) * 1e-9)
+    print(f'/tf map -> {base_frame}: {len(interp.k)} msgs, {rate:.1f} Hz')
+    out['tf_rate'] = rate
+    out['tf_interval'] = stats('stamp interval', period)
+    out['tf_latency'] = stats('stamp -> receipt', (interp.recv - to_wall(interp.k)) * 1e3)
 
-    # vlp16_points
-    pts = raw_clouds(bag, POINTS, digest=bool(in_bag))
-    if pts:
-        paired = [k for k in pts if k in vlp]
-        after = [(pts[k][0] - vlp[k][0]) * 1e3 for k in paired]
-        print(f'vlp16_points: {len(pts)} msgs, with a vlp16_pose of the same stamp: {len(paired)}, '
-              f'received after the pose: {sum(a >= 0 for a in after)}, '
-              f'vlp16_pose without vlp16_points: {len(set(vlp) - set(pts))}')
-        stats('pose -> points receipt', after)
-        if in_bag:
-            src = raw_clouds(in_bag, '/velodyne_points', set(pts), digest=True)
-            same = sum(src[k][1] == pts[k][1] for k in pts if k in src)
-            print(f'  same content as /velodyne_points of {in_bag}: {same} / {len(pts)} (found {len(src)})')
-    else:
-        print('vlp16_points: not recorded')
+    ndt = {ns(m.header.stamp): (t, pose_msg_to_matrix(m.pose.pose)) for t, m in d.get('/ndt_pose', [])}
+    post = {ns(tr.header.stamp): transform_msg_to_matrix(tr.transform)
+            for _, m in d.get('/tf_ndt_update', []) for tr in m.transforms if tr.header.frame_id == 'map'}
+    print(f'/ndt_pose: {len(ndt)}, /tf_ndt_update: {len(post)}')
+    out['n_ndt'] = len(ndt)
+    out['ndt_latency'] = stats('/ndt_pose: cloud stamp -> receipt', [(t - to_wall(k)) * 1e3 for k, (t, _) in ndt.items()])
 
-    # 同じ点群の時刻の base_pose（予測）と NDT で更新した直後の base の差
-    bx = np.array([pose_msg_to_matrix(m.pose.pose) for _, m in d[BASE]])
-    byaw = np.unwrap([np.arctan2(T[1, 0], T[0, 0]) for T in bx])
-    rows = []
-    for k in sorted(base_update):
-        if not base_k[0] <= k <= base_k[-1]:
+    truth = None
+    if '/wheelchair/pose' in read_bag(bag, ['/wheelchair/pose']):
+        from compare_run import load, truth_lidar  # noqa: E402  Gazebo だけ
+        tt, tv, *_ = load(bag)
+        truth = (tt, tv, truth_lidar)
+
+    rows = []   # [stamp s, tf_wait ms, prior-ndt xy, yaw, prior-post xy, yaw, prior-truth xy, yaw, post-truth xy, yaw]
+    for k in sorted(ndt):
+        P = interp.at(k)
+        avail = interp.available(k)
+        if P is None or avail is None:
             continue
-        x = np.interp(k, base_k, bx[:, 0, 3])
-        y = np.interp(k, base_k, bx[:, 1, 3])
-        yaw = np.interp(k, base_k, byaw)
-        U = base_update[k]
-        rows.append([k * 1e-9, np.hypot(x - U[0, 3], y - U[1, 3]),
-                     wrap(yaw - np.arctan2(U[1, 0], U[0, 0]))])
+        prior = P @ mount
+        row = [k * 1e-9, (avail - to_wall(k)) * 1e3, *diff(prior, ndt[k][1])]
+        row += [*diff(prior, post[k] @ mount)] if k in post else [np.nan, np.nan]
+        if truth is not None:
+            tt, tv, truth_lidar = truth
+            Tl = vec_to_matrix(truth_lidar(tt, tv, [k * 1e-9])[0])
+            row += [*diff(prior, Tl)]
+            row += [*diff(post[k] @ mount, Tl)] if k in post else [np.nan, np.nan]
+        rows.append(row)
     rows = np.array(rows)
-    if len(rows):
-        stats('base_pose - NDT update (horizontal)', rows[:, 1] * 1e3, 'mm')
-        stats('base_pose - NDT update (|yaw|)', np.degrees(np.abs(rows[:, 2])), 'deg')
-    return {
-        'base_delay': (base_recv - to_wall(base_k)) * 1e3,
-        'vlp_delay': np.array([(t - to_wall(k)) * 1e3 for k, (t, _) in vlp.items()]),
-        'diff': rows,
-    }
+    out['tf_wait'] = stats('cloud stamp -> the first /tf after it (receipt)', rows[:, 1])
+    names = [('prior_ndt', 2), ('prior_post', 4)] + ([('prior_truth', 6), ('post_truth', 8)] if truth else [])
+    for name, i in names:
+        ok = ~np.isnan(rows[:, i])
+        out[name] = {'xy': stats(f'{name} (horizontal)', rows[ok, i] * 1e3, 'mm'),
+                     'yaw': stats(f'{name} (|yaw|)', np.degrees(np.abs(rows[ok, i + 1])), 'deg')}
+    print('METRICS ' + json.dumps(out))
+    return out, rows
 
 
-def plot(bag, out, r):
+def plot(bag, out, rows):
     try:
         ph = phases_of(bag)
     except FileNotFoundError:
         ph = {}
-    rows = r['diff']
     t0 = min(ph.values()) if ph else rows[0, 0]
     setup()
-    fig, axes = plt.subplots(3, 1, figsize=(11, 9), facecolor=SURFACE,
-                             gridspec_kw={'height_ratios': [1.0, 1.0, 1.0]})
+    fig, axes = plt.subplots(3, 1, figsize=(11, 9), facecolor=SURFACE)
     ax = axes[0]
     style(ax)
-    top = max(np.percentile(r['vlp_delay'], 99.5), 20.0)
-    bins = np.arange(0.0, top + 2.0, 2.0)
-    for (label, v), color in zip([('Base pose (prediction, base_pose_rate)', r['base_delay']),
-                                  ('LiDAR pose (NDT update, at the cloud stamp)', r['vlp_delay'])], SERIES):
-        ax.hist(np.clip(v, 0, bins[-1]), bins=bins, weights=np.full(len(v), 1.0 / len(v)), color=color,
-                edgecolor='black', lw=0.5, alpha=0.85, label=f'{label}: mean {v.mean():.1f} ms')
-    ax.set_xlabel('Time from the stamp to the receipt [ms]')
+    v = rows[:, 1]
+    bins = np.arange(np.floor(v.min()) - 1.0, max(np.percentile(v, 99.5), 20.0) + 1.0, 1.0)
+    ax.hist(np.clip(v, bins[0], bins[-1]), bins=bins, weights=np.full(len(v), 1.0 / len(v)), color=SERIES[0],
+            edgecolor='black', lw=0.5, label=f'Mean {v.mean():.1f} ms, max {v.max():.1f} ms')
+    ax.set_xlabel('Time from the cloud stamp to the first /tf after it [ms]')
     ax.set_ylabel('Relative frequency')
     ax.legend(loc='upper right', frameon=False, fontsize=9)
-    ax.set_title('When /localization/base_pose and /localization/vlp16_pose arrive')
+    ax.set_title('When the TF at the cloud stamp becomes available')
     box_on(ax)
-    lw = widths_back_to_front(1)[0]
-    for ax, (i, scale, ylabel) in zip(axes[1:], [(1, 1e3, 'Horizontal position difference [mm]'),
-                                                 (2, 180 / np.pi, 'Yaw difference [deg]')]):
+    lws = widths_back_to_front(2)
+    for ax, (k, scale, ylabel) in zip(axes[1:], [(0, 1e3, 'Horizontal position difference [mm]'),
+                                                 (1, 180 / np.pi, 'Yaw difference [deg]')]):
         style(ax)
         for ts in ph.values():
             ax.axvline(ts - t0, color=INK2, lw=0.6, alpha=0.4)
-        ax.plot(rows[:, 0] - t0, rows[:, i] * scale, color=SERIES[0], lw=lw,
-                label='Base pose (prediction) − EKF NDT update (base)')
-        ax.set_ylabel(ylabel)
+        for (i, label), color, lw in zip([(2, 'Prior (/tf at the cloud stamp) − NDT solution'),
+                                          (4, 'Prior − EKF NDT update (/tf_ndt_update)')], SERIES, lws):
+            y = rows[:, i + k] * scale
+            ax.plot(rows[:, 0] - t0, y if k == 0 else np.abs(y), color=color, lw=lw, label=label)
+        ax.set_ylabel(ylabel if k == 0 else '|Yaw difference| [deg]')
         ax.set_xlabel(f'Time from "{min(ph, key=ph.get)}" [s]' if ph else 'Time from the first cloud [s]')
         box_on(ax)
     axes[1].legend(loc='upper left', frameon=False, fontsize=9)
-    axes[1].set_title('Base pose at the cloud stamp: prediction vs NDT update')
+    axes[1].set_title('LiDAR pose at the cloud stamp from /tf (what MATLAB uses)')
+    capitalize_labels(fig)
+    fig.tight_layout()
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+    fig.savefig(out, dpi=130, facecolor=SURFACE)
+    print(f'saved {out}')
+
+
+def compare(out, groups):
+    """ラベルごとに、1 回ごとの指標の平均と幅を表にし、tf_wait と prior − NDT の解の分布を並べて描く."""
+    res = {}
+    for g in groups:
+        label, bags = g.split('=', 1)
+        res[label] = [check(b) for b in bags.split(',')]
+    keys = [('tf_rate', None), ('tf_wait', 'mean'), ('tf_wait', 'max'), ('ndt_latency', 'mean'), ('n_ndt', None),
+            ('prior_ndt', 'xy', 'mean'), ('prior_ndt', 'xy', 'max'), ('prior_ndt', 'yaw', 'mean'),
+            ('prior_ndt', 'yaw', 'max'), ('prior_post', 'xy', 'mean'), ('prior_post', 'xy', 'max'),
+            ('prior_post', 'yaw', 'mean'), ('prior_post', 'yaw', 'max'), ('prior_truth', 'xy', 'mean'),
+            ('prior_truth', 'yaw', 'mean'), ('post_truth', 'xy', 'mean'), ('post_truth', 'yaw', 'mean')]
+
+    def get(m, key):
+        for p in key:
+            if p is None:
+                break
+            if not isinstance(m, dict) or p not in m:
+                return None
+            m = m[p]
+        return m
+    print('\n' + 'metric'.ljust(26) + ''.join(label.rjust(26) for label in res))
+    for key in keys:
+        cells = []
+        for runs in res.values():
+            v = [get(m, key) for m, _ in runs]
+            v = [x for x in v if x is not None]
+            cells.append(f'{np.mean(v):.2f} ({min(v):.2f}-{max(v):.2f})' if v else '-')
+        if any(c != '-' for c in cells):
+            print('.'.join(p for p in key if p).ljust(26) + ''.join(c.rjust(26) for c in cells))
+
+    setup()
+    fig, axes = plt.subplots(1, 3, figsize=(14, 4.2), facecolor=SURFACE)
+    lws = widths_back_to_front(len(res))
+    for ax, (i, scale, xlabel) in zip(axes, [(1, 1.0, 'Cloud stamp → first /tf after it [ms]'),
+                                             (2, 1e3, 'Prior − NDT solution, horizontal [mm]'),
+                                             (3, 180 / np.pi, 'Prior − NDT solution, |yaw| [deg]')]):
+        style(ax)
+        for (label, runs), color, lw in zip(res.items(), SERIES, lws):
+            v = np.sort(np.abs(np.concatenate([r[:, i] for _, r in runs])) * scale)
+            ax.plot(v, np.arange(1, len(v) + 1) / len(v), color=color, lw=lw, label=label)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel('Cumulative fraction')
+        box_on(ax)
+    axes[0].legend(loc='lower right', frameon=False, fontsize=9)
     capitalize_labels(fig)
     fig.tight_layout()
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
@@ -214,12 +252,14 @@ def plot(bag, out, r):
 
 
 def main():
-    if len(sys.argv) < 3:
+    if len(sys.argv) >= 4 and sys.argv[1] == 'compare':
+        compare(sys.argv[2], sys.argv[3:])
+    elif len(sys.argv) == 3:
+        _, rows = check(sys.argv[1])
+        plot(sys.argv[1], sys.argv[2], rows)
+    else:
         print(__doc__)
         sys.exit(1)
-    bag, out = sys.argv[1], sys.argv[2]
-    r = check(bag, sys.argv[3] if len(sys.argv) > 3 else None)
-    plot(bag, out, r)
 
 
 if __name__ == '__main__':

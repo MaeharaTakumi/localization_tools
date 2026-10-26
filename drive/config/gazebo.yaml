@@ -33,7 +33,6 @@ record_topics:
   - /localization/odom
   - /ekf_pose
   - /ekf_odom
-  - /localization/base_pose      # MATLAB 用の出力（vlp16_points は /velodyne_points と同じ中身なので録らない）
-  - /localization/vlp16_pose
+  - /tf_ndt_update               # NDT で更新した直後の map → base（点群の時刻）。/tf は周期ごとの予測値（MATLAB が引く）
   - /ndt_pose
   - /localization_debug

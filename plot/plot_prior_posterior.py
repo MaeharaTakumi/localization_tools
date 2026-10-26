@@ -3,8 +3,9 @@
 
   python3 plot_prior_posterior.py <bag> <出力 png>
 
-録画は ekf_localizer を publish_trigger: cloud で動かしたもの。どれも点群の stamp の時刻の map -> LiDAR：
-  予測値      /tf（map -> base。1 つ前の NDT の更新値をオドメトリで点群の時刻まで進めたもの。NDT の初期値）
+どれも点群の stamp の時刻の map -> LiDAR：
+  予測値      /tf（map -> base を点群の stamp で補間。NDT の初期値。2026-10-26 から 50 Hz の周期ごとの予測値、
+              それまでの publish_trigger: cloud の録画は点群の stamp ちょうどの予測値）
   NDT の更新値 /tf_ndt_update（map -> base。その点群の NDT で更新した直後の EKF の値。publish_ndt_update_tf。
               RViz は /tf をこれに付け替えて点群を map に直す。録画に無ければ描かない）
   NDT の解    /ndt_pose
@@ -25,6 +26,7 @@ sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')] 
 from plot_noise import box_on, setup, style  # noqa: E402
 from plot_spin import capitalize_labels, INK2, read_bag, SURFACE, widths_back_to_front, wrap  # noqa: E402
 from plot_velocity import phases_of  # noqa: E402
+from plot_matlab_outputs import TfInterp  # noqa: E402
 from pose_math import pose_msg_to_matrix  # noqa: E402
 
 RANGE = 10.0   # 表示のずれを見る点の距離 [m]
@@ -68,8 +70,12 @@ def lidar_poses(bag):
         return {ns(tr.header.stamp): tf_matrix(tr) @ mount for _, m in d.get(topic, []) for tr in m.transforms
                 if tr.header.frame_id == 'map' and tr.child_frame_id == base}
 
-    poses = {'prior': from_tf('/tf'), 'update': from_tf('/tf_ndt_update'),
-             'ndt': {ns(m.header.stamp): pose_msg_to_matrix(m.pose.pose) for _, m in d['/ndt_pose']}}
+    ndt = {ns(m.header.stamp): pose_msg_to_matrix(m.pose.pose) for _, m in d['/ndt_pose']}
+    # /tf は点群の stamp の時刻で引く（tf2 と同じ補間。2026-10-26 までの publish_trigger: cloud の録画は stamp ちょうどの値がある）
+    interp = TfInterp([(ns(tr.header.stamp), t, tf_matrix(tr)) for t, m in d['/tf'] for tr in m.transforms
+                       if tr.header.frame_id == 'map' and tr.child_frame_id == base])
+    prior = {k: P @ mount for k in ndt for P in [interp.at(k)] if P is not None}
+    poses = {'prior': prior, 'update': from_tf('/tf_ndt_update'), 'ndt': ndt}
     return poses, lidar
 
 

@@ -150,26 +150,31 @@ python3 plot/plot_motion_compare.py report /root/ros2_ws/fig/compare eval/result
 ```
 
 RViz の点群の表示に使う姿勢の違い（同じ点群の時刻の、EKF の予測値（`/tf`）・EKF の NDT の更新値（`/tf_ndt_update`。RViz が使う）・NDT の解（`/ndt_pose`）の差。
-`publish_trigger: cloud` の録画。実機でもよい。`/tf_ndt_update` が無い録画は予測値と NDT の解だけ。`dev_log.md` の 53・54）：
+2026-10-26 までの `publish_trigger: cloud` の録画。実機でもよい。`/tf_ndt_update` が無い録画は予測値と NDT の解だけ。`dev_log.md` の 53・54）：
 
 ```bash
 python3 plot/plot_prior_posterior.py /root/ros2_ws/bags/real/blue_spin5_20261016_160557 /root/ros2_ws/fig/prior_posterior_blue_spin5.png
 ```
 
-MATLAB 用の出力（ekf_localizer の `/localization/base_pose`・`vlp16_pose`・`vlp16_points`）を確かめる（`dev_log.md` の 61）。
-`eval/replay_outputs.py` で録画全体を再生して出力を録り（`ROS_DOMAIN_ID=99`。実機の録画は環境の名前と地図も渡す）、
-`plot/plot_matlab_outputs.py` で base_pose の周期、vlp16_pose が `/tf_ndt_update` × 取付と同じか、vlp16_points に同じ stamp の
-vlp16_pose があるか・入力の点群と中身が同じか、届くまでの時間を出し、図（届くまでの時間の分布、点群の時刻の base_pose と NDT で更新した直後の値の差）を描く：
+MATLAB が `/tf` から引く値を確かめる（`dev_log.md` の 68。2026-10-26 から MATLAB は `/velodyne_points` をそのまま購読し、
+`ros2tf` で後輪間中心は最新の map → base、点群は stamp の時刻の map → velodyne を引く。それまでの ekf_localizer の
+`/localization/base_pose`・`vlp16_pose`・`vlp16_points` はやめた。61 はそのころの確かめ）。
+`eval/replay_outputs.py` で録画全体を再生して `/tf`・`/tf_static`・`/tf_ndt_update`・`/ndt_pose` などを録り（`ROS_DOMAIN_ID=99`。実機の録画は環境の名前と地図も渡す）、
+`plot/plot_matlab_outputs.py` で `/tf` の周期、点群の stamp より後の `/tf` が届くまでの時間、点群の stamp の時刻の `/tf`（補間）に取付を掛けた
+LiDAR の姿勢（事前推定値。NDT の初期値と同じ）と NDT の解・NDT で更新した直後の値（Gazebo は真値も）の差を出し、図を描く。
+`compare` で、ラベルごとの 1 回ずつの指標の平均と幅の表と、分布の図：
 
 ```bash
-python3 eval/replay_outputs.py /root/ros2_ws/bags/gazebo/gazebo_spin5_20261016_111637 vlp16_check_spin5
-python3 eval/replay_outputs.py /root/ros2_ws/bags/real/blue_spin5_20261016_160557 vlp16_check_blue_spin5 blue /root/ros2_ws/map/10build_4F_C_20260414.pcd
-python3 plot/plot_matlab_outputs.py /root/ros2_ws/bags/gazebo/tune/vlp16_check_spin5 /root/ros2_ws/fig/matlab_outputs/gazebo_spin5.png /root/ros2_ws/bags/gazebo/gazebo_spin5_20261016_111637
+python3 eval/replay_outputs.py /root/ros2_ws/bags/gazebo/gazebo_spin5_20261016_111637 tf_check_spin5
+python3 eval/replay_outputs.py /root/ros2_ws/bags/real/blue_spin5_20261016_160557 tf_check_blue_spin5 blue /root/ros2_ws/map/10build_4F_C_20260414.pcd
+python3 plot/plot_matlab_outputs.py /root/ros2_ws/bags/gazebo/tune/tf_check_spin5 /root/ros2_ws/fig/matlab_outputs/gazebo_spin5.png
+python3 plot/plot_matlab_outputs.py compare /root/ros2_ws/fig/matlab_outputs/compare.png \
+  before=/root/ros2_ws/bags/gazebo/tune/a_1,/root/ros2_ws/bags/gazebo/tune/a_2 after=/root/ros2_ws/bags/gazebo/tune/b_1
 ```
 
 実機の録画をコンテナの中で再生すると、大きい点群が受け取る側で落ちることがある（blue では NDT が解いたのが半分ほど）（ソケットの受信バッファ 208 kB に 314 kB の点群が収まらないため。ホストの net.core.rmem_max・rmem_default を 8 MB にすると全部届く。dev_log.md の 66・67）。
 
-MATLAB（`MaeharaTakumi/whill_common_matlab` の `cr_debug` ブランチの CR_debug）がこれらを受け取って組にできるかは、`replay_outputs.py` で
+MATLAB（`MaeharaTakumi/whill_common_matlab` の `cr_debug` ブランチの CR_debug）が点群と `/tf` を受け取って姿勢を引けるかは、`replay_outputs.py` で
 再生している間に、ホストで MATLAB を `-batch` で動かして確かめる（`ROS_DOMAIN_ID=99`、Fast DDS の localhost のプロファイル。`dev_log.md` の 62）：
 
 ```bash
@@ -188,7 +193,7 @@ REPO="<whill_common_matlab のフォルダ>" TEST_DURATION=50 TEST_OUT_DIR=/tmp/
 
 録画の再生（自己位置推定）・MATLAB・図と動画を 1 回で行うのは `matlab/replay_matlab.sh`（ホストで実行。`dev_log.md` の 65）。
 MATLAB を先に起動して購読ができてから録画を再生し（`RECORD=0` の `replay_outputs.py`）、新しい組が `STOP_IDLE`（既定 5）秒
-来なくなったら MATLAB が止まって図と動画を作る。ROS の時刻は録画の `/clock`（`SIM_TIME=1`）なので、点群の古さ（`LiDAR_age`）も録画の時刻で出る：
+できなくなったら MATLAB が止まって図と動画を作る。ROS の時刻は録画の `/clock`（`SIM_TIME=1`）なので、点群の古さ（`LiDAR_age`）も録画の時刻で出る：
 
 ```bash
 matlab/replay_matlab.sh /root/ros2_ws/bags/gazebo/gazebo_spin5_20261016_111637 ../../results/matlab_outputs/replay_gazebo_spin5
