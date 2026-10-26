@@ -149,8 +149,8 @@ RANGE=1 python3 eval/compare_run.py table eval/results/results_compare.jsonl    
 python3 plot/plot_motion_compare.py report /root/ros2_ws/fig/compare eval/results/results_compare.jsonl        # 軌跡・まとめ・時間推移の図
 ```
 
-RViz の点群の表示に使う姿勢の違い（同じ点群の時刻の、EKF の予測値（`/tf`）・EKF の NDT の更新値（`/tf_ndt_update`。RViz が使う）・NDT の解（`/ndt_pose`）の差。
-2026-10-26 までの `publish_trigger: cloud` の録画。実機でもよい。`/tf_ndt_update` が無い録画は予測値と NDT の解だけ。`dev_log.md` の 53・54）：
+RViz の点群の表示に使う姿勢の違い（同じ点群の時刻の、EKF の予測値（`/tf`）・EKF の NDT の更新値（`/tf_ndt_update`。2026-10-26 にやめた）・NDT の解（`/ndt_pose`）の差。
+実機でもよい。`/tf_ndt_update` が無い録画（2026-10-26 から）は予測値と NDT の解だけ。`dev_log.md` の 53・54）：
 
 ```bash
 python3 plot/plot_prior_posterior.py /root/ros2_ws/bags/real/blue_spin5_20261016_160557 /root/ros2_ws/fig/prior_posterior_blue_spin5.png
@@ -159,9 +159,9 @@ python3 plot/plot_prior_posterior.py /root/ros2_ws/bags/real/blue_spin5_20261016
 MATLAB が `/tf` から引く値を確かめる（`dev_log.md` の 68。2026-10-26 から MATLAB は `/velodyne_points` をそのまま購読し、
 `ros2tf` で後輪間中心は最新の map → base、点群は stamp の時刻の map → velodyne を引く。それまでの ekf_localizer の
 `/localization/base_pose`・`vlp16_pose`・`vlp16_points` はやめた。61 はそのころの確かめ）。
-`eval/replay_outputs.py` で録画全体を再生して `/tf`・`/tf_static`・`/tf_ndt_update`・`/ndt_pose` などを録り（`ROS_DOMAIN_ID=99`。実機の録画は環境の名前と地図も渡す）、
+`eval/replay_outputs.py` で録画全体を再生して `/tf`・`/tf_static`・`/ndt_pose` などを録り（`ROS_DOMAIN_ID=99`。実機の録画は環境の名前と地図も渡す）、
 `plot/plot_matlab_outputs.py` で `/tf` の周期、点群の stamp より後の `/tf` が届くまでの時間、点群の stamp の時刻の `/tf`（補間）に取付を掛けた
-LiDAR の姿勢（事前推定値。NDT の初期値と同じ）と NDT の解・NDT で更新した直後の値（Gazebo は真値も）の差を出し、図を描く。
+LiDAR の姿勢（事前推定値。NDT の初期値と同じ）と NDT の解（Gazebo は真値も。2026-10-26 より前の録画は NDT で更新した直後の値 `/tf_ndt_update` も）の差を出し、図を描く。
 `compare` で、ラベルごとの 1 回ずつの指標の平均と幅の表と、分布の図：
 
 ```bash

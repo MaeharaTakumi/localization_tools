@@ -49,6 +49,5 @@ record_topics:
   - /localization/odom
   - /ekf_pose
   - /ekf_odom
-  - /tf_ndt_update               # NDT で更新した直後の map → base（点群の時刻）。/tf は周期ごとの予測値（MATLAB が引く）
   - /ndt_pose
   - /localization_debug

@@ -6,8 +6,8 @@
 どれも点群の stamp の時刻の map -> LiDAR：
   予測値      /tf（map -> base を点群の stamp で補間。NDT の初期値。2026-10-26 から 50 Hz の周期ごとの予測値、
               それまでの publish_trigger: cloud の録画は点群の stamp ちょうどの予測値）
-  NDT の更新値 /tf_ndt_update（map -> base。その点群の NDT で更新した直後の EKF の値。publish_ndt_update_tf。
-              RViz は /tf をこれに付け替えて点群を map に直す。録画に無ければ描かない）
+  NDT の更新値 /tf_ndt_update（map -> base。その点群の NDT で更新した直後の EKF の値。publish_ndt_update_tf。2026-10-26 にやめた。
+              2026-10-19〜26 は RViz が /tf をこれに付け替えて点群を map に直していた。録画に無ければ描かない）
   NDT の解    /ndt_pose
 base の姿勢には /tf_static の取付 base -> LiDAR を掛ける。差は水平の位置 [mm]・yaw [deg] と、
 LiDAR から 10 m の点が表示でずれる距離 [mm]（水平の 8 方向の最大）。
@@ -26,14 +26,14 @@ sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')] 
 from plot_noise import box_on, setup, style  # noqa: E402
 from plot_spin import capitalize_labels, INK2, read_bag, SURFACE, widths_back_to_front, wrap  # noqa: E402
 from plot_velocity import phases_of  # noqa: E402
-from plot_matlab_outputs import TfInterp  # noqa: E402
+from plot_matlab_outputs import mount_of, TfInterp  # noqa: E402
 from pose_math import pose_msg_to_matrix  # noqa: E402
 
 RANGE = 10.0   # 表示のずれを見る点の距離 [m]
 # 比べる組（後 − 前）と色。録画にある組だけ描く（先に描くものほど太い）
 PAIRS = [('ndt', 'prior', 'NDT − EKF prediction', '#2a78d6'),
-         ('update', 'prior', 'EKF NDT update (RViz) − EKF prediction', '#eb6834'),
-         ('ndt', 'update', 'NDT − EKF NDT update (RViz)', '#1baf7a')]
+         ('update', 'prior', 'EKF NDT update − EKF prediction', '#eb6834'),
+         ('ndt', 'update', 'NDT − EKF NDT update', '#1baf7a')]
 PANELS = [('xy', 1e3, 'Horizontal position difference [mm]'),
           ('yaw', 180 / np.pi, 'Yaw difference [deg]'),
           ('shift', 1e3, f'Shift of a point {RANGE:.0f} m away [mm]')]
@@ -57,14 +57,13 @@ def ns(stamp):
 def lidar_poses(bag):
     """{'prior' / 'update' / 'ndt': {点群の stamp [ns]: map -> LiDAR}} と LiDAR のフレーム名."""
     d = read_bag(bag, ['/tf', '/tf_static', '/tf_ndt_update', '/ndt_pose'])
-    mount, base, lidar = None, None, None
-    # 取付 base -> LiDAR（実機の環境ファイルの static_tfs。imu_link などは使わない）
-    for _, m in d.get('/tf_static', []):
-        for tr in m.transforms:
-            if mount is None and tr.child_frame_id == 'velodyne':
-                base, lidar, mount = tr.header.frame_id, tr.child_frame_id, tf_matrix(tr)
-    if mount is None:
-        raise RuntimeError(f'no mount (base -> velodyne) in /tf_static of {bag}')
+    # base は /tf の map の子。取付 base -> LiDAR は /tf_static をたどる（実機は base_link -> velodyne、
+    # Gazebo は base_footprint -> base_link -> velodyne_base_link -> velodyne）
+    lidar = 'velodyne'
+    base = next((tr.child_frame_id for _, m in d['/tf'] for tr in m.transforms if tr.header.frame_id == 'map'), None)
+    if base is None:
+        raise RuntimeError(f'no /tf map -> base in {bag}')
+    mount = mount_of(d.get('/tf_static', []), base, lidar)
 
     def from_tf(topic):
         return {ns(tr.header.stamp): tf_matrix(tr) @ mount for _, m in d.get(topic, []) for tr in m.transforms

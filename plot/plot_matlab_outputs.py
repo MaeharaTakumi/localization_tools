@@ -4,7 +4,7 @@
   python3 plot_matlab_outputs.py <出力を録った bag> <出力 png>                         1 回分の確かめと図
   python3 plot_matlab_outputs.py compare <出力 png> <ラベル>=<bag>[,<bag>...] ...      ラベルごとの平均と幅、分布の図
 
-出力の bag は eval/replay_outputs.py で録ったもの（/tf・/tf_static・/tf_ndt_update・/ndt_pose・/clock。Gazebo は /wheelchair/pose も）。
+出力の bag は eval/replay_outputs.py で録ったもの（/tf・/tf_static・/ndt_pose・/clock。Gazebo は /wheelchair/pose も）。
 確かめること（結果は標準出力。最後の行は METRICS <1 行 JSON>）：
   tf          map -> base の /tf の stamp の間隔（predict_rate の周期か）と、stamp から受信までの時間
   tf_wait     点群の stamp（/ndt_pose の stamp）より後の /tf が届くまでの時間（点群の stamp から）。NDT と MATLAB が
@@ -12,7 +12,8 @@
   prior       点群の stamp の時刻の /tf（tf2 と同じく前後の 2 つを補間。位置は線形、回転は slerp）に取付を掛けた
               map -> LiDAR。MATLAB が点群の座標変換に使う値で、NDT の初期値と同じ
   prior_ndt   prior − NDT の解（/ndt_pose）。NDT が初期値からどれだけ動いたか
-  prior_post  prior − NDT で更新した直後の値（/tf_ndt_update に取付）。2026-10-26 まで MATLAB が使っていた vlp16_pose との差
+  prior_post  prior − NDT で更新した直後の値（/tf_ndt_update に取付）。2026-10-26 まで MATLAB が使っていた vlp16_pose との差。
+              /tf_ndt_update は 2026-10-26 にやめたので、それより前の録画（dev_log.md の 68 の再生など）だけ
   Gazebo だけ prior_truth・post_truth（真値の LiDAR との差。真値は /wheelchair/pose に URDF の取付）
 差は水平の位置 [mm] と |yaw| [deg]。受信の時刻は bag の時刻（壁時計）。stamp は /clock で壁時計に直す。
 図（1 回分）：(1) 点群の stamp から TF が届くまでの時間の分布、(2)(3) prior − NDT の解、prior − NDT で更新した直後の値の時間推移。

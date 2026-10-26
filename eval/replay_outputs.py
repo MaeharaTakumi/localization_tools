@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bag_paths import source_of, tune_dir  # noqa: E402
 import tune_run  # noqa: E402
 
-OUTPUTS = ['/tf', '/tf_static', '/tf_ndt_update', '/ndt_pose', '/ekf_pose', '/localization_debug']
+OUTPUTS = ['/tf', '/tf_static', '/ndt_pose', '/ekf_pose', '/localization_debug']
 ENV_DIR = '/root/ros2_ws/install/localization_bringup/share/localization_bringup/param/env'
 
 
