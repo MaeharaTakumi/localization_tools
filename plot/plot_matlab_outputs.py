@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """MATLAB が /tf から引く値（後輪間中心の最新の姿勢と、点群の stamp の時刻の LiDAR の姿勢）を録画で確かめ、図を描く.
 
-  python3 plot_matlab_outputs.py <出力を録った bag> <出力 png>                         1 回分の確かめと図
-  python3 plot_matlab_outputs.py compare <出力 png> <ラベル>=<bag>[,<bag>...] ...      ラベルごとの平均と幅、分布の図
+  python3 plot_matlab_outputs.py <出力を録った bag> <出力 png> [--input <入力 bag>]                     1 回分の確かめと図
+  python3 plot_matlab_outputs.py compare <出力 png> <ラベル>=<bag>[,<bag>...] ... [--input <入力 bag>]  ラベルごとの平均と幅、分布の図
 
 出力の bag は eval/replay_outputs.py で録ったもの（/tf・/tf_static・/ndt_pose・/clock。Gazebo は /wheelchair/pose も）。
 確かめること（結果は標準出力。最後の行は METRICS <1 行 JSON>）：
@@ -10,7 +10,11 @@
   tf_wait     点群の stamp（/ndt_pose の stamp）より後の /tf が届くまでの時間（点群の stamp から）。NDT と MATLAB が
               点群の stamp の時刻の TF を引けるのはこれより後（点群は stamp から約 15 ms 後に届く）
   prior       点群の stamp の時刻の /tf（tf2 と同じく前後の 2 つを補間。位置は線形、回転は slerp）に取付を掛けた
-              map -> LiDAR。MATLAB が点群の座標変換に使う値で、NDT の初期値と同じ
+              map -> LiDAR。MATLAB が点群の座標変換に使う値で、NDT の初期値と同じ。
+              ekf_localizer の tf_future_steps >= 1 では同じ stamp の /tf が何度も届いて置き換わる。--input（再生した入力の
+              録画）を付けると、点群が届いた時刻（入力の録画の stamp から受信までの時間で求める。TF がまだ無ければ揃った時刻）に
+              購読側が持っていた値を使う。付けなければ stamp ごとに最後に届いた値
+  tf_wait_receipt  --input のとき、点群が届いてから TF が揃うまでの時間（負なら届いた時点で揃っている）。waited はその割合
   prior_ndt   prior − NDT の解（/ndt_pose）。NDT が初期値からどれだけ動いたか
   prior_post  prior − NDT で更新した直後の値（/tf_ndt_update に取付）。2026-10-26 まで MATLAB が使っていた vlp16_pose との差。
               /tf_ndt_update は 2026-10-26 にやめたので、それより前の録画（dev_log.md の 68 の再生など）だけ
@@ -20,6 +24,7 @@
 """
 import json
 import os
+import struct
 import sys
 
 import matplotlib
@@ -55,6 +60,28 @@ def mount_of(static, base, lidar):
     return T
 
 
+def cloud_delays(in_bag):
+    """入力の録画の点群の stamp [ns] → stamp から受信までの時間 [s]（Gazebo は /clock で stamp を壁時計に直す）."""
+    import rosbag2_py
+    reader = rosbag2_py.SequentialReader()
+    reader.open(rosbag2_py.StorageOptions(uri=in_bag, storage_id='sqlite3'),
+                rosbag2_py.ConverterOptions('cdr', 'cdr'))
+    reader.set_filter(rosbag2_py.StorageFilter(topics=['/velodyne_points', '/clock']))
+    clk, clouds = [], []
+    while reader.has_next():
+        topic, data, t = reader.read_next()
+        sec, nsec = struct.unpack_from('<iI', data, 4)   # CDR の頭 4 バイトの次が header.stamp（/clock は clock）
+        if topic == '/clock':
+            clk.append((t * 1e-9, sec + nsec * 1e-9))
+        else:
+            clouds.append((sec * 10**9 + nsec, t * 1e-9))
+    clk = np.array(clk)
+
+    def to_wall(s):
+        return np.interp(s, clk[:, 1], clk[:, 0]) if len(clk) else s
+    return {k: t - to_wall(k * 1e-9) for k, t in clouds}
+
+
 def diff(A, B):
     """A − B の水平の位置 [m] と yaw [rad]（map 座標の差）."""
     yaw = np.arctan2(A[1, 0], A[0, 0]) - np.arctan2(B[1, 0], B[0, 0])
@@ -71,32 +98,68 @@ def stats(name, v, unit='ms'):
     return {'mean': float(v.mean()), 'p95': float(np.percentile(v, 95)), 'max': float(v.max())}
 
 
+def interp_pose(k, k0, M0, k1, M1):
+    """stamp k0・k1 の姿勢の間を tf2 と同じく補間する（位置は線形、回転は slerp）."""
+    if k1 == k0:
+        return M0.copy()
+    T = np.eye(4)
+    T[:3, 3] = M0[:3, 3] + (M1[:3, 3] - M0[:3, 3]) * (k - k0) / (k1 - k0)
+    slerp = Slerp([0.0, 1.0], Rotation.from_matrix([M0[:3, :3], M1[:3, :3]]))
+    T[:3, :3] = slerp([(k - k0) / (k1 - k0)]).as_matrix()[0]
+    return T
+
+
 class TfInterp:
-    """map -> base の /tf を、tf2 と同じく前後の 2 つで補間する（その時刻より後の TF が無ければ None）."""
+    """map -> base の /tf を、tf2 と同じく前後の 2 つで補間する（その時刻より後の TF が無ければ None）.
+
+    ekf_localizer の tf_future_steps >= 1 では同じ stamp の TF が何度も届き、tf2 では後から届いた値で置き換わる。
+    at(k) は stamp ごとに最後に届いた値、at(k, recv) は受信時刻 recv の時点で購読側が持っていた値で補間する.
+    """
 
     def __init__(self, items):
-        items = sorted(items, key=lambda x: x[0])
-        self.k = np.array([k for k, _, _ in items])
-        self.recv = np.array([t for _, t, _ in items])
-        T = np.array([M for _, _, M in items])
+        versions = {}
+        for k, t, M in sorted(items, key=lambda x: x[1]):
+            versions.setdefault(k, []).append((t, M))
+        self.k = np.array(sorted(versions))
+        self.versions = [versions[k] for k in self.k]
+        # stamp ごとの最初の受信時刻（以下の互換のため recv と呼ぶ）と最後の値
+        self.recv = np.array([v[0][0] for v in self.versions])
+        T = np.array([v[-1][1] for v in self.versions])
         self.p = T[:, :3, 3]
         self.slerp = Slerp(self.k * 1e-9, Rotation.from_matrix(T[:, :3, :3]))
+        # stamp が k 以上の TF のどれかが最初に届いた時刻（後ろからの最小）
+        self.first_at_or_after = np.minimum.accumulate(self.recv[::-1])[::-1]
+        self.n_sent = np.array([len(v) for v in self.versions])
 
-    def at(self, k):
+    def at(self, k, recv=None):
         if not self.k[0] <= k <= self.k[-1]:
             return None
-        T = np.eye(4)
-        T[:3, 3] = [np.interp(k, self.k, self.p[:, i]) for i in range(3)]
-        T[:3, :3] = self.slerp([k * 1e-9]).as_matrix()[0]
-        return T
+        if recv is None:
+            T = np.eye(4)
+            T[:3, 3] = [np.interp(k, self.k, self.p[:, i]) for i in range(3)]
+            T[:3, :3] = self.slerp([k * 1e-9]).as_matrix()[0]
+            return T
+        # recv の時点で届いていた、k 以前の最も新しい stamp と k 以上の最も古い stamp の、その時点の値
+        i = int(np.searchsorted(self.k, k, side='right')) - 1
+        j = int(np.searchsorted(self.k, k, side='left'))
+        while i >= 0 and self.recv[i] > recv:
+            i -= 1
+        while j < len(self.k) and self.recv[j] > recv:
+            j += 1
+        if i < 0 or j >= len(self.k):
+            return None
+
+        def value(n):
+            return [M for t, M in self.versions[n] if t <= recv][-1]
+        return interp_pose(k, self.k[i], value(i), self.k[j], value(j))
 
     def available(self, k):
-        """stamp k の TF を引けるようになる受信時刻 [s]（stamp が k 以上の最初の TF の受信時刻）."""
+        """stamp k の TF を引けるようになる受信時刻 [s]（stamp が k 以上の TF のどれかが最初に届いた時刻）."""
         i = np.searchsorted(self.k, k)
-        return self.recv[i] if i < len(self.k) else None
+        return self.first_at_or_after[i] if i < len(self.k) else None
 
 
-def check(bag):
+def check(bag, in_bag=None):
     d = read_bag(bag, ['/clock', '/tf', '/tf_static', '/tf_ndt_update', '/ndt_pose'])
     clk = np.array([(t, m.clock.sec + m.clock.nanosec * 1e-9) for t, m in d.get('/clock', [])])
 
@@ -116,8 +179,10 @@ def check(bag):
 
     period = np.diff(interp.k) * 1e-6
     rate = (len(interp.k) - 1) / ((interp.k[-1] - interp.k[0]) * 1e-9)
-    print(f'/tf map -> {base_frame}: {len(interp.k)} msgs, {rate:.1f} Hz')
+    print(f'/tf map -> {base_frame}: {len(interp.k)} stamps, {rate:.1f} Hz, '
+          f'each stamp sent {interp.n_sent.mean():.2f} times on average')
     out['tf_rate'] = rate
+    out['tf_sent'] = float(interp.n_sent.mean())
     out['tf_interval'] = stats('stamp interval', period)
     out['tf_latency'] = stats('stamp -> receipt', (interp.recv - to_wall(interp.k)) * 1e3)
 
@@ -134,11 +199,22 @@ def check(bag):
         tt, tv, *_ = load(bag)
         truth = (tt, tv, truth_lidar)
 
+    delays = cloud_delays(in_bag) if in_bag else {}
+    waits = []   # 点群が届いてから TF が揃うまで [ms]
     rows = []   # [stamp s, tf_wait ms, prior-ndt xy, yaw, prior-post xy, yaw, prior-truth xy, yaw, post-truth xy, yaw]
     for k in sorted(ndt):
-        P = interp.at(k)
         avail = interp.available(k)
-        if P is None or avail is None:
+        if avail is None:
+            continue
+        if delays:
+            if k not in delays:
+                continue
+            look = to_wall(k) + delays[k]   # 点群が届いた時刻
+            waits.append((avail - look) * 1e3)
+            P = interp.at(k, max(look, avail))
+        else:
+            P = interp.at(k)
+        if P is None:
             continue
         prior = P @ mount
         row = [k * 1e-9, (avail - to_wall(k)) * 1e3, *diff(prior, ndt[k][1])]
@@ -151,6 +227,10 @@ def check(bag):
         rows.append(row)
     rows = np.array(rows)
     out['tf_wait'] = stats('cloud stamp -> the first /tf after it (receipt)', rows[:, 1])
+    if waits:
+        out['tf_wait_receipt'] = stats('cloud receipt -> the TF at the cloud stamp available', waits)
+        out['waited'] = float(np.mean(np.array(waits) > 0))
+        print(f'  waited for the TF: {out["waited"] * 100:.1f} % of {len(waits)} clouds')
     names = [('prior_ndt', 2), ('prior_post', 4)] + ([('prior_truth', 6), ('post_truth', 8)] if truth else [])
     for name, i in names:
         ok = ~np.isnan(rows[:, i])
@@ -201,13 +281,15 @@ def plot(bag, out, rows):
     print(f'saved {out}')
 
 
-def compare(out, groups):
+def compare(out, groups, in_bag=None):
     """ラベルごとに、1 回ごとの指標の平均と幅を表にし、tf_wait と prior − NDT の解の分布を並べて描く."""
     res = {}
     for g in groups:
         label, bags = g.split('=', 1)
-        res[label] = [check(b) for b in bags.split(',')]
-    keys = [('tf_rate', None), ('tf_wait', 'mean'), ('tf_wait', 'max'), ('ndt_latency', 'mean'), ('n_ndt', None),
+        res[label] = [check(b, in_bag) for b in bags.split(',')]
+    keys = [('tf_rate', None), ('tf_sent', None), ('tf_wait', 'mean'), ('tf_wait', 'max'),
+            ('tf_wait_receipt', 'mean'), ('tf_wait_receipt', 'max'), ('waited', None),
+            ('ndt_latency', 'mean'), ('n_ndt', None),
             ('prior_ndt', 'xy', 'mean'), ('prior_ndt', 'xy', 'max'), ('prior_ndt', 'yaw', 'mean'),
             ('prior_ndt', 'yaw', 'max'), ('prior_post', 'xy', 'mean'), ('prior_post', 'xy', 'max'),
             ('prior_post', 'yaw', 'mean'), ('prior_post', 'yaw', 'max'), ('prior_truth', 'xy', 'mean'),
@@ -234,12 +316,13 @@ def compare(out, groups):
     setup()
     fig, axes = plt.subplots(1, 3, figsize=(14, 4.2), facecolor=SURFACE)
     lws = widths_back_to_front(len(res))
-    for ax, (i, scale, xlabel) in zip(axes, [(1, 1.0, 'Cloud stamp → first /tf after it [ms]'),
+    for ax, (i, scale, xlabel) in zip(axes, [(1, 1.0, 'Cloud stamp → first /tf at or after it [ms]'),
                                              (2, 1e3, 'Prior − NDT solution, horizontal [mm]'),
                                              (3, 180 / np.pi, 'Prior − NDT solution, |yaw| [deg]')]):
         style(ax)
         for (label, runs), color, lw in zip(res.items(), SERIES, lws):
-            v = np.sort(np.abs(np.concatenate([r[:, i] for _, r in runs])) * scale)
+            v = np.concatenate([r[:, i] for _, r in runs]) * scale
+            v = np.sort(v if i == 1 else np.abs(v))   # tf_wait は負（点群の stamp より前に届いた）もそのまま
             ax.plot(v, np.arange(1, len(v) + 1) / len(v), color=color, lw=lw, label=label)
         ax.set_xlabel(xlabel)
         ax.set_ylabel('Cumulative fraction')
@@ -253,11 +336,17 @@ def compare(out, groups):
 
 
 def main():
-    if len(sys.argv) >= 4 and sys.argv[1] == 'compare':
-        compare(sys.argv[2], sys.argv[3:])
-    elif len(sys.argv) == 3:
-        _, rows = check(sys.argv[1])
-        plot(sys.argv[1], sys.argv[2], rows)
+    args = sys.argv[1:]
+    in_bag = None
+    if '--input' in args:
+        i = args.index('--input')
+        in_bag = args[i + 1]
+        del args[i:i + 2]
+    if len(args) >= 3 and args[0] == 'compare':
+        compare(args[1], args[2:], in_bag)
+    elif len(args) == 2:
+        _, rows = check(args[0], in_bag)
+        plot(args[0], args[1], rows)
     else:
         print(__doc__)
         sys.exit(1)

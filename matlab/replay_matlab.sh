@@ -6,7 +6,7 @@
 # 流れ：MATLAB を起動し、購読ができたら（READY_FILE）録画を再生する。新しい組が STOP_IDLE 秒来なくなったら MATLAB が止まり、
 # DataPlotter・myplotResult・myplotPointCloudVideo で図と動画を作る（出力のフォルダの result）。
 # 環境変数：REPO（whill_common_matlab のフォルダ）、MATLAB（matlab の実行ファイル）、MAP（動画の地図。ホストのパス）、
-#   STOP_IDLE（既定 5）、RATE（再生の速さ。実機の録画だけ）
+#   STOP_IDLE（既定 5）、RATE（再生の速さ。実機の録画だけ）、PARAMS（推定器のパラメータの上書き。eval/replay_outputs.py の PARAMS）
 # 実機の録画は、ホストの net.core.rmem_max・rmem_default が 208 kB のままだと点群が半分ほど落ちる。8 MB にしておく（dev_log.md の 66・67）。
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
@@ -49,7 +49,7 @@ for _ in $(seq 180); do
 done
 [ -e "$ready" ] || { echo "MATLAB did not get ready (see $out/matlab.log)"; kill $matlab_pid; exit 1; }
 echo "MATLAB is subscribing; replaying the bag"
-docker exec $LOC bash -ic "cd /root/ros2_ws/localization_tools && RECORD=0 RATE=${RATE:-1.0} python3 eval/replay_outputs.py $replay_args" \
+docker exec -e PARAMS="${PARAMS:-}" $LOC bash -ic "cd /root/ros2_ws/localization_tools && RECORD=0 RATE=${RATE:-1.0} python3 eval/replay_outputs.py $replay_args" \
   > "$out/replay.log" 2>&1 || echo "replay failed (see $out/replay.log)"
 echo "replay finished; waiting for MATLAB (plots and video)"
 wait $matlab_pid || { echo "MATLAB failed (see $out/matlab.log)"; exit 1; }

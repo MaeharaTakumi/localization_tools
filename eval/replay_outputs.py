@@ -8,11 +8,14 @@
   Gazebo：tune_run.replay（gazebo.yaml と URDF の取付、入力は /clock を含む IN_TOPICS）で、再生する範囲だけ録画全体にする。
   実機  ：環境ファイルの写し（use_sim_time: true）で起動し、点群とオドメトリ（whill_odometry の motor_speed）を
           --clock で流す。RATE（環境変数、既定 1.0）で再生の速さを変えられる。
+PARAMS（環境変数、JSON）でノードのパラメータを上書きする（例 '{"ekf_localizer": {"tf_future_steps": 2}}'。
+tune_run.py の parameters と同じ形で、env の parameters.<ノード名> に足す）。
 RECORD=0（環境変数）なら出力を録らない（Gazebo は tune_run が /clock だけ録る。MATLAB で確かめるとき。matlab/replay_matlab.sh）。
 大きい点群をコンテナの中で流すと、受け取る側で点群が落ちることがある（実機 blue の録画では NDT が解いたのは
 半分ほど。ソケットの受信バッファ 208 kB に 314 kB の点群が収まらないため。ホストの net.core.rmem_max・rmem_default を
 8 MB にすると 1527 個中 1515 個を解く。dev_log.md の 61・66・67）。
 """
+import json
 import os
 import subprocess
 import sys
@@ -33,6 +36,10 @@ def bag_duration(bag):
     return rosbag2_py.Info().read_metadata(bag, 'sqlite3').duration.nanoseconds / 1e9
 
 
+def params_from_env():
+    return json.loads(os.environ.get('PARAMS') or '{}')
+
+
 def record_outputs():
     return os.environ.get('RECORD', '1') != '0'
 
@@ -40,7 +47,7 @@ def record_outputs():
 def replay_gazebo(in_bag, name):
     tune_run.OUT_TOPICS = sorted(set(tune_run.OUT_TOPICS) | set(OUTPUTS)) if record_outputs() else ['/clock']
     tune_run.play_window = lambda bag, phases: (0.0, bag_duration(bag))
-    return tune_run.replay(in_bag, name, {})
+    return tune_run.replay(in_bag, name, params_from_env())
 
 
 def replay_real(in_bag, name, env_name, map_path):
@@ -53,6 +60,9 @@ def replay_real(in_bag, name, env_name, map_path):
     with open(os.path.join(ENV_DIR, env_name + '.yaml')) as f:
         env = yaml.safe_load(f)
     env['use_sim_time'] = True   # 録画の時刻（--clock）で動かす
+    env.setdefault('parameters', {})
+    for node, p in params_from_env().items():
+        env['parameters'][node] = {**(env['parameters'].get(node) or {}), **p}
     env_path = f'/tmp/replay_env_{name}.yaml'
     with open(env_path, 'w') as f:
         yaml.safe_dump(env, f)

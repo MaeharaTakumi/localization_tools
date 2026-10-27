@@ -172,6 +172,19 @@ python3 plot/plot_matlab_outputs.py compare /root/ros2_ws/fig/matlab_outputs/com
   before=/root/ros2_ws/bags/gazebo/tune/a_1,/root/ros2_ws/bags/gazebo/tune/a_2 after=/root/ros2_ws/bags/gazebo/tune/b_1
 ```
 
+推定器のパラメータは環境変数 `PARAMS`（JSON、`tune_run.py` の parameters と同じ形）で上書きできる（`replay_matlab.sh` も同じ）。
+ekf_localizer の `tf_future_steps` が 1 以上だと同じ stamp の `/tf` が何度も届く（`dev_log.md` の 72）。`plot_matlab_outputs.py` は
+stamp ごとに最後に届いた値を使い、`--input <再生した入力の録画>` を付けると、点群が届いた時刻に購読側が持っていた値（tf2 と同じく
+後から届いた値で置き換える）と、点群が届いてから TF が揃うまでの時間（`tf_wait_receipt`、待った割合 `waited`）を出す：
+
+```bash
+PARAMS='{"ekf_localizer": {"tf_future_steps": 2, "tf_past_steps": 1}}' \
+  python3 eval/replay_outputs.py /root/ros2_ws/bags/gazebo/gazebo_spin5_20261016_111637 tfgrid_f2p1_gazebo
+python3 plot/plot_matlab_outputs.py compare /root/ros2_ws/fig/matlab_outputs/tfgrid_gazebo_spin5.png \
+  F0=/root/ros2_ws/bags/gazebo/tune/tfgrid_f0_gazebo F2P1=/root/ros2_ws/bags/gazebo/tune/tfgrid_f2p1_gazebo \
+  --input /root/ros2_ws/bags/gazebo/gazebo_spin5_20261016_111637
+```
+
 実機の録画をコンテナの中で再生すると、大きい点群が受け取る側で落ちることがある（blue では NDT が解いたのが半分ほど）（ソケットの受信バッファ 208 kB に 314 kB の点群が収まらないため。ホストの net.core.rmem_max・rmem_default を 8 MB にすると全部届く。dev_log.md の 66・67）。
 
 MATLAB（`MaeharaTakumi/whill_common_matlab` の `cr_debug` ブランチの CR_debug）が点群と `/tf` を受け取って姿勢を引けるかは、`replay_outputs.py` で
