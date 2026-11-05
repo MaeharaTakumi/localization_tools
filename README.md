@@ -139,6 +139,16 @@ SCORE_KEYS=trans_max_mean,steady_mean,ang_mean,xy_mean python3 eval/summarize.py
 ```
 
 `ROS_DOMAIN_ID=99` で再生するので Gazebo・MATLAB とは混ざらない。指標（`tune_run.py` の出力）は真値を使う（Gazebo だけ）。
+録画は `bags/gazebo/` からのパスで渡す（名前だけでは `_phases.txt` が見つからない）。
+
+ekf_localizer の `Q`・`P_init` は 11 要素（2026-11-05 から。`[x, y, z, roll, pitch, yaw, v_xy, v_z, omega_roll, omega_pitch, omega_yaw]`）。
+`eval/batches/` の古い候補の 8 要素の `Q`・`P_init` は、ekf_localizer が WARN を出してコードの既定値にするので、そのままでは使えない。
+
+候補ごとに 1 回ずつの値を点で並べる図（再生のばらつきと候補の差。`dev_log.md` の 74）：
+
+```bash
+python3 plot/plot_runs.py <出力 png> eval/results/<結果>.jsonl '<試行名の接頭辞>=<ラベル>' ... [--keys start_max,stop_max,...]
+```
 
 いろいろな動きの録画での比較（どの動きの録画にも使える指標。`dev_log.md` の 22）：
 
