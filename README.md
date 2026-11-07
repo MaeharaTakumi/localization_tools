@@ -196,6 +196,22 @@ python3 plot/plot_matlab_outputs.py compare /root/ros2_ws/fig/matlab_outputs/tfg
 ```
 
 実機の録画をコンテナの中で再生すると、大きい点群が受け取る側で落ちることがある（blue では NDT が解いたのが半分ほど）（ソケットの受信バッファ 208 kB に 314 kB の点群が収まらないため。ホストの net.core.rmem_max・rmem_default を 8 MB にすると全部届く。dev_log.md の 66・67）。
+ホストを起動し直すと 208 kB に戻るので、そのたびにアプリの外の端末で `sudo sysctl -w net.core.rmem_max=8388608 net.core.rmem_default=8388608`。
+
+`prior_ndt`・`prior_truth` は |z| [mm]・|roll|・|pitch| [deg] も出す（2026-11-07）。候補（パラメータの上書き）ごとに録画全体を再生して
+これらの指標を jsonl に足すのは `eval/outputs_batch.py`（回を外側に回し、最初に録画を読んでおく。実機の録画は rmem が 8 MB でないと止める）。
+ekf_localizer の速度の Q（v_z と omega_roll・omega_pitch）ごとの図は `plot/plot_q_sweep.py`、候補ごとに 1 回ずつの値を並べる図は
+`plot/plot_runs.py` の `--keys prior_ndt.roll,...`（`dev_log.md` の 76）：
+
+```bash
+python3 eval/outputs_batch.py eval/batches/batch_qvel_blue.json eval/results/results_qvel_blue.jsonl
+python3 plot/plot_q_sweep.py /root/ros2_ws/fig/qvel/qvel_blue_ndt.png eval/results/results_qvel_blue.jsonl --metric prior_ndt
+python3 plot/plot_runs.py /root/ros2_ws/fig/qvel/qvel_gazebo_check.png eval/results/results_qvel_gazebo.jsonl \
+  'qvel_base_=Q 0 (before)' 'qvel_w0.1_=omega Q 0.1' --keys prior_truth.roll,prior_truth.pitch --title 'Gazebo gazebo_spin5'
+```
+
+実機 blue の `blue_calibration_20261016_133648`・`134316` はラズパイの時計がずれていて（受信時刻 − stamp が点群 60134 s、オドメトリ 60136 s）、
+`stamp_mode: stamp` では再生できない（NDT が点群の stamp の TF を引けない）。`141128` 以降はずれていない。
 
 MATLAB（`MaeharaTakumi/whill_common_matlab` の `cr_debug` ブランチの CR_debug）が点群と `/tf` を受け取って姿勢を引けるかは、`replay_outputs.py` で
 再生している間に、ホストで MATLAB を `-batch` で動かして確かめる（`ROS_DOMAIN_ID=99`、Fast DDS の localhost のプロファイル。`dev_log.md` の 62）：

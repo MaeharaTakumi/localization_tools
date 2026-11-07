@@ -19,7 +19,7 @@
   prior_post  prior − NDT で更新した直後の値（/tf_ndt_update に取付）。2026-10-26 まで MATLAB が使っていた vlp16_pose との差。
               /tf_ndt_update は 2026-10-26 にやめたので、それより前の録画（dev_log.md の 68 の再生など）だけ
   Gazebo だけ prior_truth・post_truth（真値の LiDAR との差。真値は /wheelchair/pose に URDF の取付）
-差は水平の位置 [mm] と |yaw| [deg]。受信の時刻は bag の時刻（壁時計）。stamp は /clock で壁時計に直す。
+差は水平の位置 [mm] と |yaw| [deg]。prior_ndt・prior_truth は |z| [mm]・|roll|・|pitch| [deg] も（2026-11-05）。受信の時刻は bag の時刻（壁時計）。stamp は /clock で壁時計に直す。
 図（1 回分）：(1) 点群の stamp から TF が届くまでの時間の分布、(2)(3) prior − NDT の解、prior − NDT で更新した直後の値の時間推移。
 """
 import json
@@ -38,7 +38,7 @@ sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')] 
 from plot_noise import box_on, setup, style  # noqa: E402
 from plot_spin import capitalize_labels, INK2, read_bag, SERIES, SURFACE, widths_back_to_front  # noqa: E402
 from plot_velocity import phases_of  # noqa: E402
-from pose_math import pose_msg_to_matrix, transform_msg_to_matrix, vec_to_matrix  # noqa: E402
+from pose_math import matrix_to_vec, pose_msg_to_matrix, transform_msg_to_matrix, vec_to_matrix  # noqa: E402
 
 LIDAR_FRAME = 'velodyne'   # 環境ファイルの lidar_frame_id
 
@@ -86,6 +86,14 @@ def diff(A, B):
     """A − B の水平の位置 [m] と yaw [rad]（map 座標の差）."""
     yaw = np.arctan2(A[1, 0], A[0, 0]) - np.arctan2(B[1, 0], B[0, 0])
     return np.hypot(A[0, 3] - B[0, 3], A[1, 3] - B[1, 3]), np.arctan2(np.sin(yaw), np.cos(yaw))
+
+
+def diff_zrp(A, B):
+    """A − B の z [m]、roll・pitch [rad]（それぞれの ZYX の角度の差）."""
+    a, b = matrix_to_vec(A), matrix_to_vec(B)
+    d = a[2:5] - b[2:5]
+    d[1:] = np.arctan2(np.sin(d[1:]), np.cos(d[1:]))
+    return d
 
 
 def stats(name, v, unit='ms'):
@@ -202,6 +210,7 @@ def check(bag, in_bag=None):
     delays = cloud_delays(in_bag) if in_bag else {}
     waits = []   # 点群が届いてから TF が揃うまで [ms]
     rows = []   # [stamp s, tf_wait ms, prior-ndt xy, yaw, prior-post xy, yaw, prior-truth xy, yaw, post-truth xy, yaw]
+    zrp = {'prior_ndt': [], 'prior_truth': []}   # z, roll, pitch の差（rows と同じ順）
     for k in sorted(ndt):
         avail = interp.available(k)
         if avail is None:
@@ -219,10 +228,12 @@ def check(bag, in_bag=None):
         prior = P @ mount
         row = [k * 1e-9, (avail - to_wall(k)) * 1e3, *diff(prior, ndt[k][1])]
         row += [*diff(prior, post[k] @ mount)] if k in post else [np.nan, np.nan]
+        zrp['prior_ndt'].append(diff_zrp(prior, ndt[k][1]))
         if truth is not None:
             tt, tv, truth_lidar = truth
             Tl = vec_to_matrix(truth_lidar(tt, tv, [k * 1e-9])[0])
             row += [*diff(prior, Tl)]
+            zrp['prior_truth'].append(diff_zrp(prior, Tl))
             row += [*diff(post[k] @ mount, Tl)] if k in post else [np.nan, np.nan]
         rows.append(row)
     rows = np.array(rows)
@@ -236,6 +247,11 @@ def check(bag, in_bag=None):
         ok = ~np.isnan(rows[:, i])
         out[name] = {'xy': stats(f'{name} (horizontal)', rows[ok, i] * 1e3, 'mm'),
                      'yaw': stats(f'{name} (|yaw|)', np.degrees(np.abs(rows[ok, i + 1])), 'deg')}
+        if zrp.get(name):
+            v = np.abs(np.array(zrp[name]))
+            out[name]['z'] = stats(f'{name} (|z|)', v[:, 0] * 1e3, 'mm')
+            out[name]['roll'] = stats(f'{name} (|roll|)', np.degrees(v[:, 1]), 'deg')
+            out[name]['pitch'] = stats(f'{name} (|pitch|)', np.degrees(v[:, 2]), 'deg')
     print('METRICS ' + json.dumps(out))
     return out, rows
 
