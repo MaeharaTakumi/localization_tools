@@ -19,7 +19,7 @@
 #   <bag 名> を check/<名前> にすると bags/<gazebo|real>/check/ に録る（ツールの動作確認など、比較・調整に使わない録画）。
 #   <動き> は drive/profiles.yaml（spin・spin5・stops・accel・curve・slalom・reverse。drive/drive_test.py <target> --list）。
 #   パラメータ推定用の動きは calibration/run_calibration.sh が使う（drive の動きではない）。
-#   速さの上限・走ってよい範囲・トピックは drive/config/<target>.yaml。
+#   速さの上限・トピックは drive/config/<target>.yaml。
 #   環境変数：PROFILES（動きのファイルのコンテナ内のパス。既定 drive/profiles.yaml。calibration/run_calibration.sh が使う）、
 #             PURPOSE（録画の用途。<bag 名>_info.yaml に書く）、CONFIG（設定の yaml のコンテナ内のパス。既定は target の設定。
 #             例 CONFIG=real_in_gazebo で実機の設定を Gazebo で試す）
@@ -77,7 +77,7 @@ stop_bg() { cx "pkill -INT -f '[${1:0:1}]${1:1}'"; }
 
 # ホストから：localization_tools 一式をコンテナの /root/ros2_ws/localization_tools に写す（走行・描画・評価もそこで行う）
 [ $INSIDE = 1 ] || "$root/sync.sh" push
-cx "$DT $profile --simulate" || { echo "動き $profile が範囲に収まらない・設定が読めない"; exit 1; }
+cx "$DT $profile --simulate" || { echo "動き $profile・設定が読めない"; exit 1; }
 topics=$(cx "$DT --record-topics" | tail -1)
 cx "mkdir -p $(dirname $BAGS/$bag) && touch $(dirname $BAGS)/COLCON_IGNORE"
 
@@ -137,7 +137,7 @@ else
   echo "== start recording"
   cbg "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$tag.log 2>&1"
   sleep 3
-  echo "== drive（計画を確かめて yes で走り出す。止めるときは Ctrl-C かジョイスティック）"
+  echo "== drive（計画を確かめて Enter で走り出す。止めるときは Ctrl-C かジョイスティック）"
   cit "$DT $profile 2>&1 | tee /tmp/drive_$tag.log; exit \${PIPESTATUS[0]}"
   status=$?
 fi

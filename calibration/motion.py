@@ -2,7 +2,7 @@
 """パラメータ推定用の動き（param/motion.yaml）を、drive/drive_test.py の動きのファイル（profiles.yaml と同じ形）にする.
 
   python3 calibration/motion.py <gazebo|red|blue|white> --out <profiles の yaml>   # 動き calibration を書く（run_calibration.sh が使う）
-  python3 calibration/motion.py <gazebo|red|blue|white> [--simulate]               # 走る前の計画（範囲に収まるか）を表示する
+  python3 calibration/motion.py <gazebo|red|blue|white> [--simulate]               # 走る前の計画（計算した軌跡）を表示する
 
 速さは m/s・rad/s の値を drive/config/<target>.yaml の上限に対する割合に直す（上限を超えたら止める）。
 """
@@ -56,9 +56,7 @@ def main():
             yaml.safe_dump(prof, f, sort_keys=False, allow_unicode=True)
         print(f'wrote {args.out}')
     if args.simulate or not args.out:
-        text, ok = plan_report(cfg, build(cfg, prof, NAME), NAME)
-        print(text)
-        return 0 if ok else 2
+        print(plan_report(cfg, build(cfg, prof, NAME), NAME))
     return 0
 
 

@@ -40,7 +40,7 @@ python3 eval/bag_info.py write <bag> --source gazebo|real --drive '...' --purpos
 | `eval/` | 録画の再生・評価・パラメータの調整（`tune_run.py`、`tune_batch.py`、`summarize.py`、`transition_eval.py`、`make_window_bag.py`）。候補は `batches/`、結果は `results/` |
 | `plot/` | 図（`plot_*.py`、`check_*.py`）。`plot_spin.py` は bag の読み込みや図の共通部品も持つ。`rerender_results.sh` で `Docker/localization/results` の図を全部描き直す（NDT の R の図は計算に約 9 分かかるので `FULL=1` のときだけ） |
 | `record_rviz.sh` | **RViz の画面の録画（ホストで実行）**。下の「RViz の画面の録画」 |
-| `drive/` | **テスト走行と録画（Gazebo・実機共通）**：`run_test.sh`（ホストかコンテナの中で実行）、`drive_test.py`（走らせる）、`profiles.yaml`（動き）、`config/gazebo.yaml`・`config/red.yaml`・`blue.yaml`・`white.yaml`（実機の車椅子ごと。速さの上限・走ってよい範囲・トピック・録画するトピック）、`config/real_in_gazebo.yaml`（実機の設定を Gazebo で試す）、`config/gazebo_ground.yaml` と `profiles_velocity.yaml`（Gazebo の地面でオドメトリと真値の速度を比べる） |
+| `drive/` | **テスト走行と録画（Gazebo・実機共通）**：`run_test.sh`（ホストかコンテナの中で実行）、`drive_test.py`（走らせる）、`profiles.yaml`（動き）、`config/gazebo.yaml`・`config/red.yaml`・`blue.yaml`・`white.yaml`（実機の車椅子ごと。速さの上限・トピック・録画するトピック）、`config/real_in_gazebo.yaml`（実機の設定を Gazebo で試す）、`config/gazebo_ground.yaml` と `profiles_velocity.yaml`（Gazebo の地面でオドメトリと真値の速度を比べる） |
 
 ## R を求める（`calibration/calibrate_noise.py`）
 
@@ -129,6 +129,8 @@ python3 calibration/calibrate_mount_scale.py /root/ros2_ws/bags/gazebo/<録画> 
   - 図 `<出力>_yaw.png`（`mount_scale_yaw.png`）に各時刻の値（インライア・外れ値）と最終値を描く。
   - 区間全体の円弧の当てはめ、始点と終点を結ぶ方法、Censi ほか（IEEE T-RO 2013）の同時推定とも比べ、2026-10-16 にこの方法に決めた（`dev_log.md` の 49〜52）。
 - 取付の roll・pitch（床が水平と仮定）、z（`--map` の地図の床の高さとの差。参考）
+- 取付の roll・pitch・yaw は、端末の表示・`summary.yaml`・図 `mount_scale_yaw.png` とも **rad**（env の `static_tfs` の `rpy` と同じ単位。
+  2026-11-07、ユーザー指示。それまで表示と図は deg）。RANSAC のしきい値 `ransac_threshold_deg` は deg のまま。
 
 ## 録画を再生して評価・調整する（`eval/`）
 
@@ -253,7 +255,7 @@ Gazebo のときは Gazebo が動いていて車椅子が初期位置にある�
 localization_tools/drive/run_test.sh gazebo <動き> [<bag 名> [launch の追加引数]]   # ホストかコンテナの中
 localization_tools/drive/run_test.sh <red|blue|white> <動き> [<bag 名>]              # 実機。端末から（確認がある）
 python3 drive/drive_test.py <gazebo|red|blue|white> --list               # 動きの一覧
-python3 drive/drive_test.py <gazebo|red|blue|white> <動き> --simulate    # 計算した軌跡と範囲（ROS 不要）
+python3 drive/drive_test.py <gazebo|red|blue|white> <動き> --simulate    # 計算した軌跡（ROS 不要）
 ```
 
 コンテナの中では、`drive`（= `drive/run_test.sh`。bag 名を省くと `<target>_<動き>_<日時>`）・`drive_list`（動きの一覧。`drive_list red spin5` で計画）・`bags_list`（録画の一覧。`bags_list real` で実機だけ）
@@ -262,11 +264,13 @@ python3 drive/drive_test.py <gazebo|red|blue|white> <動き> --simulate    # 計
 - **動き**（`profiles.yaml`）：`spin`（その場で左右 1 周 + 3 秒前進）、`spin5`（その場で左に 5 周 → 右に 5 周 + 3 秒前進）、`stops`（13 か所で止まる）、`accel`（加減速・停止、8.5 m）、
   `curve`（半径 0.75 m の 8 の字）、`slalom`（波長 2.5 m）、`reverse`（後退・S 字・前後の切り替え）。速さは上限に対する割合、
   直進は距離、旋回は角度、円は半径で決めるので、上限を変えても形・大きさは同じ。
-- **設定**（`config/<target>.yaml`）：速さの上限（Gazebo v 1.5・後退 0.8 m/s・ω 1.0 rad/s、実機 0.5・0.3・0.5）、走ってよい範囲
-  （出発時の車体の中心を基準に前 10 m・後ろ 1 m・左右 2 m。両方）、指令・姿勢・ジョイスティックのトピック、録画するトピック。
-- **安全**：走る前に計算した軌跡が範囲に収まるか確かめる。走行中は、範囲の外に出た・姿勢（Gazebo は真値、実機は `/ekf_pose`
+- **設定**（`config/<target>.yaml`）：速さの上限（Gazebo v 1.5・後退 0.8 m/s・ω 1.0 rad/s、実機 0.5・0.3・0.5）、
+  指令・姿勢・ジョイスティックのトピック、録画するトピック。
+- **安全**：走る前に計算した軌跡（出発時の車体の中心を基準にした前・左の範囲）を表示する。走行中は、姿勢（Gazebo は真値、実機は `/ekf_pose`
   を取付で車体に直したもの）が 0.5 s 届かない・ジョイスティックが倒された（実機）・時計が止まった・区間が 60 s を超えた・Ctrl-C
-  のどれかで 0 の指令を出して止める（止めた理由は録画の情報ファイルのメモに書く）。実機は計画を表示して `yes` と入力するまで走らない。
+  のどれかで 0 の指令を出して止める（止めた理由は録画の情報ファイルのメモに書く）。実機は計画を表示して Enter を押すまで走らない
+  （何か入力して Enter なら取りやめ）。走ってよい範囲（設定の `area`・`plan_margin`。前 10 m・後ろ 1 m・左右 2 m）の確認は、走る前・走行中とも
+  2026-11-07 にユーザー指示でやめた。
   whill_driver も、指令が 1 s 途切れると止まり、ジョイスティックの操作を優先する。
 - **Gazebo**：起動し直して車椅子を初期位置に戻し、推定器を起動して走らせ、`/root/ros2_ws/bags/gazebo/<bag 名>` に録る。
 - **実機**：自己位置推定（`/ekf_pose`）・whill_driver・LiDAR が動いていることを確かめてから、`/root/ros2_ws/bags/real/<bag 名>` に録る
@@ -282,7 +286,7 @@ python3 drive/drive_test.py <gazebo|red|blue|white> <動き> --simulate    # 計
   監視（`/test/joy_ts`）を Gazebo で試せる。
 - **地面でオドメトリと真値の速度を比べる**（Gazebo）：`config/gazebo_ground.yaml` は車椅子を世界の原点（建物の外の ground_plane、
   z −0.4 から落とす。yaw 0）に置き、自己位置推定は起動しない（設定の `gazebo_launch_args` を Gazebo の launch に渡し、
-  `localization: false` で推定を起動しない）。上限は v 1.0 m/s・ω 1.0 rad/s、範囲の前は 15 m。動きは `profiles_velocity.yaml`
+  `localization: false` で推定を起動しない）。上限は v 1.0 m/s・ω 1.0 rad/s。動きは `profiles_velocity.yaml`
   （`spin5_w05`・`spin5_w10`：その場で左に 5 周、`straight_v05`・`straight_v10`：10 s 直進。前後に止まる）。図は `plot/plot_odom_truth.py`。
 
   ```bash

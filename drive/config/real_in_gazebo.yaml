@@ -1,13 +1,11 @@
 # テスト走行の設定：実機の設定を Gazebo で試す（予行演習・安全のしくみの確認用）
 #   drive/run_test.sh gazebo <動き> <bag 名> と CONFIG=real_in_gazebo で使う。
-#   real.yaml と同じ上限・範囲で、姿勢は自己位置推定の /ekf_pose（Gazebo の取付で車体に直す）、ジョイスティックは /test/joy_ts
+#   real.yaml と同じ上限で、姿勢は自己位置推定の /ekf_pose（Gazebo の取付で車体に直す）、ジョイスティックは /test/joy_ts
 #   （ros2 topic pub で値を出すと止まるかを確かめられる）。指令と録画のトピックは Gazebo のもの
 target: gazebo
 use_sim_time: true
 limits: {v_max: 0.5, v_reverse_max: 0.3, w_max: 0.5}
-area: {forward: 10.0, behind: 1.0, left: 2.0, right: 2.0}
-plan_margin: 0.2
-sim_omega_scale: 0.92
+sim_omega_scale: 0.92     # 走る前に表示する計画の軌跡で、omega を指令の何倍とみなすか
 command: {topic: /wheelchair/diff_drive_controller/cmd_vel, type: twist_stamped, frame_id: base_link, rate: 50.0}
 feedback:
   topic: /ekf_pose

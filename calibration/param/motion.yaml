@@ -7,10 +7,10 @@
 #   止まる区間   … 旋回と直進を分ける、NDT の roll・pitch（取付。参考。床が水平と仮定）
 #   その場の旋回 … omega の倍率（左回りだけ）、取付の x・y（LiDAR が描く円）、旋回中の omega の残差
 #   直進         … R_v（定速の直進の v の残差）とそこから計算する R_omega、v の倍率、取付の yaw
-# 走ってよい範囲（前 10 m・後ろ 1 m・左右 2 m）に収まるかは走る前に確かめる（calibration_plan <target>）。
+# 走る前の計画（計算した軌跡）は calibration_plan <target> で表示する（走ってよい範囲の確認は 2026-11-07 にやめた）。
 motion:
   stop_time: 5.0        # 止まる時間 [s]（旋回の後と直進の後）
   spin_omega: 0.4       # その場の旋回の角速度 [rad/s]
   spin_turns: 4         # その場で左に回る周回数（1 周ずつの区間にする）
   straight_v: 0.4       # 直進の速度 [m/s]
-  straight_time: 20.0   # 直進の時間 [s]（片道。距離 = straight_v x straight_time。前 10 m の範囲に収める）
+  straight_time: 20.0   # 直進の時間 [s]（片道。距離 = straight_v x straight_time）

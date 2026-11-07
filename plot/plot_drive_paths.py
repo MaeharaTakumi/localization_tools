@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""テスト走行（drive/drive_test.py）の軌跡を、出発時の車体の位置・向きを基準に、走ってよい範囲と重ねて描く（コンテナ test 内で実行）.
+"""テスト走行（drive/drive_test.py）の軌跡を、出発時の車体の位置・向きを基準に描く（コンテナ test 内で実行）.
 
   python3 plot_drive_paths.py <出力 png> <設定（gazebo・real・yaml のパス）> <動き>=<bag>[@<姿勢のトピック>] ...
 
 姿勢のトピックの既定は Gazebo の真値 /wheelchair/pose（base_footprint）。/ekf_pose（LiDAR）なら設定の feedback の mount で
-車体に直す。出発は最初の動作の時刻の姿勢。範囲は設定の area。点線は使わない（範囲は塗りつぶし）。
+車体に直す。出発は最初の動作の時刻の姿勢。設定に area（走ってよい範囲。2026-11-07 に drive の設定から外した）があれば
+塗りつぶして重ねる。点線は使わない。
 """
 import math
 import os
@@ -44,7 +45,7 @@ def base_path(bag, topic, mount):
 def main():
     out, target = sys.argv[1:3]
     cfg = load_config(target)
-    area = cfg['area']
+    area = cfg.get('area')
     items = [a.split('=', 1) for a in sys.argv[3:]]
     plt.rcParams.update({'font.size': 10, 'axes.edgecolor': GRID, 'axes.labelcolor': INK2, 'xtick.color': INK2,
                          'ytick.color': INK2, 'axes.titlesize': 10.5})
@@ -70,13 +71,15 @@ def main():
         fy = -s * (x[m] - x[k]) + c * (y[m] - y[k])
         ax.set_facecolor(SURFACE)
         # 範囲（縦軸 = 前、横軸 = 右。上から見た向きにする）
-        ax.fill_between([-area['left'], area['right']], -area['behind'], area['forward'], color=BAND, lw=0, zorder=0,
-                        label='Allowed area')
+        if area:
+            ax.fill_between([-area['left'], area['right']], -area['behind'], area['forward'], color=BAND, lw=0,
+                            zorder=0, label='Allowed area')
         ax.plot(-fy, fx, color=SERIES[0], lw=1.8, zorder=3, label='Path (vehicle center)')
         ax.plot(0, 0, 'o', color=INK, ms=6, zorder=4)
         ax.annotate('Start', (0, 0), xytext=(6, -12), textcoords='offset points', fontsize=8, color=INK2)
-        ax.set_xlim(-area['left'] - 0.5, area['right'] + 0.5)
-        ax.set_ylim(-area['behind'] - 0.5, area['forward'] + 0.5)
+        if area:
+            ax.set_xlim(-area['left'] - 0.5, area['right'] + 0.5)
+            ax.set_ylim(-area['behind'] - 0.5, area['forward'] + 0.5)
         ax.set_aspect('equal')
         ax.grid(color=GRID, lw=0.6)
         ax.set_title(f'{name}\nForward {fx.min():.2f} to {fx.max():.2f} m, right {-fy.max():+.2f} to {-fy.min():+.2f} m',
@@ -87,8 +90,11 @@ def main():
         ax.set_visible(False)
     handles, labels = axes.flat[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper left', ncol=2, frameon=False, bbox_to_anchor=(0.01, 0.955))
-    fig.suptitle(f"Test drive paths in the start frame ({cfg['target']}; area forward {area['forward']} m, "
-                 f"behind {area['behind']} m, sides {area['left']} / {area['right']} m)",
+    title = f"Test drive paths in the start frame ({cfg['target']}"
+    if area:
+        title += (f"; area forward {area['forward']} m, behind {area['behind']} m, "
+                  f"sides {area['left']} / {area['right']} m")
+    fig.suptitle(title + ')',
                  x=0.01, ha='left', fontsize=12, fontweight='bold')
     fig.tight_layout(rect=(0, 0, 1, 0.92))
     capitalize_labels(fig)

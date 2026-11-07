@@ -304,8 +304,8 @@ def main():
             x.update(straight_yaw(x, m_rot, args.yaw_window, args.steady_tol, math.radians(args.ransac_threshold),
                                   args.ransac_iterations))
             print(f"  {x['bag']:<18} {x['t0']:8.2f}-{x['t1']:8.2f}  {x['n_inlier']} inliers, {x['n_outlier']} outliers "
-                  f"(NDT yaw change {math.degrees(x['dyaw_ndt']):+.3f} deg)  -> mount yaw {math.degrees(x['yaw_m']):+.3f} deg "
-                  f"(sd of inliers {math.degrees(x['yaw_sd']):.3f})")
+                  f"(NDT yaw change {math.degrees(x['dyaw_ndt']):+.3f} deg)  -> mount yaw {x['yaw_m']:+.6f} rad "
+                  f"(sd of inliers {x['yaw_sd']:.6f})")
         yaw_m = float(np.mean([x['yaw_m'] for x in v_rows]))
         yaw_series = [(x['bag'], *x['_yaw_series'], x['yaw_m']) for x in v_rows if '_yaw_series' in x]
         for x in v_rows:
@@ -319,13 +319,13 @@ def main():
         print(f'\nLiDAR mount (base -> LiDAR), from {len(turns)} turning segments (fit rms {rms * 1000:.1f} mm):')
         print(f'  x {m[0]:+.4f} m (+-{m_sd[0]:.4f})   now {now[0]:+.4f}')
         print(f'  y {m[1]:+.4f} m (+-{m_sd[1]:.4f})   now {now[1]:+.4f}')
-        print(f'  yaw {math.degrees(yaw_m):+.3f} deg (from straight segments)   now {math.degrees(now[5]):+.3f}')
+        print(f'  yaw {yaw_m:+.6f} rad (from straight segments)   now {now[5]:+.6f}')
     if stops:
         rp = np.array([s['vec'][3:5] for s in stops])
         out['mount_roll_pitch'] = rp.mean(axis=0).tolist()
-        print(f'  roll {math.degrees(rp[:, 0].mean()):+.3f} deg, pitch {math.degrees(rp[:, 1].mean()):+.3f} deg '
-              f'(stopped NDT, level floor assumed; spread {math.degrees(rp[:, 0].std()):.3f}/'
-              f'{math.degrees(rp[:, 1].std()):.3f})   now {math.degrees(now[3]):+.3f}, {math.degrees(now[4]):+.3f}')
+        print(f'  roll {rp[:, 0].mean():+.6f} rad, pitch {rp[:, 1].mean():+.6f} rad '
+              f'(stopped NDT, level floor assumed; spread {rp[:, 0].std():.6f}/'
+              f'{rp[:, 1].std():.6f})   now {now[3]:+.6f}, {now[4]:+.6f}')
         if args.map:
             pts = read_pcd_xyz(args.map)
             zs = []

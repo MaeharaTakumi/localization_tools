@@ -3,7 +3,7 @@
 #
 #   calibration/run_calibration.sh <gazebo|red|blue|white> [<bag 名>]
 #     走行と録画は drive/run_test.sh <target> calibration <bag 名>（動きは calibration/motion.py が作り、PROFILES で渡す。Gazebo は推定器も
-#     起動、実機は推定・whill_driver・LiDAR が動いていること。実機は計画を表示して yes で走り出す）。
+#     起動、実機は推定・whill_driver・LiDAR が動いていること。実機は計画を表示して Enter で走り出す）。
 #     bag 名を省くと <target>_calibration_<年月日_時分秒>。
 #     推定は calibrate.py（観測ノイズ R・オドメトリの倍率・LiDAR の取付）。推定の設定は
 #     calibration/param/calibrate.yaml。結果は /root/ros2_ws/fig/calibration/<bag 名>/（summary.yaml に env に入れる候補。env の yaml には書き込まない）。

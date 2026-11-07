@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""テスト走行（Gazebo・実機共通）：profiles.yaml の動きを、config/<target>.yaml の上限・範囲・トピックで走らせる.
+"""テスト走行（Gazebo・実機共通）：profiles.yaml の動きを、config/<target>.yaml の上限・トピックで走らせる.
 
   python3 drive_test.py <target> <動き> [--yes] [--phases <出力>]   走らせる（自己位置推定のコンテナで）
-  python3 drive_test.py <target> <動き> --simulate                  計算した軌跡と範囲の確認だけ（ROS 不要）
+  python3 drive_test.py <target> <動き> --simulate                  計算した軌跡の表示だけ（ROS 不要）
   python3 drive_test.py <target> --list                             動きの一覧
   python3 drive_test.py <target> --record-topics                    録画するトピック（run_test.sh が使う）
   --profiles <yaml> で動きのファイルを変える（既定 drive/profiles.yaml。推定用の動きは calibration/motion.py が作る）
     target：gazebo、実機の車椅子 red・blue・white（drive/config/<target>.yaml）、または設定の yaml のパス
 
-走る前に、出発時の姿勢を基準に計算した軌跡が範囲（area。plan_margin の余裕込み）に収まるかを確かめ、収まらなければ走らない。
+走る前に、出発時の姿勢を基準に計算した軌跡を表示する（走ってよい範囲の確認は 2026-11-07 にユーザー指示でやめた）。
 走行中は次のどれかで止める（0 の指令を出して終わる。終了コード 1）：
-  - 車体の中心が範囲の外に出た（姿勢は feedback：Gazebo は真値、実機は /ekf_pose を取付で車体に直したもの）
-  - feedback_timeout より新しい姿勢が無い（実機で自己位置推定が止まった）
+  - feedback_timeout より新しい姿勢が無い（姿勢は feedback：Gazebo は真値、実機は /ekf_pose を取付で車体に直したもの。
+    実機で自己位置推定が止まった）
   - ジョイスティックが倒された（実機。whill_driver も手での操作を優先する）
   - 1 区間が max_segment_time を超えた、Ctrl-C
-confirm: true（実機）なら、計画を表示して yes と入力するまで走らない（--yes で省く）。
+confirm: true（実機）なら、計画を表示して Enter を押すまで走らない（何か入力して Enter なら取りやめ。--yes で省く）。
 動作の開始時刻を <phases>（既定 /tmp/drive_phases.txt）に「<区間の名前> <時刻 [s]>」で書く（最後は stop。止まる区間は
 stop_<label>_start / _end）。時刻は Gazebo は sim time、実機は ROS の時刻（壁時計）。
 """
@@ -138,7 +138,7 @@ def omega_at(seg, t):
 
 
 # ---------------------------------------------------------------------------
-# 計算した軌跡と範囲
+# 計算した軌跡
 # ---------------------------------------------------------------------------
 
 def simulate(segs, w_scale, dt=0.01):
@@ -170,14 +170,8 @@ def simulate(segs, w_scale, dt=0.01):
     return rows, np.array(pts)
 
 
-def inside(area, x, y, margin=0.0):
-    return (-area['behind'] + margin <= x <= area['forward'] - margin
-            and -area['right'] + margin <= y <= area['left'] - margin)
-
-
 def plan_report(cfg, segs, name):
     rows, pts = simulate(segs, cfg.get('sim_omega_scale', 1.0))
-    area, margin = cfg['area'], cfg.get('plan_margin', 0.0)
     lines = [f"動き {name}（{cfg['target']}、上限 v {cfg['limits']['v_max']} m/s・後退 {cfg['limits']['v_reverse_max']} m/s・"
              f"omega {cfg['limits']['w_max']} rad/s）"]
     for s, t, x, y, yaw in rows:
@@ -187,11 +181,9 @@ def plan_report(cfg, segs, name):
         lines.append(f"  {s['name']:<20} v {s['v']:+.2f} m/s  w {w:>12} rad/s  until {end:<9} "
                      f"({t:5.1f} s) -> 前 {x:+5.2f} m, 左 {y:+5.2f} m, 向き {yaw:+6.0f} deg")
     total = sum(r[1] for r in rows)
-    ok = all(inside(area, px, py, margin) for px, py in pts)
     lines.append(f"  計 {total:.1f} s、前 {pts[:, 0].min():+.2f}〜{pts[:, 0].max():+.2f} m、"
-                 f"左 {pts[:, 1].min():+.2f}〜{pts[:, 1].max():+.2f} m（範囲：前 {area['forward']}、後ろ {area['behind']}、"
-                 f"左 {area['left']}、右 {area['right']} m、余裕 {margin} m）→ {'範囲内' if ok else '範囲の外に出る'}")
-    return '\n'.join(lines), ok
+                 f"左 {pts[:, 1].min():+.2f}〜{pts[:, 1].max():+.2f} m（出発時の車体の中心を基準）")
+    return '\n'.join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -322,22 +314,17 @@ def run(cfg, segs, name, args):
             raise RuntimeError(f"姿勢（{fb_cfg['topic']}）が {stale():.1f} s 更新されていない")
         if joy_cfg and node.joy > joy_cfg['threshold']:
             raise RuntimeError('ジョイスティックが倒れている')
-        text, ok = plan_report(cfg, segs, name)
-        print(text, flush=True)
-        if not ok:
-            raise RuntimeError('計算した軌跡が範囲に収まらない（area・plan_margin か動きを直す）')
+        print(plan_report(cfg, segs, name), flush=True)
         if cfg.get('confirm') and not args.yes:
             print(f"\n指令のトピック {cmd_cfg['topic']}、姿勢 {fb_cfg['topic']}。周りの安全を確かめ、"
-                  "ジョイスティックですぐ止められるようにしてから、yes と入力すると走り出す：", flush=True)
-            if input().strip() != 'yes':
+                  "ジョイスティックですぐ止められるようにしてから、Enter を押すと走り出す（何か入力して Enter なら取りやめ）：",
+                  flush=True)
+            if input().strip():
                 raise RuntimeError('取りやめた')
             for _ in range(10):   # 入力を待つ間に溜まった姿勢を読む
                 rclpy.spin_once(node, timeout_sec=0.02)
             if stale() > cfg['feedback_timeout']:
                 raise RuntimeError(f"姿勢（{fb_cfg['topic']}）が {stale():.1f} s 更新されていない")
-        x0, y0, yaw0 = node.pose
-        c0, s0 = math.cos(yaw0), math.sin(yaw0)
-        area = cfg['area']
         for s in segs:
             t0 = node.now()
             m0 = _time.monotonic()          # 区間の打ち切りは壁時計でも測る
@@ -372,10 +359,6 @@ def run(cfg, segs, name, args):
                     raise RuntimeError(f"姿勢が {stale():.2f} s 届いていない（{fb_cfg['topic']}）")
                 if joy_cfg and node.joy > joy_cfg['threshold']:
                     raise RuntimeError('ジョイスティックが倒された（手での操作）')
-                ex, ey = node.pose[0] - x0, node.pose[1] - y0
-                fx, fy = c0 * ex + s0 * ey, -s0 * ex + c0 * ey   # 出発時の向きを基準にした前・左
-                if not inside(area, fx, fy):
-                    raise RuntimeError(f'範囲の外に出た（前 {fx:+.2f} m、左 {fy:+.2f} m）')
                 if el > cfg['max_segment_time'] or mono - m0 > cfg['max_segment_time']:
                     raise RuntimeError(f"区間 {s['name']} が {cfg['max_segment_time']} s で終わらない")
                 node.send(s['v'], omega_at(s, el))
@@ -432,16 +415,14 @@ def main():
         return 0
     segs = build(cfg, profiles, args.profile)
     if args.describe:
-        lim, area = cfg['limits'], cfg['area']
+        lim = cfg['limits']
         who = f"車椅子 {cfg['target']}。" if cfg['target'] != 'gazebo' else ''
         print(f"{who}{profiles[args.profile].get('description', '')}。上限 v {lim['v_max']}・後退 {lim['v_reverse_max']} m/s・"
-              f"omega {lim['w_max']} rad/s、範囲 前 {area['forward']}・後ろ {area['behind']}・左 {area['left']}・"
-              f"右 {area['right']} m（出発時の車体を基準）")
+              f"omega {lim['w_max']} rad/s")
         return 0
     if args.simulate:
-        text, ok = plan_report(cfg, segs, args.profile)
-        print(text)
-        return 0 if ok else 2
+        print(plan_report(cfg, segs, args.profile))
+        return 0
     return run(cfg, segs, args.profile, args)
 
 

@@ -14,9 +14,6 @@ use_sim_time: false
 # 速さの上限（profiles.yaml の速さはこれに対する割合）[m/s]、[rad/s]（ユーザー指示の既定）
 limits: {v_max: 0.5, v_reverse_max: 0.3, w_max: 0.5}
 
-# 走ってよい範囲。出発時の車体の中心の位置・向きを基準に、前・後ろ・左・右へ何 m まで [m]（ユーザー指示の既定）
-area: {forward: 10.0, behind: 1.0, left: 2.0, right: 2.0}
-plan_margin: 0.2
 sim_omega_scale: 1.0      # 実機の旋回の倍率は未校正
 
 # 速度の指令（whill_driver）

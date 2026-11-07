@@ -108,20 +108,20 @@ def plot_mount_yaw(path, yaw_series, out, now):
     fig, ax = plt.subplots(figsize=(11, 5.4), facecolor=SURFACE)
     style(ax)
     final = out['mount_yaw']
-    ax.axhline(math.degrees(now[5]), color=TRUTH_COLOR, lw=TRUTH_LW, zorder=2,
-               label=f'Current mount yaw (TF) {math.degrees(now[5]):+.3f} deg')
+    ax.axhline(now[5], color=TRUTH_COLOR, lw=TRUTH_LW, zorder=2,
+               label=f'Current mount yaw (TF) {now[5]:+.5f} rad')
     t_shift = 0.0
     for j, (bag, t, d, inl, yaw_seg) in enumerate(yaw_series):
         x = t + t_shift
-        ax.scatter(x[inl], np.degrees(d[inl]), s=10, color=C_SEG, alpha=0.7, lw=0, zorder=3,
+        ax.scatter(x[inl], d[inl], s=10, color=C_SEG, alpha=0.7, lw=0, zorder=3,
                    label='Each time, RANSAC inlier' if j == 0 else None)
-        ax.scatter(x[~inl], np.degrees(d[~inl]), s=18, color=C_OUT, lw=0, zorder=4,
+        ax.scatter(x[~inl], d[~inl], s=18, color=C_OUT, lw=0, zorder=4,
                    label='Each time, outlier (removed)' if j == 0 and (~inl).any() else None)
         t_shift = x.max() + 1.0
-    ax.axhline(math.degrees(final), color=C_EST, lw=1.6, zorder=5,
-               label=f'Final mount yaw {math.degrees(final):+.3f} deg (mean of inliers)')
+    ax.axhline(final, color=C_EST, lw=1.6, zorder=5,
+               label=f'Final mount yaw {final:+.5f} rad (mean of inliers)')
     ax.set_xlabel('Time from the start of the straight segment [s]')
-    ax.set_ylabel('Mount yaw (LiDAR yaw - heading of the base) [deg]')
+    ax.set_ylabel('Mount yaw (LiDAR yaw - heading of the base) [rad]')
     ax.set_title('LiDAR mount yaw on the straight segment: each time and the final value')
     ax.legend(loc='upper left', bbox_to_anchor=(1.01, 1.0), frameon=False, fontsize=8.5)
     fig.tight_layout()

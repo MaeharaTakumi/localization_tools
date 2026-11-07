@@ -133,7 +133,7 @@ def main():
             print(f'  mount {k:<5} {new[k]:+.4f} m   now {cur[k]:+.4f}')
     for k in ('roll', 'pitch', 'yaw'):
         if new[k] is not None:
-            print(f'  mount {k:<5} {math.degrees(new[k]):+.3f} deg   now {math.degrees(cur[k]):+.3f}')
+            print(f'  mount {k:<5} {new[k]:+.6f} rad   now {cur[k]:+.6f}')   # env の static_tfs の rpy と同じ rad
     print(f'  figures: {out}/noise_hist.png, noise_segments.png, noise_summary.png, mount_scale.png, mount_scale_yaw.png')
 
 
