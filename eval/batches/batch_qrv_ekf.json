@@ -6,12 +6,6 @@
  {
   "name": "qrv_ekf_tuned_1",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     2.7e-06,
-     9.65e-05
-    ]
-   },
    "ekf_localizer": {
     "R_ndt": [
      1.57e-05,
@@ -30,6 +24,10 @@
      0.0005,
      0.05,
      10.0
+    ],
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
     ]
    }
   }
@@ -37,12 +35,6 @@
  {
   "name": "qrv_ekf_newR_1",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     2.7e-06,
-     9.65e-05
-    ]
-   },
    "ekf_localizer": {
     "R_ndt": [
      1.57e-05,
@@ -51,6 +43,10 @@
      4.7e-07,
      4.64e-07,
      1.6e-05
+    ],
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
     ]
    }
   }
@@ -62,12 +58,6 @@
  {
   "name": "qrv_ekf_tuned_2",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     2.7e-06,
-     9.65e-05
-    ]
-   },
    "ekf_localizer": {
     "R_ndt": [
      1.57e-05,
@@ -86,6 +76,10 @@
      0.0005,
      0.05,
      10.0
+    ],
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
     ]
    }
   }
@@ -93,12 +87,6 @@
  {
   "name": "qrv_ekf_newR_2",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     2.7e-06,
-     9.65e-05
-    ]
-   },
    "ekf_localizer": {
     "R_ndt": [
      1.57e-05,
@@ -107,6 +95,10 @@
      4.7e-07,
      4.64e-07,
      1.6e-05
+    ],
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
     ]
    }
   }
@@ -118,12 +110,6 @@
  {
   "name": "qrv_ekf_tuned_3",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     2.7e-06,
-     9.65e-05
-    ]
-   },
    "ekf_localizer": {
     "R_ndt": [
      1.57e-05,
@@ -142,6 +128,10 @@
      0.0005,
      0.05,
      10.0
+    ],
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
     ]
    }
   }

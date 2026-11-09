@@ -375,8 +375,8 @@ def main():
         + ' rad/s' + (f'   moving x tau_int: R_omega {r_odom_moving[1]:.3g}' if not args.no_correlation else ''))
 
     snippet = {
-        'odom_covariance': {'R_odom': [float(f'{x:.3g}') for x in r_odom]},
-        'ekf_localizer': {'R_ndt': [float(f'{x:.3g}') for x in r_ndt]},
+        'ekf_localizer': {'R_odom': [float(f'{x:.3g}') for x in r_odom],
+                          'R_ndt': [float(f'{x:.3g}') for x in r_ndt]},
     }
     how = '分散' if args.no_correlation else '分散 x 積分相関時間'
     print(f'\n# R（R_v は{"直進の" if v_from == "straight" else "動いている"}区間、R_omega は R_v と車輪の間隔 {args.tread} m から、'

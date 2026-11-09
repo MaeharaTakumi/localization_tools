@@ -53,6 +53,7 @@ def main():
     env = yaml.safe_load(open(env_path))
     env_params = env.get('parameters') or {}
     scale = (env_params.get('odom_covariance') or {}).get('odom_scale', [1.0, 1.0])
+    ekf_yaml = yaml.safe_load(open(os.path.join(share('ekf_localizer'), 'param', 'ekf.yaml')))['/**']['ros__parameters']
     if args.target == 'gazebo':
         tread, tread_from = float(settings['noise']['gazebo_tread']), 'calibration/param/calibrate.yaml'
     else:
@@ -92,12 +93,13 @@ def main():
     summary = {
         'bag': bag, 'target': args.target,
         'candidate': {   # env（param/env/<target>.yaml）の parameters に入れる候補
-            'odom_covariance': {'R_odom': [r3(x) for x in noise['R_odom']], 'odom_scale': new_scale},
-            'ekf_localizer': {'R_ndt': [r3(x) for x in noise['R_ndt']]},
+            'odom_covariance': {'odom_scale': new_scale},
+            'ekf_localizer': {'R_odom': [r3(x) for x in noise['R_odom']], 'R_ndt': [r3(x) for x in noise['R_ndt']]},
         },
         'current': {
-            'odom_covariance': {'R_odom': env_params.get('odom_covariance', {}).get('R_odom'), 'odom_scale': scale},
-            'ekf_localizer': {'R_ndt': env_params.get('ekf_localizer', {}).get('R_ndt', '(ekf.yaml)')},
+            'odom_covariance': {'odom_scale': scale},
+            'ekf_localizer': {'R_odom': env_params.get('ekf_localizer', {}).get('R_odom', ekf_yaml['R_odom']),
+                              'R_ndt': env_params.get('ekf_localizer', {}).get('R_ndt', '(ekf.yaml)')},
         },
         'mount': {   # base -> LiDAR（実機は env の static_tfs、Gazebo は URDF）
             'calibrated': {'x': r4(mount_scale['mount_xy'][0]) if 'mount_xy' in mount_scale else None,
@@ -124,7 +126,7 @@ def main():
 
     print(f'\n== summary ({out}/summary.yaml)')
     c = summary['candidate']
-    print(f"  R_odom      {c['odom_covariance']['R_odom']}   now {summary['current']['odom_covariance']['R_odom']}")
+    print(f"  R_odom      {c['ekf_localizer']['R_odom']}   now {summary['current']['ekf_localizer']['R_odom']}")
     print(f"  odom_scale  {new_scale}   now {scale}")
     print(f"  R_ndt       {c['ekf_localizer']['R_ndt']}")
     new, cur = summary['mount']['calibrated'], summary['mount']['current']

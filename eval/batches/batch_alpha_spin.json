@@ -5,12 +5,12 @@
   "label": "ekf_a0",
   "runs": 4,
   "params": {
-   "odom_covariance": {
+   "ekf_localizer": {
     "odom_noise_alpha": [
-     0,
-     0,
-     0,
-     0
+     0.0,
+     0.0,
+     0.0,
+     0.0
     ]
    }
   }
@@ -21,11 +21,11 @@
   "label": "ekf_w0.005",
   "runs": 4,
   "params": {
-   "odom_covariance": {
+   "ekf_localizer": {
     "odom_noise_alpha": [
-     0,
-     0,
-     0,
+     0.0,
+     0.0,
+     0.0,
      0.005
     ]
    }
@@ -37,11 +37,11 @@
   "label": "ekf_w0.05",
   "runs": 4,
   "params": {
-   "odom_covariance": {
+   "ekf_localizer": {
     "odom_noise_alpha": [
-     0,
-     0,
-     0,
+     0.0,
+     0.0,
+     0.0,
      0.05
     ]
    }
@@ -53,12 +53,12 @@
   "label": "ekf_v0.005",
   "runs": 4,
   "params": {
-   "odom_covariance": {
+   "ekf_localizer": {
     "odom_noise_alpha": [
      0.005,
-     0,
-     0,
-     0
+     0.0,
+     0.0,
+     0.0
     ]
    }
   }
@@ -69,11 +69,11 @@
   "label": "ekf_vw0.005",
   "runs": 4,
   "params": {
-   "odom_covariance": {
+   "ekf_localizer": {
     "odom_noise_alpha": [
      0.005,
-     0,
-     0,
+     0.0,
+     0.0,
      0.005
     ]
    }

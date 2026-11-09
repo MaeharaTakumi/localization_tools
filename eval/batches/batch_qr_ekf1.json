@@ -10,12 +10,6 @@
  {
   "name": "qr_ekf_newR_1",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     2.7e-06,
-     9.65e-05
-    ]
-   },
    "ekf_localizer": {
     "R_ndt": [
      1.57e-05,
@@ -24,6 +18,10 @@
      4.7e-07,
      4.64e-07,
      1.6e-05
+    ],
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
     ]
    }
   }
@@ -31,12 +29,6 @@
  {
   "name": "qr_ekf_newR_2",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     2.7e-06,
-     9.65e-05
-    ]
-   },
    "ekf_localizer": {
     "R_ndt": [
      1.57e-05,
@@ -45,6 +37,10 @@
      4.7e-07,
      4.64e-07,
      1.6e-05
+    ],
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
     ]
    }
   }
@@ -52,12 +48,6 @@
  {
   "name": "qr_ekf_yaw5e-3",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     2.7e-06,
-     9.65e-05
-    ]
-   },
    "ekf_localizer": {
     "R_ndt": [
      1.57e-05,
@@ -76,6 +66,10 @@
      0.005,
      0.05,
      10.0
+    ],
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
     ]
    }
   }
@@ -83,12 +77,6 @@
  {
   "name": "qr_ekf_yaw5e-4",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     2.7e-06,
-     9.65e-05
-    ]
-   },
    "ekf_localizer": {
     "R_ndt": [
      1.57e-05,
@@ -107,6 +95,10 @@
      0.0005,
      0.05,
      10.0
+    ],
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
     ]
    }
   }
@@ -114,12 +106,6 @@
  {
   "name": "qr_ekf_yaw5e-5",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     2.7e-06,
-     9.65e-05
-    ]
-   },
    "ekf_localizer": {
     "R_ndt": [
      1.57e-05,
@@ -138,6 +124,10 @@
      5e-05,
      0.05,
      10.0
+    ],
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
     ]
    }
   }
@@ -145,12 +135,6 @@
  {
   "name": "qr_ekf_xy5e-3",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     2.7e-06,
-     9.65e-05
-    ]
-   },
    "ekf_localizer": {
     "R_ndt": [
      1.57e-05,
@@ -169,6 +153,10 @@
      0.05,
      0.05,
      10.0
+    ],
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
     ]
    }
   }
@@ -176,12 +164,6 @@
  {
   "name": "qr_ekf_xy5e-4",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     2.7e-06,
-     9.65e-05
-    ]
-   },
    "ekf_localizer": {
     "R_ndt": [
      1.57e-05,
@@ -200,6 +182,10 @@
      0.05,
      0.05,
      10.0
+    ],
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
     ]
    }
   }
@@ -207,12 +193,6 @@
  {
   "name": "qr_ekf_w1",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     2.7e-06,
-     9.65e-05
-    ]
-   },
    "ekf_localizer": {
     "R_ndt": [
      1.57e-05,
@@ -231,6 +211,10 @@
      0.05,
      0.05,
      1.0
+    ],
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
     ]
    }
   }
@@ -238,12 +222,6 @@
  {
   "name": "qr_ekf_w100",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     2.7e-06,
-     9.65e-05
-    ]
-   },
    "ekf_localizer": {
     "R_ndt": [
      1.57e-05,
@@ -262,6 +240,10 @@
      0.05,
      0.05,
      100.0
+    ],
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
     ]
    }
   }
@@ -269,12 +251,6 @@
  {
   "name": "qr_ekf_w0.1",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     2.7e-06,
-     9.65e-05
-    ]
-   },
    "ekf_localizer": {
     "R_ndt": [
      1.57e-05,
@@ -293,6 +269,10 @@
      0.05,
      0.05,
      0.1
+    ],
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
     ]
    }
   }
@@ -300,12 +280,6 @@
  {
   "name": "qr_ekf_v0.5",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     2.7e-06,
-     9.65e-05
-    ]
-   },
    "ekf_localizer": {
     "R_ndt": [
      1.57e-05,
@@ -324,6 +298,10 @@
      0.05,
      0.5,
      10.0
+    ],
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
     ]
    }
   }
@@ -331,12 +309,6 @@
  {
   "name": "qr_ekf_v0.005",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     2.7e-06,
-     9.65e-05
-    ]
-   },
    "ekf_localizer": {
     "R_ndt": [
      1.57e-05,
@@ -355,6 +327,10 @@
      0.05,
      0.005,
      10.0
+    ],
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
     ]
    }
   }
@@ -362,12 +338,6 @@
  {
   "name": "qr_ekf_zrp5e-4",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     2.7e-06,
-     9.65e-05
-    ]
-   },
    "ekf_localizer": {
     "R_ndt": [
      1.57e-05,
@@ -386,6 +356,10 @@
      0.05,
      0.05,
      10.0
+    ],
+    "R_odom": [
+     2.7e-06,
+     9.65e-05
     ]
    }
   }

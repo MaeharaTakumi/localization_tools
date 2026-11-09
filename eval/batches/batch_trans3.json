@@ -20,12 +20,6 @@
  {
   "name": "ekf_d0.09_Qw10_Rw1e-3",
   "params": {
-   "odom_covariance": {
-    "R_odom": [
-     0.0025,
-     0.001
-    ]
-   },
    "ekf_localizer": {
     "Q": [
      0.05,
@@ -37,7 +31,11 @@
      0.05,
      10.0
     ],
-    "odom_delay": 0.09
+    "odom_delay": 0.09,
+    "R_odom": [
+     0.0025,
+     0.001
+    ]
    }
   }
  },

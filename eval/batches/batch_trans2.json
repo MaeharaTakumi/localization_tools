@@ -100,56 +100,48 @@
  {
   "name": "ekf_Rw1e-3",
   "params": {
-   "odom_covariance": {
+   "ekf_localizer": {
+    "odom_delay": 0.09,
     "R_odom": [
      0.0025,
      0.001
     ]
-   },
-   "ekf_localizer": {
-    "odom_delay": 0.09
    }
   }
  },
  {
   "name": "ekf_Rw2e-2",
   "params": {
-   "odom_covariance": {
+   "ekf_localizer": {
+    "odom_delay": 0.09,
     "R_odom": [
      0.0025,
      0.02
     ]
-   },
-   "ekf_localizer": {
-    "odom_delay": 0.09
    }
   }
  },
  {
   "name": "ekf_Rv5e-4",
   "params": {
-   "odom_covariance": {
+   "ekf_localizer": {
+    "odom_delay": 0.09,
     "R_odom": [
      0.0005,
      0.005
     ]
-   },
-   "ekf_localizer": {
-    "odom_delay": 0.09
    }
   }
  },
  {
   "name": "ekf_Rv1e-2",
   "params": {
-   "odom_covariance": {
+   "ekf_localizer": {
+    "odom_delay": 0.09,
     "R_odom": [
      0.01,
      0.005
     ]
-   },
-   "ekf_localizer": {
-    "odom_delay": 0.09
    }
   }
  }

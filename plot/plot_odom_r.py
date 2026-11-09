@@ -3,7 +3,7 @@
 
   python3 plot_odom_r.py <出力 png> <bag> ...
 
-- 線：odom_covariance の R（R_v = R_odom[0] + a0 v² + a1 omega²、R_omega = R_odom[1] + a2 v² + a3 omega²）を、
+- 線：ekf_localizer のオドメトリの R（R_v = R_odom[0] + a0 v² + a1 omega²、R_omega = R_odom[1] + a2 v² + a3 omega²）を、
   今の設定（alpha 0）と dev_log.md の 24. で試した alpha で描く（加速度の項は 0）
 - 点：指令が一定の区間（オドメトリが指令の変化の半分まで応答した 0.5 s 後〜次の変化の 0.1 s 前、1 s 以上）ごとに、
   （応答から数えるのは、最初の指令が届くまで遅れることがあるため。後退の録画では 0.7 s 遅れて動き出した）
@@ -99,7 +99,7 @@ def main():
         ax.grid(color=GRID, lw=0.6, which='major')
     handles, labels = axes[1].get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper left', ncol=2, bbox_to_anchor=(0.01, 0.93), fontsize=9)
-    fig.suptitle('Odometry magnitude and R (odom_covariance)', x=0.01, ha='left', fontsize=12, fontweight='bold')
+    fig.suptitle('Odometry magnitude and R (ekf_localizer)', x=0.01, ha='left', fontsize=12, fontweight='bold')
     fig.tight_layout(rect=(0, 0, 1, 0.80))
     capitalize_labels(fig)
     fig.savefig(out, dpi=130, facecolor=SURFACE)
