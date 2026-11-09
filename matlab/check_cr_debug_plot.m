@@ -23,7 +23,7 @@ if isempty(color), color = 'red'; end
 
 vehicleInfo.type = "CR_debug";
 vehicleInfo.color = color;
-vehicleInfo.sensor = logical([1 0 0 0 1 0 1 1]);   % LiDAR, Matching (/tf), Localization Debug, LiDAR pose (/tf)
+vehicleInfo.sensor = logical([1 0 0 0 1 0 1]);   % LiDAR, Matching (/tf), Localization Debug, LiDAR pose (/tf)
 vehicleInfo.base_sensor = 1;
 cfg = struct("modeNumber", mode, "isParallel", false, "RID", 99, "rosNamespace", "matlab_cr_debug_plot", ...
     "vehicleInfo", vehicleInfo, "useSimTime", envNumber("SIM_TIME", 0) == 1);

@@ -272,7 +272,7 @@ def main():
     # NDT のパラメータ：パッケージの値 -> gazebo.yaml の pcl_localization -> この試験用（launch の ndt_params と同じ）
     env = yaml.safe_load(open(ENV))
     over = dict(env['parameters'].get('pcl_localization', {}))
-    over.update({'base_frame_id': args.base, 'scan_time_source': 'message', 'publish_rviz_tf': False,
+    over.update({'base_frame_id': args.base, 'scan_time_source': 'message',
                  'publish_tf': False, 'use_tf_init_guess': True, 'tf_init_guess_timeout': 0.2,
                  'use_sim_time': True})
     param_path = '/tmp/ndt_noise_noise_params.yaml'

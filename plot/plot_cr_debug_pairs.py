@@ -5,7 +5,7 @@
 
 (1) 軌跡：MATLAB の周期ごとの Plant（最新の /tf map -> base、後輪間中心）と、新しい組の LIDAR_pose
     （点群の stamp の時刻の /tf と取付、LiDAR）。(2) 新しい組の間隔（LIDAR_new の周期の間）。
-    題に、点群の stamp の時刻の TF がまだ無く前の組のままにした周期（LIDAR_waiting）の数。
+    題に、TF が 1 つも引けず前の組のままにした周期（LIDAR_waiting）の数。
 2026-10-26 の 68 より前の結果（10 列）は /localization/base_pose・vlp16_pose を購読していたころのもの。
 """
 import os
