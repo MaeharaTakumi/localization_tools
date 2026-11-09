@@ -1,0 +1,10 @@
+[
+ {"name": "qrpdef_old_1", "params": {"ekf_localizer": {"R_ndt": [1.0e-2, 1.0e-2, 1.0e-2, 0.03, 0.03, 1.0e-3], "P_init": [0.2, 0.2, 0.2, 0.01, 0.01, 0.01, 0.01, 0.0, 0.0, 0.0, 0.01]}}},
+ {"name": "qrpdef_blue_1", "params": {}},
+ {"name": "qrpdef_old_2", "params": {"ekf_localizer": {"R_ndt": [1.0e-2, 1.0e-2, 1.0e-2, 0.03, 0.03, 1.0e-3], "P_init": [0.2, 0.2, 0.2, 0.01, 0.01, 0.01, 0.01, 0.0, 0.0, 0.0, 0.01]}}},
+ {"name": "qrpdef_blue_2", "params": {}},
+ {"name": "qrpdef_old_3", "params": {"ekf_localizer": {"R_ndt": [1.0e-2, 1.0e-2, 1.0e-2, 0.03, 0.03, 1.0e-3], "P_init": [0.2, 0.2, 0.2, 0.01, 0.01, 0.01, 0.01, 0.0, 0.0, 0.0, 0.01]}}},
+ {"name": "qrpdef_blue_3", "params": {}},
+ {"name": "qrpdef_old_4", "params": {"ekf_localizer": {"R_ndt": [1.0e-2, 1.0e-2, 1.0e-2, 0.03, 0.03, 1.0e-3], "P_init": [0.2, 0.2, 0.2, 0.01, 0.01, 0.01, 0.01, 0.0, 0.0, 0.0, 0.01]}}},
+ {"name": "qrpdef_blue_4", "params": {}}
+]
