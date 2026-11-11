@@ -15,35 +15,12 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
-from plot_spin import (BAND, capitalize_labels, GRID, INK, INK2, SURFACE,  # noqa: E402
-                       widths_back_to_front)
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from plot_style import BAND, capitalize_labels, GRID, INK, INK2, setup, style, SURFACE, widths_back_to_front  # noqa: E402
 
 CLASS_LABEL = {'stopped': 'Stopped', 'turning': 'Turning', 'straight': 'Straight', 'curve': 'Curve'}
 C_OMEGA, C_V, C_YAW, C_X, C_Y = '#2a78d6', '#eb6834', '#4a3aa7', '#1baf7a', '#eda100'
 C_EST, C_EFF, C_STOP, C_TRUTH = '#2a78d6', '#4a3aa7', '#1baf7a', '#eb6834'
-
-
-def setup():
-    plt.rcParams.update({
-        'font.size': 10, 'axes.edgecolor': GRID, 'axes.labelcolor': INK2, 'xtick.color': INK2,
-        'ytick.color': INK2, 'text.color': INK, 'axes.titlecolor': INK, 'axes.titlesize': 10,
-        'axes.titleweight': 'bold', 'axes.titlelocation': 'left'})
-
-
-def style(ax):
-    ax.set_facecolor(SURFACE)
-    ax.grid(axis='y', color=GRID, lw=0.8)
-    ax.set_axisbelow(True)
-    box_on(ax)
-
-
-def box_on(ax):
-    """図の枠を 4 辺とも黒にする（MATLAB の box on。ユーザー指示）."""
-    for spine in ax.spines.values():
-        spine.set_visible(True)
-        spine.set_color('black')
-        spine.set_linewidth(0.8)
 
 
 def plot_segments(path, ot, ov, ow, nt, used, odom_rows, ndt_rows, segs, half):

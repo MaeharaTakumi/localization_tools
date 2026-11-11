@@ -35,40 +35,14 @@ import numpy as np
 import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
 import params  # noqa: E402
-from plot_spin import read_bag  # noqa: E402
-from pose_math import (matrix_to_vec, pose_msg_to_matrix,  # noqa: E402
-                                        transform_msg_to_matrix, vec_to_matrix)
+from bag_io import mount_from_tf_static, read_bag, stamp_sec  # noqa: E402
+from pose_math import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix, wrap  # noqa: E402
 
 CLASSES = ('stopped', 'turning', 'straight', 'curve')
 ODOM_KEYS = ('v', 'omega')
 NDT_KEYS = ('x', 'y', 'z', 'roll', 'pitch', 'yaw')
-
-
-def stamp(m):
-    return m.header.stamp.sec + m.header.stamp.nanosec * 1e-9
-
-
-def wrap(a):
-    return (a + np.pi) % (2 * np.pi) - np.pi
-
-
-def mount_from_tf_static(d, base, lidar):
-    """/tf_static から base -> lidar の変換（4x4）. 見つからなければ None."""
-    edges = {}
-    for _, m in d.get('/tf_static', []):
-        for tr in m.transforms:
-            edges[tr.child_frame_id] = (tr.header.frame_id, transform_msg_to_matrix(tr.transform))
-    t = np.eye(4)
-    frame = lidar
-    while frame != base:
-        if frame not in edges:
-            return None
-        parent, tf = edges[frame]
-        t = tf @ t
-        frame = parent
-    return t
 
 
 def command_segments(d, cmd_topic, to_sim, t_begin, t_end, timeout):
@@ -76,7 +50,7 @@ def command_segments(d, cmd_topic, to_sim, t_begin, t_end, timeout):
     cmds = []
     for t_recv, m in d.get(cmd_topic, []):
         tw = m.twist if hasattr(m, 'twist') else m
-        t = stamp(m) if hasattr(m, 'header') and stamp(m) > 0 else float(to_sim(t_recv))
+        t = stamp_sec(m) if hasattr(m, 'header') and stamp_sec(m) > 0 else float(to_sim(t_recv))
         cmds.append((t, tw.linear.x, tw.angular.z))
     cmds.sort()
     changes = [(t_begin, 0.0, 0.0)]
@@ -274,16 +248,16 @@ def main():
     else:
         def to_sim(ts):
             return np.asarray(ts, float)
-    mount = mount_from_tf_static(d, args.base, args.lidar)
+    mount = mount_from_tf_static(d.get('/tf_static', []), args.base, args.lidar)
     if mount is None:
         if not args.mount:
             sys.exit(f'{args.base} -> {args.lidar} が /tf_static に無いので --mount を指定する')
         mount = vec_to_matrix([float(x) for x in args.mount.split(',')])
     print('mount', args.base, '->', args.lidar, np.round(matrix_to_vec(mount), 4).tolist())
 
-    od = sorted((stamp(m), m.twist.twist.linear.x * sv, m.twist.twist.angular.z * sw) for _, m in d[args.odom])
+    od = sorted((stamp_sec(m), m.twist.twist.linear.x * sv, m.twist.twist.angular.z * sw) for _, m in d[args.odom])
     ot, ov, ow = (np.array(x) for x in zip(*od))
-    nd = sorted(((stamp(m), pose_msg_to_matrix(m.pose.pose)) for _, m in d[args.ndt]), key=lambda x: x[0])
+    nd = sorted(((stamp_sec(m), pose_msg_to_matrix(m.pose.pose)) for _, m in d[args.ndt]), key=lambda x: x[0])
     nt = np.array([t for t, _ in nd])
     mats = [m for _, m in nd]
     t_begin, t_end = max(ot[0], nt[0]), min(ot[-1], nt[-1])

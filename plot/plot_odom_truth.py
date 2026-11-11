@@ -18,10 +18,10 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]
-from plot_noise import box_on  # noqa: E402
-from plot_spin import capitalize_labels, GRID, INK, INK2, read_bag, SURFACE, TRUTH_COLOR, TRUTH_LW  # noqa: E402
-from plot_velocity import C_ODOM, odom_series, phases_of, truth_velocity  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]
+from bag_io import phases_of, read_bag  # noqa: E402
+from plot_style import box_on, capitalize_labels, GRID, INK, INK2, SURFACE, TRUTH_COLOR, TRUTH_LW  # noqa: E402
+from plot_velocity import C_ODOM, odom_series, truth_velocity  # noqa: E402
 
 TOPICS = ['/clock', '/wheelchair/pose', '/wheelchair/odom']
 SETTLE = 2.0   # 定常値の平均を取り始める、動き出しからの時間 [s]

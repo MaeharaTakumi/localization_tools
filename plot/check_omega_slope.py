@@ -16,11 +16,13 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
-from plot_spin import capitalize_labels, GRID, INK, INK2, read_bag, SURFACE, TRUTH_COLOR, TRUTH_LW  # noqa: E402
-from plot_velocity import odom_series, phases_of, truth_velocity  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from gazebo_model import ODOM_SCALE, WHEEL_RADIUS, WHEEL_SEPARATION  # noqa: E402
+from bag_io import phases_of, read_bag  # noqa: E402
+from plot_style import capitalize_labels, GRID, INK, INK2, setup, SURFACE, TRUTH_COLOR, TRUTH_LW  # noqa: E402
+from plot_velocity import odom_series, truth_velocity  # noqa: E402
 
-R, B, SCALE, WINDOW = 0.1325, 0.492, 0.922, 0.2
+SCALE, WINDOW = ODOM_SCALE[1], 0.2   # omega の倍率、移動平均の幅 [s]
 
 
 def joint_omega(d):
@@ -28,7 +30,7 @@ def joint_omega(d):
     for _, m in d['/wheelchair/joint_states']:
         il, ir = m.name.index('left_wheel_joint'), m.name.index('right_wheel_joint')
         t.append(m.header.stamp.sec + m.header.stamp.nanosec * 1e-9)
-        w.append(R * (m.velocity[ir] - m.velocity[il]) / B)
+        w.append(WHEEL_RADIUS * (m.velocity[ir] - m.velocity[il]) / WHEEL_SEPARATION)
     o = np.argsort(t)
     return np.array(t)[o], np.array(w)[o]
 
@@ -85,9 +87,7 @@ def main():
         diff = ow[m] - np.interp(ot[m], jt, moving_average(jt, jw, WINDOW))
         print(f'odom vs reproduced 0.2 s average: RMS {np.sqrt(np.nanmean(diff ** 2)):.4f} rad/s')
 
-    plt.rcParams.update({'font.size': 10, 'axes.edgecolor': GRID, 'axes.labelcolor': INK2,
-                         'xtick.color': INK2, 'ytick.color': INK2, 'text.color': INK, 'axes.titlecolor': INK,
-                         'axes.titlesize': 10, 'axes.titleweight': 'bold', 'axes.titlelocation': 'left'})
+    setup()
     fig, axes = plt.subplots(1, 2, figsize=(14, 4.8), facecolor=SURFACE)
     for ax, (title, key) in zip(axes, (('omega at rotation start', 'left turn'),
                                        ('omega at reverse (+1 -> -1 rad/s)', 'right turn'))):

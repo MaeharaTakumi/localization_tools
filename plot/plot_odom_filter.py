@@ -21,12 +21,14 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
-from plot_spin import (capitalize_labels, GRID, INK, INK2, read_bag, SURFACE, TRUTH_COLOR, TRUTH_LW,  # noqa: E402
-                       widths_back_to_front)
-from plot_velocity import odom_series, phases_of, truth_velocity  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from gazebo_model import ODOM_SCALE, WHEEL_RADIUS, WHEEL_SEPARATION  # noqa: E402
+from bag_io import phases_of, read_bag  # noqa: E402
+from plot_style import (capitalize_labels, GRID, INK, INK2,  # noqa: E402
+                        setup, SURFACE, TRUTH_COLOR, TRUTH_LW, widths_back_to_front)
+from plot_velocity import odom_series, truth_velocity  # noqa: E402
 
-R, B, SCALE = 0.1325, 0.492, 0.922
+SCALE = ODOM_SCALE[1]   # omega の倍率
 # 色は系列ごとに固定（移動平均 1 は両方の図で同じ色）
 WINDOW10, WINDOW1, WINDOW1_SCALED = '#eb6834', '#2a78d6', '#4a3aa7'
 TRUTH_LABEL = 'Truth (d/dt of /wheelchair/pose)'
@@ -44,18 +46,16 @@ def rolling_odometry(d, n):
     o = np.argsort(t)
     t, pl, pr = (np.array(x)[o] for x in (t, pl, pr))
     dt = np.diff(t)
-    dl, dr = np.diff(pl) * R, np.diff(pr) * R
+    dl, dr = np.diff(pl) * WHEEL_RADIUS, np.diff(pr) * WHEEL_RADIUS
     k = np.ones(n) / n
     v = np.convolve((dl + dr) / 2 / dt, k)[:len(dt)]
-    w = np.convolve((dr - dl) / B / dt, k)[:len(dt)]
+    w = np.convolve((dr - dl) / WHEEL_SEPARATION / dt, k)[:len(dt)]
     return t[1 + n - 1:], v[n - 1:], w[n - 1:]
 
 
 def figure(path, title, truth, series, panels, ylabel, xlim):
     """series: [(ラベル, t, y, 色)]（後方→手前の順）。panels: [(題, 切り替え時刻)]."""
-    plt.rcParams.update({'font.size': 10, 'axes.edgecolor': GRID, 'axes.labelcolor': INK2,
-                         'xtick.color': INK2, 'ytick.color': INK2, 'text.color': INK, 'axes.titlecolor': INK,
-                         'axes.titlesize': 10, 'axes.titleweight': 'bold', 'axes.titlelocation': 'left'})
+    setup()
     fig, axes = plt.subplots(1, len(panels), figsize=(14, 4.8), facecolor=SURFACE)
     widths = widths_back_to_front(len(series))
     lines = [(TRUTH_LABEL, truth[0], truth[1], TRUTH_COLOR, TRUTH_LW)]

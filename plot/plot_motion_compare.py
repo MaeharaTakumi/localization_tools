@@ -22,10 +22,11 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]
+from bag_io import phases_of, read_bag  # noqa: E402
 from bag_paths import tune_bag  # noqa: E402
-from plot_spin import (BAND, capitalize_labels, GRID, INK, INK2, SERIES, SURFACE, TRUTH_COLOR,  # noqa: E402
-                       widths_back_to_front)
+from plot_style import (BAND, capitalize_labels, GRID, INK, INK2,  # noqa: E402
+                        SERIES, SURFACE, TRUTH_COLOR, TRUTH_LW, widths_back_to_front)
 
 MAP = '/root/ros2_ws/map/SC10_4_0.05.pcd'
 FLOOR_Z = 12.3
@@ -62,7 +63,7 @@ def map_walls():
 
 
 def traj(out, items):
-    from compare_run import load, phases_of
+    from compare_run import load
     style()
     walls = map_walls()
     n = len(items)
@@ -273,7 +274,6 @@ ZOOM_PRE, ZOOM_POST = 0.3, 1.5
 def candidate_series(prefix, results, motion, title, items):
     """候補（label）ごとの時間推移。omega・v は /ekf_odom（推定）と /wheelchair/pose の微分（真値）."""
     from compare_run import series
-    from plot_spin import read_bag, TRUTH_COLOR, TRUTH_LW
     from plot_velocity import odom_series, truth_velocity
     style()
     rows = load_results(results)
@@ -283,7 +283,7 @@ def candidate_series(prefix, results, motion, title, items):
         name, bag = row['name'], tune_bag(row)
         d = read_bag(bag, ['/clock', '/wheelchair/pose', '/ekf_odom'])
         s = series(bag)
-        t0 = min(phases_of_bag(bag).values())
+        t0 = min(phases_of(bag).values())
         et, ev, ew = odom_series(d['/ekf_odom'])
         runs.append((f'{text} ({name.rsplit("_", 1)[1]})', s, et - t0, ev, ew))
     tt, tv, tw = truth_velocity(d)
@@ -372,11 +372,6 @@ def candidate_series(prefix, results, motion, title, items):
     capitalize_labels(fig)
     fig.savefig(f'{prefix}_zoom.png', dpi=130, facecolor=SURFACE)
     print(f'saved {prefix}_zoom.png')
-
-
-def phases_of_bag(bag):
-    from compare_run import phases_of
-    return phases_of(bag)
 
 
 def main():

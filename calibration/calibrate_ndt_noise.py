@@ -48,11 +48,11 @@ from tf2_ros import TransformBroadcaster
 import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
-from calibrate_noise import mount_from_tf_static, NDT_KEYS, wrap  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from bag_io import mount_from_tf_static, read_bag  # noqa: E402
+from calibrate_noise import NDT_KEYS  # noqa: E402
+from pose_math import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix, wrap  # noqa: E402
 import params  # noqa: E402
-from plot_spin import read_bag  # noqa: E402
-from pose_math import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix  # noqa: E402
 
 SHARE = '/root/ros2_ws/install'
 NDT_PARAM = f'{SHARE}/pcl_localization_ros2/share/pcl_localization_ros2/param/localization.yaml'
@@ -252,7 +252,7 @@ def main():
     sigma = np.array(s[:3] + [math.radians(x) for x in s[3:]])
 
     d = read_bag(args.bag, ['/clock', '/tf_static', '/wheelchair/pose'])
-    mount = mount_from_tf_static(d, args.base, args.lidar)
+    mount = mount_from_tf_static(d.get('/tf_static', []), args.base, args.lidar)
     ph = {}
     with open(args.bag.rstrip('/') + '_phases.txt') as f:
         for line in f:
@@ -272,7 +272,7 @@ def main():
     # NDT のパラメータ：パッケージの値 -> gazebo.yaml の pcl_localization -> この試験用（launch の ndt_params と同じ）
     env = yaml.safe_load(open(ENV))
     over = dict(env['parameters'].get('pcl_localization', {}))
-    over.update({'base_frame_id': args.base, 'scan_time_source': 'message',
+    over.update({'base_frame_id': args.base, 'stamp_mode': 'stamp',
                  'publish_tf': False, 'use_tf_init_guess': True, 'tf_init_guess_timeout': 0.2,
                  'use_sim_time': True})
     param_path = '/tmp/ndt_noise_noise_params.yaml'

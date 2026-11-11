@@ -17,7 +17,6 @@ Gazebo は --truth で真値との比較も出す。
 """
 import argparse
 import json
-import math
 import os
 import subprocess
 import sys
@@ -52,7 +51,7 @@ def main():
     env_path = os.path.join(share('localization_bringup'), 'param', 'env', f'{args.target}.yaml')
     env = yaml.safe_load(open(env_path))
     env_params = env.get('parameters') or {}
-    scale = (env_params.get('odom_covariance') or {}).get('odom_scale', [1.0, 1.0])
+    scale = (env_params.get('odom_relay') or {}).get('odom_scale', [1.0, 1.0])
     ekf_yaml = yaml.safe_load(open(os.path.join(share('ekf_localizer'), 'param', 'ekf.yaml')))['/**']['ros__parameters']
     if args.target == 'gazebo':
         tread, tread_from = float(settings['noise']['gazebo_tread']), 'calibration/param/calibrate.yaml'
@@ -62,7 +61,7 @@ def main():
         tread_from = odo_path
         if 'tread_width' in (env_params.get('whill_odometry') or {}):
             tread, tread_from = env_params['whill_odometry']['tread_width'], env_path
-    common = ['--odom', env['nodes']['odom_covariance']['topics']['odom'], '--cmd', cfg['command']['topic'],
+    common = ['--odom', env['nodes']['odom_relay']['topics']['odom'], '--cmd', cfg['command']['topic'],
               '--base', env['base_frame_id'], '--lidar', env['lidar_frame_id']]
     truth = ['--truth'] if args.target == 'gazebo' else []
     sc = f'{scale[0]},{scale[1]}'
@@ -93,11 +92,11 @@ def main():
     summary = {
         'bag': bag, 'target': args.target,
         'candidate': {   # env（param/env/<target>.yaml）の parameters に入れる候補
-            'odom_covariance': {'odom_scale': new_scale},
+            'odom_relay': {'odom_scale': new_scale},
             'ekf_localizer': {'R_odom': [r3(x) for x in noise['R_odom']], 'R_ndt': [r3(x) for x in noise['R_ndt']]},
         },
         'current': {
-            'odom_covariance': {'odom_scale': scale},
+            'odom_relay': {'odom_scale': scale},
             'ekf_localizer': {'R_odom': env_params.get('ekf_localizer', {}).get('R_odom', ekf_yaml['R_odom']),
                               'R_ndt': env_params.get('ekf_localizer', {}).get('R_ndt', '(ekf.yaml)')},
         },

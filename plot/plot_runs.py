@@ -19,9 +19,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]
-from plot_noise import box_on  # noqa: E402
-from plot_spin import capitalize_labels, GRID, INK, INK2, SERIES, SURFACE  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]
+from plot_style import box_on, capitalize_labels, GRID, INK, INK2, SERIES, SURFACE  # noqa: E402
 
 # 指標の名前と単位（transition_eval.py・tune_run.py の出力）
 LABELS = {

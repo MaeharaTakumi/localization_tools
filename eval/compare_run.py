@@ -30,24 +30,16 @@ import sys
 import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
-from plot_spin import read_bag, URDF_MOUNT, wrap  # noqa: E402
-from pose_math import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from bag_io import phases_of, read_bag  # noqa: E402
+from gazebo_model import URDF_MOUNT  # noqa: E402
+from pose_math import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix, wrap  # noqa: E402
 from bag_paths import tune_bag  # noqa: E402
 
 MAP_OFFSET = np.array([0.041, -0.021])   # NDT − 真値（地図と Gazebo の座標のずれ）[m]
 RT_RATE = 100.0
 TAIL_EVAL = 2.0
 PRE, POST = 0.1, 1.0
-
-
-def phases_of(bag):
-    out = {}
-    with open(bag.rstrip('/') + '_phases.txt') as f:
-        for line in f:
-            name, t = line.rsplit(' ', 1)
-            out[name] = float(t)
-    return out
 
 
 def load(bag, topic='/ekf_pose'):

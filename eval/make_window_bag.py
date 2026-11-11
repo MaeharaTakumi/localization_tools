@@ -18,23 +18,11 @@ import rosbag2_py
 from rosidl_runtime_py.utilities import get_message
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_odom_filter などを import する
-from plot_odom_filter import B, R  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from bag_io import open_reader, stamp_ns  # noqa: E402
+from gazebo_model import WHEEL_RADIUS, WHEEL_SEPARATION  # noqa: E402
 
 TOPICS = ['/clock', '/velodyne_points', '/wheelchair/odom', '/wheelchair/joint_states', '/wheelchair/pose']
-
-
-def open_reader(path, topics=None):
-    reader = rosbag2_py.SequentialReader()
-    reader.open(rosbag2_py.StorageOptions(uri=path, storage_id='sqlite3'),
-                rosbag2_py.ConverterOptions('cdr', 'cdr'))
-    if topics:
-        reader.set_filter(rosbag2_py.StorageFilter(topics=topics))
-    return reader
-
-
-def stamp_ns(m):
-    return m.header.stamp.sec * 1_000_000_000 + m.header.stamp.nanosec
 
 
 def rolling(in_bag, n):
@@ -46,15 +34,15 @@ def rolling(in_bag, n):
         _, data, _ = reader.read_next()
         m = deserialize_message(data, msg_type)
         il, ir = m.name.index('left_wheel_joint'), m.name.index('right_wheel_joint')
-        rows.append((stamp_ns(m), m.position[il], m.position[ir]))
+        rows.append((stamp_ns(m.header.stamp), m.position[il], m.position[ir]))
     rows.sort()
     t = np.array([r[0] for r in rows])
     pl, pr = np.array([r[1] for r in rows]), np.array([r[2] for r in rows])
     dt = np.diff(t) * 1e-9
-    dl, dr = np.diff(pl) * R, np.diff(pr) * R
+    dl, dr = np.diff(pl) * WHEEL_RADIUS, np.diff(pr) * WHEEL_RADIUS
     k = np.ones(n) / n
     v = np.convolve((dl + dr) / 2 / dt, k)[:len(dt)]
-    w = np.convolve((dr - dl) / B / dt, k)[:len(dt)]
+    w = np.convolve((dr - dl) / WHEEL_SEPARATION / dt, k)[:len(dt)]
     return {int(t[i + 1]): (v[i], w[i]) for i in range(n - 1, len(dt))}
 
 
@@ -76,7 +64,7 @@ def main():
         topic, data, t = reader.read_next()
         if topic == '/wheelchair/odom':
             m = deserialize_message(data, odom_type)
-            vw = table.get(stamp_ns(m))
+            vw = table.get(stamp_ns(m.header.stamp))
             if vw is None:
                 missing += 1
             else:

@@ -18,9 +18,8 @@ import numpy as np  # noqa: E402
 from scipy.io import loadmat  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
-from plot_noise import box_on, setup, style  # noqa: E402
-from plot_spin import capitalize_labels, SERIES, SURFACE, widths_back_to_front  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from plot_style import box_on, capitalize_labels, SERIES, setup, style, SURFACE, widths_back_to_front  # noqa: E402
 
 
 def main():

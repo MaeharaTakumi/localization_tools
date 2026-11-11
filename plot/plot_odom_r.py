@@ -20,13 +20,14 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]
-from calibrate_noise import command_segments, odom_residuals, stamp  # noqa: E402
-from plot_spin import capitalize_labels, GRID, INK2, read_bag, SERIES, SURFACE  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]
+from gazebo_model import ODOM_SCALE  # noqa: E402
+from bag_io import read_bag, stamp_sec  # noqa: E402
+from calibrate_noise import command_segments, odom_residuals  # noqa: E402
+from plot_style import capitalize_labels, GRID, INK2, SERIES, SURFACE  # noqa: E402
 from plot_velocity import truth_velocity  # noqa: E402
 
 R_ODOM = (2.5e-3, 5.0e-3)
-ODOM_SCALE = (1.0, 0.922)
 SETTLE, MARGIN, MIN_LEN, HALF = 0.5, 0.1, 1.0, 0.5
 CMD = '/wheelchair/diff_drive_controller/cmd_vel'
 # (表示名, [a0, a1, a2, a3])。dev_log.md の 24.
@@ -45,7 +46,7 @@ def segment_stats(bag):
         return np.interp(ts, clk[:, 0], clk[:, 1])
 
     od = d['/wheelchair/odom']
-    ot = np.array([stamp(m) for _, m in od])
+    ot = np.array([stamp_sec(m) for _, m in od])
     ov = np.array([m.twist.twist.linear.x for _, m in od]) * ODOM_SCALE[0]
     ow = np.array([m.twist.twist.angular.z for _, m in od]) * ODOM_SCALE[1]
     tt, tv, tw = truth_velocity(d)

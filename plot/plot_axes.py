@@ -21,26 +21,14 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
-from plot_spin import capitalize_labels, BAND, GRID, INK, INK2, read_bag, SURFACE, URDF_MOUNT  # noqa: E402
-from plot_spin import TRUTH_COLOR, TRUTH_LW, widths_back_to_front  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from bag_io import phases_of, read_bag, stamp_sec  # noqa: E402
+from gazebo_model import URDF_MOUNT  # noqa: E402
+from plot_style import BAND, BAND_ALT, capitalize_labels, INK, INK2, setup, style, SURFACE, TRUTH_COLOR, TRUTH_LW, widths_back_to_front  # noqa: E402
 from pose_math import matrix_to_vec, pose_msg_to_matrix  # noqa: E402
 
 COLORS = os.environ.get('PLOT_COLORS', '#2a78d6,#1baf7a,#eda100').split(',')
 MOUNT_INV = np.linalg.inv(URDF_MOUNT)
-
-
-def stamp(m):
-    return m.header.stamp.sec + m.header.stamp.nanosec * 1e-9
-
-
-def phases_of(bag):
-    out = {}
-    with open(bag.rstrip('/') + '_phases.txt') as f:
-        for line in f:
-            name, t = line.rsplit(' ', 1)
-            out[name] = float(t)
-    return out
 
 
 def unwrap_to(yaw, ref_t, ref_yaw, t):
@@ -70,7 +58,7 @@ def load(path, topic):
     run['truth_lidar'][:, 5] = np.unwrap(run['truth_lidar'][:, 5])
 
     msgs = d.get(topic, [])
-    run['t'] = np.array([stamp(m) for _, m in msgs])
+    run['t'] = np.array([stamp_sec(m) for _, m in msgs])
     lidar = [pose_msg_to_matrix(m.pose.pose) for _, m in msgs]
     run['lidar'] = np.array([matrix_to_vec(T) for T in lidar])
     run['base'] = np.array([matrix_to_vec(T @ MOUNT_INV) for T in lidar])
@@ -78,22 +66,12 @@ def load(path, topic):
         run[key][:, 5] = unwrap_to(run[key][:, 5], run['truth_t'], run['truth_' + key][:, 5], run['t'])
     run['out_latency'] = (to_sim([t for t, _ in msgs]) - run['t']) * 1000.0
     ndt = d.get('/ndt_pose', [])
-    run['ndt_t'] = np.array([stamp(m) for _, m in ndt])
+    run['ndt_t'] = np.array([stamp_sec(m) for _, m in ndt])
     run['ndt_latency'] = (to_sim([t for t, _ in ndt]) - run['ndt_t']) * 1000.0
     dbg = d.get('/localization_debug', [])
     run['align_t'] = to_sim([t for t, _ in dbg])
     run['align_ms'] = np.array([m.data[1] for _, m in dbg]) * 1000.0
     return run
-
-
-def style_axis(ax, bands):
-    ax.set_facecolor(SURFACE)
-    for i, (_, a, b) in enumerate(bands):
-        ax.axvspan(a, b, color=BAND if i % 2 == 0 else '#f6f5f2', lw=0, zorder=0)
-    ax.grid(axis='y', color=GRID, lw=0.8)
-    ax.set_axisbelow(True)
-    for spine in ('top', 'right'):
-        ax.spines[spine].set_visible(False)
 
 
 def draw_strip(strip, bands, short=False):
@@ -103,17 +81,14 @@ def draw_strip(strip, bands, short=False):
         spine.set_visible(False)
     strip.tick_params(axis='x', length=0)
     for i, (name, a, b) in enumerate(bands):
-        strip.axvspan(a, b, color=BAND if i % 2 == 0 else '#f6f5f2', lw=0)
+        strip.axvspan(a, b, color=BAND if i % 2 == 0 else BAND_ALT, lw=0)
         label = name.split('  ')[0] if short else name   # 2 列の図では指令の値を省く
         strip.text((a + b) / 2, 0.5, label, ha='center', va='center', fontsize=9, color=INK2,
                    transform=strip.get_xaxis_transform())
 
 
 def new_figure(ncols, nrows, title, size):
-    plt.rcParams.update({
-        'font.size': 10, 'axes.edgecolor': GRID, 'axes.labelcolor': INK2, 'xtick.color': INK2,
-        'ytick.color': INK2, 'text.color': INK, 'axes.titlecolor': INK, 'axes.titlesize': 10,
-        'axes.titleweight': 'bold', 'axes.titlelocation': 'left'})
+    setup()
     fig, axes = plt.subplots(nrows + 1, ncols, figsize=size, sharex=True, facecolor=SURFACE,
                              gridspec_kw={'height_ratios': [0.22] + [1] * nrows}, squeeze=False)
     fig.suptitle(title, x=0.06, ha='left', fontsize=12, fontweight='bold', color=INK, y=0.995)
@@ -171,7 +146,7 @@ def main():
         draw_strip(axes[0][col], bands, short=True)
         for row, axis in enumerate('xyz'):
             ax = axes[row + 1][col]
-            style_axis(ax, bands)
+            style(ax, box=False, bands=bands)
             plot_series(ax, key, row)
             ax.set_title(f'{axis} ({name}) [m]')
     finish(fig, axes, f'{prefix}_position.png', t_range, handles)
@@ -181,7 +156,7 @@ def main():
     draw_strip(axes[0][0], bands)
     for row, axis in enumerate(('roll', 'pitch', 'yaw')):
         ax = axes[row + 1][0]
-        style_axis(ax, bands)
+        style(ax, box=False, bands=bands)
         plot_series(ax, 'lidar', row + 3, 180.0 / math.pi)
         ax.set_title(f'{axis} [deg]' + ('  (unwrapped)' if axis == 'yaw' else ''))
     finish(fig, axes, f'{prefix}_orientation.png', t_range, handles)
@@ -197,7 +172,7 @@ def main():
     print(f"{'':<28} {'mean':>7} {'p95':>7} {'max':>7}  [ms, during motion]")
     for row, (title, tk, vk) in enumerate(panels):
         ax = axes[row + 1][0]
-        style_axis(ax, bands)
+        style(ax, box=False, bands=bands)
         for j, ((label, r), c, w) in enumerate(zip(runs, COLORS, widths)):
             m = window(r[tk])
             ax.plot(r[tk][m] - t0, r[vk][m], color=c, lw=w, zorder=3 + j)

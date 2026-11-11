@@ -3,10 +3,11 @@
 # 真値なしの R・取付と倍率の推定は録画から計算し直す（数分）。NDT の R（ndt_init_stops、NDT を計算し直すので約 9 分）は FULL=1 のときだけ
 # robot_localization を含む図（spin_results・spin360_*・axes_*・transition_compare・velocity*・scale_*・compare_*・qg_*）は
 # 2026-10-15 に robot_localization を廃止して録画・再生の出力を消したので描き直さない（results/ の図は開発ログの記録として残す）
+# 環境変数 OUT で図の出力先、T0 でツールの場所を変えられる（ツールを直したとき、別の場所に描いて前の図と比べる）
 set -u
-T0=/root/ros2_ws/localization_tools
+T0=${T0:-/root/ros2_ws/localization_tools}
 cd $T0/plot
-B=/root/ros2_ws/bags/gazebo; T=$B/tune; O=/root/ros2_ws/fig; R=$T0/eval/results
+B=/root/ros2_ws/bags/gazebo; T=$B/tune; O=${OUT:-/root/ros2_ws/fig}; R=$T0/eval/results
 mkdir -p $O
 run() { echo "== $*" | cut -c1-120; "$@" 2>&1 | grep -E "saved|Error|Traceback|line [0-9]" ; }
 run python3 check_omega_slope.py $O/omega_slope.png $B/spin360_js_ekf

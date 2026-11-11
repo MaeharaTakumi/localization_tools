@@ -34,30 +34,12 @@ import numpy as np  # noqa: E402
 from scipy.spatial.transform import Rotation, Slerp  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
-from plot_noise import box_on, setup, style  # noqa: E402
-from plot_spin import capitalize_labels, INK2, read_bag, SERIES, SURFACE, widths_back_to_front  # noqa: E402
-from plot_velocity import phases_of  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from bag_io import mount_from_tf_static, phases_of, read_bag, stamp_ns  # noqa: E402
+from plot_style import box_on, capitalize_labels, INK2, SERIES, setup, style, SURFACE, widths_back_to_front  # noqa: E402
 from pose_math import matrix_to_vec, pose_msg_to_matrix, transform_msg_to_matrix, vec_to_matrix  # noqa: E402
 
 LIDAR_FRAME = 'velodyne'   # 環境ファイルの lidar_frame_id
-
-
-def ns(stamp):
-    return stamp.sec * 10**9 + stamp.nanosec
-
-
-def mount_of(static, base, lidar):
-    """/tf_static をたどった base -> lidar（Gazebo は base_footprint -> base_link -> velodyne_base_link -> velodyne）."""
-    parent = {tr.child_frame_id: (tr.header.frame_id, transform_msg_to_matrix(tr.transform))
-              for _, m in static for tr in m.transforms}
-    T, frame = np.eye(4), lidar
-    while frame != base:
-        if frame not in parent:
-            raise RuntimeError(f'no TF from {base} to {lidar} in /tf_static')
-        frame, M = parent[frame]
-        T = M @ T
-    return T
 
 
 def cloud_delays(in_bag):
@@ -175,13 +157,13 @@ def check(bag, in_bag=None):
         s = np.asarray(k) * 1e-9
         return np.interp(s, clk[:, 1], clk[:, 0]) if len(clk) else s
 
-    tf = [(ns(tr.header.stamp), t, tr.child_frame_id, transform_msg_to_matrix(tr.transform))
+    tf = [(stamp_ns(tr.header.stamp), t, tr.child_frame_id, transform_msg_to_matrix(tr.transform))
           for t, m in d['/tf'] for tr in m.transforms if tr.header.frame_id == 'map']
     if not tf:
         raise RuntimeError(f'no /tf map -> base in {bag}')
     base_frame = tf[0][2]
     interp = TfInterp([(k, t, M) for k, t, _, M in tf])
-    mount = mount_of(d['/tf_static'], base_frame, LIDAR_FRAME)
+    mount = mount_from_tf_static(d['/tf_static'], base_frame, LIDAR_FRAME, required=True)
     print(f'{bag}')
     out = {'bag': bag}
 
@@ -194,8 +176,8 @@ def check(bag, in_bag=None):
     out['tf_interval'] = stats('stamp interval', period)
     out['tf_latency'] = stats('stamp -> receipt', (interp.recv - to_wall(interp.k)) * 1e3)
 
-    ndt = {ns(m.header.stamp): (t, pose_msg_to_matrix(m.pose.pose)) for t, m in d.get('/ndt_pose', [])}
-    post = {ns(tr.header.stamp): transform_msg_to_matrix(tr.transform)
+    ndt = {stamp_ns(m.header.stamp): (t, pose_msg_to_matrix(m.pose.pose)) for t, m in d.get('/ndt_pose', [])}
+    post = {stamp_ns(tr.header.stamp): transform_msg_to_matrix(tr.transform)
             for _, m in d.get('/tf_ndt_update', []) for tr in m.transforms if tr.header.frame_id == 'map'}
     print(f'/ndt_pose: {len(ndt)}, /tf_ndt_update: {len(post)}')
     out['n_ndt'] = len(ndt)

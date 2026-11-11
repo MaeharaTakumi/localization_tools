@@ -22,12 +22,11 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
-from plot_noise import box_on, setup, style  # noqa: E402
-from plot_spin import capitalize_labels, INK2, read_bag, SURFACE, widths_back_to_front, wrap  # noqa: E402
-from plot_velocity import phases_of  # noqa: E402
-from plot_matlab_outputs import mount_of, TfInterp  # noqa: E402
-from pose_math import pose_msg_to_matrix  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from bag_io import mount_from_tf_static, phases_of, read_bag, stamp_ns  # noqa: E402
+from plot_matlab_outputs import TfInterp  # noqa: E402
+from plot_style import box_on, capitalize_labels, INK2, setup, style, SURFACE, widths_back_to_front  # noqa: E402
+from pose_math import pose_msg_to_matrix, transform_msg_to_matrix, wrap  # noqa: E402
 
 RANGE = 10.0   # 表示のずれを見る点の距離 [m]
 # 比べる組（後 − 前）と色。録画にある組だけ描く（先に描くものほど太い）
@@ -39,21 +38,6 @@ PANELS = [('xy', 1e3, 'Horizontal position difference [mm]'),
           ('shift', 1e3, f'Shift of a point {RANGE:.0f} m away [mm]')]
 
 
-def tf_matrix(tr):
-    t, q = tr.transform.translation, tr.transform.rotation
-    x, y, z, w = q.x, q.y, q.z, q.w
-    T = np.eye(4)
-    T[:3, :3] = [[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
-                 [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
-                 [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]]
-    T[:3, 3] = [t.x, t.y, t.z]
-    return T
-
-
-def ns(stamp):
-    return stamp.sec * 10**9 + stamp.nanosec
-
-
 def lidar_poses(bag):
     """{'prior' / 'update' / 'ndt': {点群の stamp [ns]: map -> LiDAR}} と LiDAR のフレーム名."""
     d = read_bag(bag, ['/tf', '/tf_static', '/tf_ndt_update', '/ndt_pose'])
@@ -63,15 +47,15 @@ def lidar_poses(bag):
     base = next((tr.child_frame_id for _, m in d['/tf'] for tr in m.transforms if tr.header.frame_id == 'map'), None)
     if base is None:
         raise RuntimeError(f'no /tf map -> base in {bag}')
-    mount = mount_of(d.get('/tf_static', []), base, lidar)
+    mount = mount_from_tf_static(d.get('/tf_static', []), base, lidar, required=True)
 
     def from_tf(topic):
-        return {ns(tr.header.stamp): tf_matrix(tr) @ mount for _, m in d.get(topic, []) for tr in m.transforms
+        return {stamp_ns(tr.header.stamp): transform_msg_to_matrix(tr.transform) @ mount for _, m in d.get(topic, []) for tr in m.transforms
                 if tr.header.frame_id == 'map' and tr.child_frame_id == base}
 
-    ndt = {ns(m.header.stamp): pose_msg_to_matrix(m.pose.pose) for _, m in d['/ndt_pose']}
+    ndt = {stamp_ns(m.header.stamp): pose_msg_to_matrix(m.pose.pose) for _, m in d['/ndt_pose']}
     # /tf は点群の stamp の時刻で引く（tf2 と同じ補間。2026-10-26 までの publish_trigger: cloud の録画は stamp ちょうどの値がある）
-    interp = TfInterp([(ns(tr.header.stamp), t, tf_matrix(tr)) for t, m in d['/tf'] for tr in m.transforms
+    interp = TfInterp([(stamp_ns(tr.header.stamp), t, transform_msg_to_matrix(tr.transform)) for t, m in d['/tf'] for tr in m.transforms
                        if tr.header.frame_id == 'map' and tr.child_frame_id == base])
     prior = {k: P @ mount for k in ndt for P in [interp.at(k)] if P is not None}
     poses = {'prior': prior, 'update': from_tf('/tf_ndt_update'), 'ndt': ndt}

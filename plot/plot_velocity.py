@@ -7,13 +7,12 @@
 
 出力: <接頭辞>_full.png（全体）、<接頭辞>_zoom.png（速度が急に変わる 4 つの瞬間の拡大）。
 真値は入力 bag の /wheelchair/pose（base_footprint）を ±0.03 s の差分で微分したもの（v は車体の前方向成分）。
-オドメトリは入力 bag の /wheelchair/odom。点線は odom_delay だけ stamp を戻したもの（odom_covariance と同じ補正）。
+オドメトリは入力 bag の /wheelchair/odom。点線は odom_delay だけ stamp を戻したもの（ekf_localizer の odom_delay と同じ補正）。
 推定値は各 bag の nav_msgs/Odometry（ekf_localizer は /ekf_odom、robot_localization は /odometry/global）の
 twist.linear.x・twist.angular.z を stamp の時刻で描く。
 変化の半分に達した時刻の、真値からの遅れ [ms] も表にする。
 環境変数：ODOM_SCALE="v,omega"（オドメトリに掛ける倍率。既定 1,1）、LABEL_BEFORE・LABEL_AFTER（推定値の凡例の名前）。
 """
-import math
 import os
 import sys
 
@@ -23,8 +22,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
-from plot_spin import capitalize_labels, BAND, GRID, INK, INK2, read_bag, SURFACE, TRUTH_COLOR, TRUTH_LW  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from bag_io import phases_of, read_bag, stamp_sec  # noqa: E402
+from plot_style import capitalize_labels, INK, INK2, setup, style, SURFACE, TRUTH_COLOR, TRUTH_LW  # noqa: E402
 from pose_math import matrix_to_vec, pose_msg_to_matrix  # noqa: E402
 
 # dataviz 参照パレット（調整後 slot 1・オドメトリ slot 2・調整前 slot 3・遅れを補正したオドメトリ slot 7）と真値
@@ -33,19 +33,6 @@ C_AFTER, C_ODOM, C_BEFORE, C_ODOM_COMP, C_TRUTH = '#2a78d6', '#eb6834', '#1baf7a
 LW = [TRUTH_LW, 2.8, 2.2, 1.7, 1.2]
 TRANSITIONS = [('start', 'left turn', 'omega'), ('reverse', 'right turn', 'omega'),
                ('to forward', 'forward', 'v'), ('stop', 'stop', 'v')]
-
-
-def stamp(m):
-    return m.header.stamp.sec + m.header.stamp.nanosec * 1e-9
-
-
-def phases_of(bag):
-    out = {}
-    with open(bag.rstrip('/') + '_phases.txt') as f:
-        for line in f:
-            name, t = line.rsplit(' ', 1)
-            out[name] = float(t)
-    return out
 
 
 def truth_velocity(d):
@@ -65,7 +52,7 @@ def truth_velocity(d):
 
 
 def odom_series(msgs):
-    t = np.array([stamp(m) for _, m in msgs])
+    t = np.array([stamp_sec(m) for _, m in msgs])
     v = np.array([m.twist.twist.linear.x for _, m in msgs])
     w = np.array([m.twist.twist.angular.z for _, m in msgs])
     o = np.argsort(t)
@@ -93,16 +80,6 @@ def half_time(t, y, t_switch):
     return float(t0 + (mid - y0) * (t1 - t0) / (y1 - y0)) if y1 != y0 else float(t1)
 
 
-def style(ax, bands):
-    ax.set_facecolor(SURFACE)
-    for i, (_, a, b) in enumerate(bands):
-        ax.axvspan(a, b, color=BAND if i % 2 == 0 else '#f6f5f2', lw=0, zorder=0)
-    ax.grid(axis='y', color=GRID, lw=0.8)
-    ax.set_axisbelow(True)
-    for spine in ('top', 'right'):
-        ax.spines[spine].set_visible(False)
-
-
 def main():
     prefix, in_bag, delay = sys.argv[1], sys.argv[2], float(sys.argv[3])
     estimators = []
@@ -122,10 +99,7 @@ def main():
     bands = [('left turn', rel['left turn'], rel['right turn']),
              ('right turn', rel['right turn'], rel['forward']), ('forward', rel['forward'], rel['stop'])]
 
-    plt.rcParams.update({
-        'font.size': 10, 'axes.edgecolor': GRID, 'axes.labelcolor': INK2, 'xtick.color': INK2,
-        'ytick.color': INK2, 'text.color': INK, 'axes.titlecolor': INK, 'axes.titlesize': 10,
-        'axes.titleweight': 'bold', 'axes.titlelocation': 'left'})
+    setup()
     handles = [
         plt.Line2D([], [], color=C_TRUTH, lw=LW[0], label='truth (d/dt of /wheelchair/pose)'),
         plt.Line2D([], [], color=C_ODOM, lw=LW[1], label=f'odometry (/wheelchair/odom){scale_note}'),
@@ -152,7 +126,7 @@ def main():
     for col, (name, before, after) in enumerate(estimators):
         for row, (key, unit) in enumerate((('v', 'm/s'), ('omega', 'rad/s'))):
             ax = axes[row][col]
-            style(ax, bands)
+            style(ax, box=False, bands=bands)
             draw(ax, key, (before, after), lo, hi)
             ax.set_title(f'{name}: {key} [{unit}]')
             if row == 0:

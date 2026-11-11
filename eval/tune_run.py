@@ -27,7 +27,9 @@ from rosidl_runtime_py.utilities import get_message
 import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from gazebo_model import URDF_TFS  # noqa: E402
+from bag_io import phases_of  # noqa: E402
 from plot_spin import load_run  # noqa: E402
 from transition_eval import evaluate as transition_metrics  # noqa: E402
 from bag_paths import tune_dir  # noqa: E402
@@ -35,22 +37,8 @@ from bag_paths import tune_dir  # noqa: E402
 LEAD = 8.0
 TAIL = 4.0
 ENV_BASE = '/root/ros2_ws/install/localization_bringup/share/localization_bringup/param/env/gazebo.yaml'
-URDF_TFS = [
-    {'parent': 'base_footprint', 'child': 'base_link', 'xyz': [0.0, 0.0, 0.10], 'rpy': [0.0, 0.0, 0.0]},
-    {'parent': 'base_link', 'child': 'velodyne_base_link', 'xyz': [-0.17, 0.0, 1.0], 'rpy': [0.0, 0.0, 0.0]},
-    {'parent': 'velodyne_base_link', 'child': 'velodyne', 'xyz': [0.0, 0.0, 0.0377], 'rpy': [0.0, 0.0, 0.0]},
-]
 OUT_TOPICS = ['/clock', '/wheelchair/pose', '/ekf_pose', '/ndt_pose', '/localization_debug', '/ekf_odom']
 IN_TOPICS = ['/clock', '/velodyne_points', '/wheelchair/odom', '/wheelchair/joint_states', '/wheelchair/pose']
-
-
-def phases_of(bag):
-    out = {}
-    with open(bag.rstrip('/') + '_phases.txt') as f:
-        for line in f:
-            name, t = line.rsplit(' ', 1)
-            out[name] = float(t)
-    return out
 
 
 def play_window(bag, phases):
@@ -74,6 +62,11 @@ def play_window(bag, phases):
             end = t
             break
     return (start - first) * 1e-9, (end - start) * 1e-9
+
+
+def bag_duration(bag):
+    """録画の長さ [s]."""
+    return rosbag2_py.Info().read_metadata(bag, 'sqlite3').duration.nanoseconds / 1e9
 
 
 def stop(proc):
@@ -112,8 +105,46 @@ def metrics(bag, pose_topic='/ekf_pose'):
     }
 
 
-def replay(in_bag, name, params, extra=()):
-    """入力 bag を候補のパラメータで再生して推定器を動かし、出力の bag（入力と同じ側の tune/<name>）を返す."""
+def launch_and_play(name, env, in_bag, out_bag, record_topics, play, launch_args=(), tag='tune'):
+    """env（環境ファイルの内容）で自己位置推定を起動し、in_bag を再生して record_topics を out_bag に録る。ログのパスを返す.
+
+    ROS_DOMAIN_ID=99 で動かす（動いている推定・Gazebo・MATLAB とは混ざらない）。play() は地図の読み込みを待ったあとに呼ばれ、
+    (ros2 bag play の追加の引数, 再生にかかる時間 [s]) を返す。record_topics が空なら録らない。
+    環境ファイルの写しとログは /tmp/<tag>_env_<name>.yaml・/tmp/<tag>_<name>.log。
+    """
+    env_path = f'/tmp/{tag}_env_{name}.yaml'
+    with open(env_path, 'w') as f:
+        yaml.safe_dump(env, f)
+    penv = dict(os.environ, ROS_DOMAIN_ID='99')
+    log_path = f'/tmp/{tag}_{name}.log'
+    log = open(log_path, 'w')
+    launch = subprocess.Popen(
+        ['ros2', 'launch', 'localization_bringup', 'localization.launch.py', f'env:={env_path}',
+         'rviz:=false', *launch_args],
+        env=penv, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    record = None
+    if record_topics:
+        record = subprocess.Popen(['ros2', 'bag', 'record', '-o', out_bag, *record_topics],
+                                  env=penv, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    try:
+        time.sleep(10.0)   # 地図の読み込み
+        play_args, duration = play()
+        subprocess.run(['ros2', 'bag', 'play', in_bag, *play_args], env=penv, stdout=log, stderr=subprocess.STDOUT,
+                       timeout=duration + 30)
+        time.sleep(2.0)
+    finally:
+        stop(launch)
+        if record is not None:
+            stop(record)
+        log.close()
+    return log_path
+
+
+def replay(in_bag, name, params, extra=(), out_topics=OUT_TOPICS, whole_bag=False):
+    """Gazebo の録画 in_bag を候補のパラメータで再生して推定器を動かし、出力の bag（入力と同じ側の tune/<name>）を返す.
+
+    再生するのは最初の動作の LEAD 秒前から最後の動作の TAIL 秒後まで（whole_bag=True なら録画全体）。録るのは out_topics。
+    """
     params = dict(params)
     out_bag = os.path.join(tune_dir(in_bag), name)
     os.makedirs(tune_dir(in_bag), exist_ok=True)
@@ -133,33 +164,16 @@ def replay(in_bag, name, params, extra=()):
             env[key] = value
     for node, p in params.items():
         env['parameters'][node] = {**(env['parameters'].get(node) or {}), **p}   # env の節が空（None）でもよい
-    env_path = f'/tmp/tune_env_{name}.yaml'
-    with open(env_path, 'w') as f:
-        yaml.safe_dump(env, f)
 
-    penv = dict(os.environ, ROS_DOMAIN_ID='99')
-    log = open(f'/tmp/tune_{name}.log', 'w')
-    launch = subprocess.Popen(
-        ['ros2', 'launch', 'localization_bringup', 'localization.launch.py', f'env:={env_path}',
-         'rviz:=false', *extra],
-        env=penv, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
-    record = subprocess.Popen(['ros2', 'bag', 'record', '-o', out_bag, *OUT_TOPICS],
-                              env=penv, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
-    try:
-        time.sleep(10.0)   # 地図の読み込み
-        offset, duration = play_window(in_bag, phases)
-        subprocess.run(['ros2', 'bag', 'play', in_bag, '--start-offset', f'{offset:.3f}',
-                        '--topics', *IN_TOPICS], env=penv, stdout=log, stderr=subprocess.STDOUT,
-                       timeout=duration + 30)
-        time.sleep(2.0)
-    finally:
-        stop(launch)
-        stop(record)
-        log.close()
+    def play():
+        offset, duration = (0.0, bag_duration(in_bag)) if whole_bag else play_window(in_bag, phases)
+        return ['--start-offset', f'{offset:.3f}', '--topics', *IN_TOPICS], duration
+
+    log_path = launch_and_play(name, env, in_bag, out_bag, out_topics, play, launch_args=extra)
     # ノードが再生の途中で落ちた回は使わない（例：パラメータを読めずに起動しなかった）。止める合図（launch の
     # 'user interrupted'）より後に落ちたものは除く（止めるときの SIGINT や、終了時のまれなセグメンテーション違反）
     died = []
-    with open(f'/tmp/tune_{name}.log') as f:
+    with open(log_path) as f:
         for line in f:
             if 'user interrupted' in line:
                 break
@@ -167,7 +181,7 @@ def replay(in_bag, name, params, extra=()):
             if m:
                 died.append(f'{m.group(1)} (exit code {m.group(2)})')
     if died:
-        raise RuntimeError(f'process died during the replay: {", ".join(died)} (see /tmp/tune_{name}.log)')
+        raise RuntimeError(f'process died during the replay: {", ".join(died)} (see {log_path})')
     return out_bag
 
 

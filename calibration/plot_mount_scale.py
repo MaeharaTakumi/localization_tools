@@ -15,25 +15,10 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
-from plot_noise import box_on  # noqa: E402
-from plot_spin import (capitalize_labels, GRID, INK, INK2, SURFACE, TRUTH_COLOR,  # noqa: E402
-                       TRUTH_LW)
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from plot_style import capitalize_labels, INK, setup, style, SURFACE, TRUTH_COLOR, TRUTH_LW  # noqa: E402
 
 C_EST, C_SEG, C_TRUTH, C_OUT = '#2a78d6', '#1baf7a', '#eb6834', '#eda100'
-
-
-def style(ax):
-    ax.set_facecolor(SURFACE)
-    ax.grid(color=GRID, lw=0.8)
-    ax.set_axisbelow(True)
-    box_on(ax)   # 枠は 4 辺とも黒（box on）
-
-
-def setup():
-    plt.rcParams.update({'font.size': 10, 'axes.edgecolor': GRID, 'axes.labelcolor': INK2, 'xtick.color': INK2,
-                         'ytick.color': INK2, 'text.color': INK, 'axes.titlecolor': INK, 'axes.titlesize': 10,
-                         'axes.titleweight': 'bold', 'axes.titlelocation': 'left'})
 
 
 def plot_mount_scale(path, turns, sol, out, now):
@@ -41,7 +26,7 @@ def plot_mount_scale(path, turns, sol, out, now):
     fig, axes = plt.subplots(1, 3, figsize=(17, 5.6), facecolor=SURFACE, gridspec_kw={'width_ratios': [1.2, 1, 1]})
     # 左：回転の中心からの LiDAR の位置
     ax = axes[0]
-    style(ax)
+    style(ax, grid_axis='both')
     for j, (t, p, _) in enumerate(turns):
         c = sol[2 + 4 * j:4 + 4 * j]
         c1 = sol[4 + 4 * j:6 + 4 * j]
@@ -64,7 +49,7 @@ def plot_mount_scale(path, turns, sol, out, now):
     # 中・右：倍率（1 付近の比なので棒ではなく点で示す）
     for ax, key, rows, name, cur in ((axes[1], 'omega_scale', out['turning'], 'Angular velocity', out['current_scale'][1]),
                                      (axes[2], 'v_scale', out['straight'], 'Linear velocity', out['current_scale'][0])):
-        style(ax)
+        style(ax, grid_axis='both')
         ax.grid(axis='x', visible=False)
         if not rows:
             ax.set_title(f'{name} scale: no segment')
@@ -106,7 +91,7 @@ def plot_mount_yaw(path, yaw_series, out, now):
     """
     setup()
     fig, ax = plt.subplots(figsize=(11, 5.4), facecolor=SURFACE)
-    style(ax)
+    style(ax, grid_axis='both')
     final = out['mount_yaw']
     ax.axhline(now[5], color=TRUTH_COLOR, lw=TRUTH_LW, zorder=2,
                label=f'Current mount yaw (TF) {now[5]:+.5f} rad')

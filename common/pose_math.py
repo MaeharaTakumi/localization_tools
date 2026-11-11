@@ -1,10 +1,12 @@
-"""姿勢の計算（[x, y, z, roll, pitch, yaw] と 4x4 同次変換、ROS のメッセージとの変換）.
-
-localization_bringup の robot_localization_adapter.py にあったものを移した（2026-10-15、robot_localization を廃止したため）。
-"""
+"""姿勢の計算（[x, y, z, roll, pitch, yaw] と 4x4 同次変換、ROS のメッセージとの変換、角度の折り返し）."""
 import math
 
 import numpy as np
+
+
+def wrap(a):
+    """角度 [rad] を [-pi, pi) に折り返す（配列でもよい）."""
+    return (a + np.pi) % (2 * np.pi) - np.pi
 
 
 def rpy_to_matrix(roll, pitch, yaw):

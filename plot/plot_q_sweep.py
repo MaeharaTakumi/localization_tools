@@ -20,9 +20,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]
-from plot_noise import box_on  # noqa: E402
-from plot_spin import capitalize_labels, GRID, INK, INK2, SERIES, SURFACE, TRUTH_COLOR, widths_back_to_front  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]
+from plot_style import (box_on, capitalize_labels, GRID, INK,  # noqa: E402
+                        INK2, SERIES, SURFACE, TRUTH_COLOR, widths_back_to_front)
 
 AXES = [('z', 'Z [mm]'), ('roll', 'Roll [deg]'), ('pitch', 'Pitch [deg]'), ('yaw', 'Yaw [deg]'), ('xy', 'Horizontal [mm]')]
 I_VZ, I_W = 7, 8

@@ -7,39 +7,24 @@
 真値の LiDAR は URDF の取付 base_footprint -> velodyne = (-0.17, 0, 1.1377)、回転 0。
 """
 import math
+import os
 import sys
 
 import numpy as np
-from rclpy.serialization import deserialize_message
-import rosbag2_py
-from rosidl_runtime_py.utilities import get_message
 
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from bag_io import read_bag, stamp_sec  # noqa: E402
+from gazebo_model import URDF_MOUNT  # noqa: E402
 from pose_math import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix  # noqa: E402
 
-URDF_MOUNT = vec_to_matrix([-0.17, 0.0, 0.10 + 1.0 + 0.0377, 0.0, 0.0, 0.0])
 SKIP = 10.0  # 最初の出力から除く時間 [s]（NDT の収束待ち）
-
-
-def read(path):
-    reader = rosbag2_py.SequentialReader()
-    reader.open(rosbag2_py.StorageOptions(uri=path, storage_id='sqlite3'),
-                rosbag2_py.ConverterOptions('cdr', 'cdr'))
-    types = {t.name: t.type for t in reader.get_all_topics_and_types()}
-    out = {}
-    while reader.has_next():
-        topic, data, t = reader.read_next()
-        out.setdefault(topic, []).append((t * 1e-9, deserialize_message(data, get_message(types[topic]))))
-    return out
-
-
-def stamp(m):
-    return m.header.stamp.sec + m.header.stamp.nanosec * 1e-9
 
 
 def main():
     path = sys.argv[1]
     base_topic = sys.argv[2] if len(sys.argv) > 2 else '/ekf_odom'
-    d = read(path)
+    d = read_bag(path)
     clk = np.array([(t, m.clock.sec + m.clock.nanosec * 1e-9) for t, m in d['/clock']])
     truth_t = np.interp([t for t, _ in d['/wheelchair/pose']], clk[:, 0], clk[:, 1])
     truth_v = np.array([matrix_to_vec(pose_msg_to_matrix(m)) for _, m in d['/wheelchair/pose']])
@@ -79,9 +64,9 @@ def main():
             print(f'    xy mean: stopped {still[:, 0].mean():.3f} m (n={len(still)}), '
                   f'moving > 0.3 m/s {moving[:, 0].mean():.3f} m (n={len(moving)})')
 
-    ekf_pose = [(stamp(m), pose_msg_to_matrix(m.pose.pose)) for _, m in d.get('/ekf_pose', [])]
+    ekf_pose = [(stamp_sec(m), pose_msg_to_matrix(m.pose.pose)) for _, m in d.get('/ekf_pose', [])]
     evaluate('/ekf_pose (LiDAR) vs truth LiDAR (URDF mount)', ekf_pose, URDF_MOUNT)
-    base = [(stamp(m), pose_msg_to_matrix(m.pose.pose)) for _, m in d.get(base_topic, [])]
+    base = [(stamp_sec(m), pose_msg_to_matrix(m.pose.pose)) for _, m in d.get(base_topic, [])]
     evaluate(f'{base_topic} (base) vs truth base_footprint', base, np.eye(4))
     dist = np.sum(np.linalg.norm(np.diff(truth_v[:, :2], axis=0), axis=1))
     print(f'truth: {truth_t[-1] - truth_t[0]:.1f} s, path length {dist:.1f} m')

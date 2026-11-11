@@ -6,7 +6,8 @@
 
 横軸は「左回転」の開始からの sim time [s]（<bag>_phases.txt）。
 真値の LiDAR は /wheelchair/pose（base_footprint、header なし。bag の受信時刻を /clock で sim time に直す）に
-URDF の取付 base_footprint -> velodyne = (-0.17, 0, 1.1377)、回転 0 を掛けたもの。
+URDF の取付 base_footprint -> velodyne = (-0.17, 0, 1.1377)、回転 0（common/gazebo_model.py）を掛けたもの。
+bag の読み込み・図の書式などの共通部品は common/（bag_io.py・plot_style.py・pose_math.py・gazebo_model.py）。
 angle_diff は /localization_debug の data[4]（header なし。同じく受信時刻から sim time に直す）。
 """
 import math
@@ -17,72 +18,14 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
-from rclpy.serialization import deserialize_message  # noqa: E402
-import rosbag2_py  # noqa: E402
-from rosidl_runtime_py.utilities import get_message  # noqa: E402
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'eval'))   # pose_math
-from pose_math import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix  # noqa: E402
-
-URDF_MOUNT = vec_to_matrix([-0.17, 0.0, 0.10 + 1.0 + 0.0377, 0.0, 0.0, 0.0])
-# dataviz 参照パレット（categorical slot 1〜3）と面・文字色
-SERIES = os.environ.get('PLOT_COLORS', '#2a78d6,#eb6834,#1baf7a,#eda100').split(',')  # 系列の色は環境変数で固定できる
-SURFACE, INK, INK2, GRID, BAND = '#fcfcfb', '#0b0b0b', '#52514e', '#e4e3df', '#f0efec'
-# 線の描き方：後方（先に描く）の線ほど太く、点線・破線は使わない。真値は一番後ろの太い薄灰色の実線
-TRUTH_COLOR, TRUTH_LW = '#a3a29c', 3.6
-
-
-def capitalize_labels(fig):
-    """図の題・軸ラベル・凡例・注記の頭文字を大文字にする（ユーザー指示。savefig の直前に呼ぶ）.
-
-    先頭の語が識別子（ekf_localizer、/wheelchair/odom、angle_diff など _ か / を含む語）ならそのままにする。
-    """
-    def fix(text):
-        s = text.get_text()
-        if not s or not s[0].islower():
-            return
-        first = s.split()[0]
-        if '_' in first or '/' in first:
-            return
-        text.set_text(s[0].upper() + s[1:])
-
-    texts = list(fig.texts)
-    if fig._suptitle is not None:
-        texts.append(fig._suptitle)
-    for leg in fig.legends:
-        texts += leg.get_texts()
-    for ax in fig.axes:
-        texts += [ax.title, ax._left_title, ax._right_title, ax.xaxis.label, ax.yaxis.label, *ax.texts]
-        if ax.get_legend() is not None:
-            texts += ax.get_legend().get_texts()
-    for text in texts:
-        fix(text)
-
-
-def widths_back_to_front(n, widest=2.6, thinnest=1.1):
-    """n 本の線を描く順（後方→手前）の線幅。後方ほど太い."""
-    if n <= 1:
-        return [1.6] * n
-    return [float(w) for w in np.linspace(widest, thinnest, n)]
-
-
-def read_bag(path, topics=None):
-    """bag を {トピック: [(受信時刻 [s], メッセージ)]} で読む。topics を渡すとそのトピックだけ（点群を読まずに速い）."""
-    reader = rosbag2_py.SequentialReader()
-    reader.open(rosbag2_py.StorageOptions(uri=path, storage_id='sqlite3'),
-                rosbag2_py.ConverterOptions('cdr', 'cdr'))
-    if topics:
-        reader.set_filter(rosbag2_py.StorageFilter(topics=list(topics)))
-    types = {t.name: t.type for t in reader.get_all_topics_and_types()}
-    out = {}
-    while reader.has_next():
-        topic, data, t = reader.read_next()
-        out.setdefault(topic, []).append((t * 1e-9, deserialize_message(data, get_message(types[topic]))))
-    return out
-
-
-def wrap(a):
-    return (a + np.pi) % (2 * np.pi) - np.pi
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from bag_io import phases_of, read_bag  # noqa: E402
+from gazebo_model import URDF_MOUNT  # noqa: E402
+from plot_style import capitalize_labels, INK, INK2, SERIES, setup, style, SURFACE, widths_back_to_front  # noqa: E402
+from plot_style import BAND, BAND_ALT  # noqa: E402
+from pose_math import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix, wrap  # noqa: E402
 
 
 def load_run(path, pose_topic='/ekf_pose'):
@@ -113,11 +56,7 @@ def load_run(path, pose_topic='/ekf_pose'):
     ang_t = to_sim([t for t, _ in dbg])
     ang = np.array([m.data[4] for _, m in dbg])
 
-    phases = {}
-    with open(path.rstrip('/') + '_phases.txt') as f:
-        for line in f:
-            name, t = line.rsplit(' ', 1)
-            phases[name] = float(t)
+    phases = phases_of(path)
     t0 = phases['left turn']
     rel = {k: v - t0 for k, v in phases.items()}
     # 真値の動き（指令どおり動いたか）
@@ -151,12 +90,10 @@ def summarize(label, r):
     print(f'  NDT angle_diff (n={len(a)}): mean {a.mean():.2f} / max {a.max():.2f} deg')
 
 
-def plot(out, runs):
-    plt.rcParams.update({
-        'font.size': 10, 'axes.edgecolor': GRID, 'axes.labelcolor': INK2, 'xtick.color': INK2,
-        'ytick.color': INK2, 'text.color': INK, 'axes.titlecolor': INK, 'axes.titlesize': 10,
-        'axes.titleweight': 'bold', 'axes.titlelocation': 'left',
-    })
+def plot(out, runs, colors=None):
+    """runs（[(ラベル, load_run の結果)]）の誤差と angle_diff の時間推移を描く。colors を渡すと系列の色をそれにする."""
+    colors = colors or SERIES
+    setup()
     fig, all_axes = plt.subplots(5, 1, figsize=(10, 11), sharex=True, facecolor=SURFACE,
                                  gridspec_kw={'height_ratios': [0.22, 1, 1, 1, 1]})
     strip, axes = all_axes[0], all_axes[1:]
@@ -172,14 +109,8 @@ def plot(out, runs):
              ('Right turn  -1 rad/s', ph['right turn'], ph['forward']),
              ('Forward 1.5 m/s', ph['forward'], ph['stop'])]
     for ax, (title, get) in zip(axes, panels):
-        ax.set_facecolor(SURFACE)
-        for i, (_, a, b) in enumerate(bands):
-            ax.axvspan(a, b, color=BAND if i % 2 == 0 else '#f6f5f2', lw=0, zorder=0)
-        ax.grid(axis='y', color=GRID, lw=0.8)
-        ax.set_axisbelow(True)
-        for spine in ('top', 'right'):
-            ax.spines[spine].set_visible(False)
-        for i, ((label, r), color, lw) in enumerate(zip(runs, SERIES, widths_back_to_front(len(runs)))):
+        style(ax, box=False, bands=bands)
+        for i, ((label, r), color, lw) in enumerate(zip(runs, colors, widths_back_to_front(len(runs)))):
             x, y = get(r)
             m = (x >= -3.0) & (x <= t_end)
             ax.plot(x[m], y[m], color=color, lw=lw, label=label, zorder=3 + i)
@@ -193,7 +124,7 @@ def plot(out, runs):
         spine.set_visible(False)
     strip.tick_params(axis='x', length=0)
     for i, (name, a, b) in enumerate(bands):
-        strip.axvspan(a, b, color=BAND if i % 2 == 0 else '#f6f5f2', lw=0)
+        strip.axvspan(a, b, color=BAND if i % 2 == 0 else BAND_ALT, lw=0)
         strip.text((a + b) / 2, 0.5, name, ha='center', va='center', fontsize=9, color=INK2,
                    transform=strip.get_xaxis_transform())
     strip.text(-2.9, 0.5, 'Command', ha='left', va='center', fontsize=9, color=INK2,

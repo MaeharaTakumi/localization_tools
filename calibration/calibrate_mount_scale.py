@@ -34,11 +34,11 @@ import sys
 import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
-from calibrate_noise import classify, command_segments, mount_from_tf_static, stamp  # noqa: E402
-import params  # noqa: E402
-from plot_spin import read_bag  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from bag_io import mount_from_tf_static, read_bag, stamp_sec  # noqa: E402
+from calibrate_noise import classify, command_segments  # noqa: E402
 from pose_math import matrix_to_vec, pose_msg_to_matrix  # noqa: E402
+import params  # noqa: E402
 
 
 def rot(a):
@@ -57,9 +57,9 @@ def load(bag, args):
     else:
         def to_sim(ts):
             return np.asarray(ts, float)
-    od = sorted((stamp(m), m.twist.twist.linear.x, m.twist.twist.angular.z) for _, m in d[args.odom])
+    od = sorted((stamp_sec(m), m.twist.twist.linear.x, m.twist.twist.angular.z) for _, m in d[args.odom])
     ot, ov, ow = (np.array(x) for x in zip(*od))
-    nd = sorted(((stamp(m), matrix_to_vec(pose_msg_to_matrix(m.pose.pose))) for _, m in d[args.ndt]), key=lambda x: x[0])
+    nd = sorted(((stamp_sec(m), matrix_to_vec(pose_msg_to_matrix(m.pose.pose))) for _, m in d[args.ndt]), key=lambda x: x[0])
     nt = np.array([t for t, _ in nd])
     nv = np.array([v for _, v in nd])
     nv[:, 5] = np.unwrap(nv[:, 5])
@@ -232,7 +232,7 @@ def main():
     args = ap.parse_args()
 
     runs = [load(b, args) for b in args.bags]
-    mount_now = mount_from_tf_static(runs[0]['d'], args.base, args.lidar)
+    mount_now = mount_from_tf_static(runs[0]['d'].get('/tf_static', []), args.base, args.lidar)
     cur_v, cur_w = (float(x) for x in args.current_scale.split(','))
 
     turns, w_rows, v_rows, yaw_rows, stops = [], [], [], [], []

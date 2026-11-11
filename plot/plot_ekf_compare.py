@@ -30,9 +30,11 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
 import plot_spin  # noqa: E402
-from plot_spin import capitalize_labels, GRID, INK, INK2, load_run, read_bag, SURFACE, TRUTH_COLOR, TRUTH_LW  # noqa: E402
+from bag_io import read_bag  # noqa: E402
+from plot_spin import load_run  # noqa: E402
+from plot_style import capitalize_labels, INK, INK2, setup, style, SURFACE, TRUTH_COLOR, TRUTH_LW, widths_back_to_front  # noqa: E402
 from plot_velocity import odom_series, truth_velocity  # noqa: E402
 
 TUNE = '/root/ros2_ws/bags/gazebo/tune'
@@ -55,21 +57,6 @@ TRANSITIONS = [('Rotation start (0 -> +1 rad/s)', 'left turn'), ('Reverse (+1 ->
                ('Rotation -> forward', 'forward'), ('Stop (1.5 -> 0 m/s)', 'stop')]
 
 
-def setup():
-    plt.rcParams.update({
-        'font.size': 10, 'axes.edgecolor': GRID, 'axes.labelcolor': INK2, 'xtick.color': INK2,
-        'ytick.color': INK2, 'text.color': INK, 'axes.titlecolor': INK, 'axes.titlesize': 10,
-        'axes.titleweight': 'bold', 'axes.titlelocation': 'left'})
-
-
-def style(ax):
-    ax.set_facecolor(SURFACE)
-    ax.grid(axis='y', color=GRID, lw=0.8)
-    ax.set_axisbelow(True)
-    for spine in ('top', 'right'):
-        ax.spines[spine].set_visible(False)
-
-
 def configure(path):
     """条件の JSON で BEFORE・AFTER・CONDITIONS などを置き換える."""
     global BEFORE, AFTER, CONDITIONS, TITLE, RUNS
@@ -82,16 +69,15 @@ def configure(path):
 
 
 def fig_timeseries(prefix):
-    plot_spin.SERIES = [BEFORE[2], AFTER[2]]
     runs = [(label, load_run(os.path.join(TUNE, name))) for label, name, _ in (BEFORE, AFTER)]
-    plot_spin.plot(f'{prefix}_timeseries.png', runs)
+    plot_spin.plot(f'{prefix}_timeseries.png', runs, colors=[BEFORE[2], AFTER[2]])
     plt.close('all')
     print(f'saved {prefix}_timeseries.png')
 
 
 def fig_transitions(prefix):
     fig, axes = plt.subplots(2, 4, figsize=(16, 7), facecolor=SURFACE)
-    widths = plot_spin.widths_back_to_front(2)
+    widths = widths_back_to_front(2)
     for k, (label, name, color) in enumerate((BEFORE, AFTER)):
         path = os.path.join(TUNE, name)
         r = load_run(path)   # r['t'] と r['phases'] は左回転の開始（t0）からの時刻
@@ -115,7 +101,7 @@ def fig_transitions(prefix):
     for c, (title, _) in enumerate(TRANSITIONS):
         for r_ in range(2):
             ax = axes[r_][c]
-            style(ax)
+            style(ax, box=False)
             ax.axvline(0, color=INK2, lw=0.8, zorder=1)
             ax.set_xlim(-0.3, 1.2)
         axes[0][c].axhline(0, color=INK2, lw=0.8, zorder=1)
@@ -138,7 +124,7 @@ def fig_transitions(prefix):
 def fig_summary(prefix, results):
     fig, axes = plt.subplots(2, 3, figsize=(15, 7.6), facecolor=SURFACE)
     for ax, (key, title) in zip(axes.flat, METRICS):
-        style(ax)
+        style(ax, box=False)
         bars = []
         for i, (pre, _, color) in enumerate(CONDITIONS):
             vals = [r[key] for name, r in results.items() if re.match(pre, name)]   # 接頭辞か正規表現

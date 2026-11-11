@@ -8,9 +8,9 @@ import os
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
-from plot_spin import read_bag  # noqa: E402
-from plot_velocity import half_time, odom_series, phases_of, truth_velocity  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from bag_io import phases_of, read_bag  # noqa: E402
+from plot_velocity import half_time, odom_series, truth_velocity  # noqa: E402
 
 
 def main():

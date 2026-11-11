@@ -17,12 +17,13 @@ import sys
 import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
-from plot_spin import read_bag  # noqa: E402
-from plot_velocity import half_time, odom_series, phases_of, truth_velocity  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from gazebo_model import WHEEL_RADIUS, WHEEL_SEPARATION  # noqa: E402
+from bag_io import phases_of, read_bag  # noqa: E402
+from plot_velocity import half_time, odom_series, truth_velocity  # noqa: E402
 
 # B は diff_drive_controller が使う車輪間隔（wheel_separation × wheel_separation_multiplier）。環境変数 WHEEL_SEP で変える
-R, B, WINDOW = 0.1325, float(os.environ.get('WHEEL_SEP', '0.492')), 10
+R, B, WINDOW = WHEEL_RADIUS, float(os.environ.get('WHEEL_SEP', str(WHEEL_SEPARATION))), 10
 
 
 def wheel_angles(d, child):

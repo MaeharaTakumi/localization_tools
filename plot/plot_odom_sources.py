@@ -18,9 +18,10 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('plot', 'eval', 'calibration')]   # plot_spin などを import する
-from plot_spin import capitalize_labels, GRID, INK, INK2, read_bag, SURFACE, TRUTH_COLOR, TRUTH_LW  # noqa: E402
-from plot_velocity import odom_series, phases_of, truth_velocity  # noqa: E402
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from bag_io import phases_of, read_bag  # noqa: E402
+from plot_style import capitalize_labels, INK, INK2, setup, style, SURFACE, TRUTH_COLOR, TRUTH_LW  # noqa: E402
+from plot_velocity import odom_series, truth_velocity  # noqa: E402
 
 TRANSITIONS = [('start', 'left turn'), ('reverse', 'right turn'), ('to forward', 'forward'), ('stop', 'stop')]
 # 描く順（後方→手前）：真値・平均・0.09 s 戻したもの・車輪の角速度。後方ほど太く、点線は使わない
@@ -39,21 +40,6 @@ METRICS = [('start_max', 'yaw error peak: rotation start [deg]'),
            ('ang_mean', 'NDT angle_diff, mean [deg]')]
 
 
-def setup():
-    plt.rcParams.update({
-        'font.size': 10, 'axes.edgecolor': GRID, 'axes.labelcolor': INK2, 'xtick.color': INK2,
-        'ytick.color': INK2, 'text.color': INK, 'axes.titlecolor': INK, 'axes.titlesize': 10,
-        'axes.titleweight': 'bold', 'axes.titlelocation': 'left'})
-
-
-def style(ax):
-    ax.set_facecolor(SURFACE)
-    ax.grid(axis='y', color=GRID, lw=0.8)
-    ax.set_axisbelow(True)
-    for spine in ('top', 'right'):
-        ax.spines[spine].set_visible(False)
-
-
 def fig_zoom(prefix, bag):
     d = read_bag(bag)
     ph = phases_of(bag)
@@ -65,7 +51,7 @@ def fig_zoom(prefix, bag):
     for r, (key, unit) in enumerate((('omega', 'rad/s'), ('v', 'm/s'))):
         for c, (tname, pkey) in enumerate(TRANSITIONS):
             ax = axes[r][c]
-            style(ax)
+            style(ax, box=False)
             ts = ph[pkey]
             lo, hi = ts - 0.4, ts + 0.8
             m = (tt >= lo) & (tt <= hi)
@@ -93,7 +79,7 @@ def fig_zoom(prefix, bag):
 def fig_summary(prefix, results):
     fig, axes = plt.subplots(2, 3, figsize=(15, 7.6), facecolor=SURFACE)
     for ax, (key, title) in zip(axes.flat, METRICS):
-        style(ax)
+        style(ax, box=False)
         bars = []
         for i, (pre, label, color) in enumerate(CONDITIONS):
             # 接頭辞のあとが回数（_1 など）だけの試行（hv_ekf_accv_1 などの候補は除く）
