@@ -36,9 +36,10 @@ python3 eval/bag_info.py write <bag> --source gazebo|real --drive '...' --purpos
 
 | フォルダ | 内容 |
 |---|---|
+| `common/` | **共通部品**（2026-11-11 にまとめた。各スクリプトは `common`・`plot`・`eval`・`calibration` を `sys.path` に入れて import する）：`bag_io.py`（bag の読み込み `read_bag`・`open_reader`、動作の開始時刻 `phases_of`、stamp の変換 `stamp_sec`・`stamp_ns`、`/tf_static` からの取付 `mount_from_tf_static`）、`pose_math.py`（姿勢と 4x4 行列の変換、角度の折り返し `wrap`）、`plot_style.py`（色・線幅・`setup`・`style`・`box_on`・`capitalize_labels`・`widths_back_to_front`）、`gazebo_model.py`（Gazebo の車椅子の定数：車輪の半径と間隔、オドメトリの倍率、URDF の取付） |
 | `calibration/` | **パラメータ推定（プログラムとパラメータ）**：`run_calibration.sh`（推定用の動きで走って、続けて推定する）、`motion.py`（推定用の動き）、`calibrate.py`（録画から R・倍率・取付をまとめて推定）、`calibrate_noise.py`（観測ノイズ R、真値なし）、`calibrate_ndt_noise.py`（NDT の R を「真値 + ノイズ」の初期値で計算し直して求める。Gazebo）、`calibrate_mount_scale.py`（LiDAR の取付位置とオドメトリの倍率、真値なし）、図は `plot_noise.py`・`plot_mount_scale.py`。設定は `param/motion.yaml`（推定用の動き）と `param/calibrate.yaml`（推定。各プログラムのオプションの既定値） |
-| `eval/` | 録画の再生・評価・パラメータの調整（`tune_run.py`、`tune_batch.py`、`summarize.py`、`transition_eval.py`、`make_window_bag.py`）。候補は `batches/`、結果は `results/` |
-| `plot/` | 図（`plot_*.py`、`check_*.py`）。`plot_spin.py` は bag の読み込みや図の共通部品も持つ。`rerender_results.sh` で `Docker/localization/results` の図を全部描き直す（NDT の R の図は計算に約 9 分かかるので `FULL=1` のときだけ） |
+| `eval/` | 録画の再生・評価・パラメータの調整（`tune_run.py`、`tune_batch.py`、`summarize.py`、`transition_eval.py`、`make_window_bag.py`）。候補は `batches/`、結果は `results/`。起動・録画・再生・停止の流れは `tune_run.launch_and_play` の 1 つ（Gazebo の `tune_run.replay` も、実機の `replay_outputs.replay_real` もこれを使う） |
+| `plot/` | 図（`plot_*.py`、`check_*.py`）。bag の読み込みや図の書式は `common/`。`rerender_results.sh` で `Docker/localization/results` の図を全部描き直す（NDT の R の図は計算に約 9 分かかるので `FULL=1` のときだけ。環境変数 `OUT` で出力先、`T0` でツールの場所を変えられるので、ツールを直したときは別の場所に描いて前の図とファイルごとに比べる） |
 | `record_rviz.sh` | **RViz の画面の録画（ホストで実行）**。下の「RViz の画面の録画」 |
 | `drive/` | **テスト走行と録画（Gazebo・実機共通）**：`run_test.sh`（ホストかコンテナの中で実行）、`drive_test.py`（走らせる）、`profiles.yaml`（動き）、`config/gazebo.yaml`・`config/red.yaml`・`blue.yaml`・`white.yaml`（実機の車椅子ごと。速さの上限・トピック・録画するトピック）、`config/real_in_gazebo.yaml`（実機の設定を Gazebo で試す）、`config/gazebo_ground.yaml` と `profiles_velocity.yaml`（Gazebo の地面でオドメトリと真値の速度を比べる） |
 
@@ -318,4 +319,4 @@ python3 drive/drive_test.py <gazebo|red|blue|white> <動き> --simulate    # 計
 ## 図
 
 描いた図は `Docker/localization/results/`、作業の記録は `Docker/localization/dev_log.md`（図を埋め込む）。図のルール：後方の線ほど太く、
-点線は使わない、真値は一番後ろの太い灰色、題・軸ラベル・凡例の頭文字は大文字（保存前に `plot_spin.capitalize_labels`）。
+点線は使わない、真値は一番後ろの太い灰色、題・軸ラベル・凡例の頭文字は大文字（保存前に `plot_style.capitalize_labels`。色・枠・書式は `common/plot_style.py`）。
