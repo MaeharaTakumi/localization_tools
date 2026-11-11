@@ -58,7 +58,7 @@ python3 calibration/calibrate_noise.py /root/ros2_ws/bags/gazebo/<録画> --out 
       直接測った omega の残差（直進・旋回・動いている区間）も表とヒストグラムに並べる（旋回中は滑りなど車輪の速度以外のばらつきも入る）。
   - NDT：LiDAR の姿勢を取付（`/tf_static`）で車体に直して当てはめ、LiDAR に戻した値との差（map 座標）→ `R_ndt`
 - `R_ndt` は動いている区間（旋回・直進）の分散。どれも残差の時間的なつながり（積分相関時間）を掛ける（`--no-correlation` で掛けない）。
-  env の `parameters` に貼れる yaml を出す。
+  localization_bringup の `param/<env>/ekf_localizer.yaml` に貼れる yaml を出す。
 - 図：`_segments.png`（区間と残差）、`_summary.png`（標準偏差の比較）、`_hist.png`（**残差のヒストグラムと正規分布**。v は直進、
   omega は直進と旋回、NDT は動いている区間。尖度と ±4.5 σ の外の点の数も書く）。
   - 縦軸は相対度数（Relative frequency。全体を 1 とした棒ごとの割合。範囲 ±4.5 σ を 45 本に分ける）。NDT の 6 つは縦軸の範囲をそろえる。
@@ -103,11 +103,11 @@ python3 calibration/calibrate.py <gazebo|red|blue|white> <bag>    # 録画から
   （bag 名を省くと `<target>_calibration_<年月日_時分秒>`）。途中で止めたら推定しない。
 - 推定は `calibrate.py`：`calibrate_noise.py`（R_odom・R_ndt とも走行中の残差から）、`calibrate_mount_scale.py`（倍率・取付）を、
   target に合わせたトピック・フレーム・倍率・車輪の間隔で動かす（指令は `drive/config/<target>.yaml`、
-  オドメトリ・フレーム・`odom_scale` は localization_bringup の `param/env/<target>.yaml`、車輪の間隔は Gazebo が `param/calibrate.yaml` の
+  フレーム・`odom_scale` は localization_bringup の `param/<target>/ekf_localizer.yaml`（オドメトリは `/wheelchair/odom`）、車輪の間隔は Gazebo が `param/calibrate.yaml` の
   `noise.gazebo_tread`、実機が whill_odometry の `tread_width`）。Gazebo は真値との比較（`--truth`）も出す。
 - 推定の設定（区間の取り方・窓・直進の安定の判定など）は `param/calibrate.yaml`（各プログラムのオプションの既定値。オプションで上書きできる）。
 - 推定にかかる時間は数秒（252 s の録画で 8 s）。
-- 結果は 1 回ごとに `/root/ros2_ws/fig/calibration/<bag 名>/`：`summary.yaml`（env に入れる候補 `candidate` と今の値。**env の yaml には書き込まない**）、
+- 結果は 1 回ごとに `/root/ros2_ws/fig/calibration/<bag 名>/`：`summary.yaml`（`param/<target>/ekf_localizer.yaml` に入れる候補 `candidate` と今の値。**yaml には書き込まない**）、
   `noise.*`（`noise_hist.png` など）、`mount_scale.*`・`mount_scale_yaw.png`。
 - NDT の R を「真値 + ノイズ」の初期値で求める `calibrate_ndt_noise.py`（Gazebo）は、2026-10-15 にユーザー指示で `calibrate.py` から外した（単独では使える）。
 
@@ -130,7 +130,7 @@ python3 calibration/calibrate_mount_scale.py /root/ros2_ws/bags/gazebo/<録画> 
   - 図 `<出力>_yaw.png`（`mount_scale_yaw.png`）に各時刻の値（インライア・外れ値）と最終値を描く。
   - 区間全体の円弧の当てはめ、始点と終点を結ぶ方法、Censi ほか（IEEE T-RO 2013）の同時推定とも比べ、2026-10-16 にこの方法に決めた（`dev_log.md` の 49〜52）。
 - 取付の roll・pitch（床が水平と仮定）、z（`--map` の地図の床の高さとの差。参考）
-- 取付の roll・pitch・yaw は、端末の表示・`summary.yaml`・図 `mount_scale_yaw.png` とも **rad**（env の `static_tfs` の `rpy` と同じ単位。
+- 取付の roll・pitch・yaw は、端末の表示・`summary.yaml`・図 `mount_scale_yaw.png` とも **rad**（`param/<色>/env.yaml` の `static_tfs` の `rpy` と同じ単位。
   2026-11-07、ユーザー指示。それまで表示と図は deg）。RANSAC のしきい値 `ransac_threshold_deg` は deg のまま。
 
 ## 録画を再生して評価・調整する（`eval/`）
@@ -142,6 +142,10 @@ SCORE_KEYS=trans_max_mean,steady_mean,ang_mean,xy_mean python3 eval/summarize.py
 ```
 
 `ROS_DOMAIN_ID=99` で再生するので Gazebo・MATLAB とは混ざらない。指標（`tune_run.py` の出力）は真値を使う（Gazebo だけ）。
+環境は localization_bringup の `param/gazebo/` を `/tmp/tune_env_<試行名>/` に写して使う（`common/env_files.py`）。parameters の JSON は
+`{"ekf_localizer": {"Q": [...]}, "pcl_localization": {...}}` のように `{ノード名: {パラメータ: 値}}` で、写した `<ノード名>.yaml` に上書きする。
+`"__env__"` の中身は `env.yaml` を上書きする。ノードは `ekf_localizer`・`pcl_localization`・`whill_odometry` だけ（2026-11-11 から。
+それより前の候補にある `odom_relay`・`odom_covariance` はエラーで止まる。倍率 `odom_scale` は `ekf_localizer` に書く）。
 録画は `bags/gazebo/` からのパスで渡す（名前だけでは `_phases.txt` が見つからない）。
 
 ekf_localizer の `Q`・`P_init` は 11 要素（2026-11-05 から。`[x, y, z, roll, pitch, yaw, v_xy, v_z, omega_roll, omega_pitch, omega_yaw]`）。
@@ -214,7 +218,7 @@ python3 plot/plot_runs.py /root/ros2_ws/fig/qvel/qvel_gazebo_check.png eval/resu
 ```
 
 実機 blue の `blue_calibration_20261016_133648`・`134316` はラズパイの時計がずれていて（受信時刻 − stamp が点群 60134 s、オドメトリ 60136 s）、
-`stamp_mode: stamp` では再生できない（NDT が点群の stamp の TF を引けない）。`141128` 以降はずれていない。
+時刻を `stamp` にしたままでは再生できない（NDT が点群の stamp の TF を引けない。NDT の `stamp_mode` と EKF の `odom_stamp_mode` を `receipt` にする）。`141128` 以降はずれていない。
 
 MATLAB（`MaeharaTakumi/whill_common_matlab` の `cr_debug` ブランチの CR_debug）が点群と `/tf` を受け取って姿勢を引けるかは、`replay_outputs.py` で
 再生している間に、ホストで MATLAB を `-batch` で動かして確かめる（`ROS_DOMAIN_ID=99`、Fast DDS の localhost のプロファイル。`dev_log.md` の 62）：

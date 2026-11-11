@@ -50,13 +50,11 @@ import yaml
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
 from bag_io import mount_from_tf_static, read_bag  # noqa: E402
+from env_files import node_params  # noqa: E402
 from calibrate_noise import NDT_KEYS  # noqa: E402
 from pose_math import matrix_to_vec, pose_msg_to_matrix, vec_to_matrix, wrap  # noqa: E402
 import params  # noqa: E402
 
-SHARE = '/root/ros2_ws/install'
-NDT_PARAM = f'{SHARE}/pcl_localization_ros2/share/pcl_localization_ros2/param/localization.yaml'
-ENV = f'{SHARE}/localization_bringup/share/localization_bringup/param/env/gazebo.yaml'
 
 
 def matrix_to_quat(r):
@@ -269,9 +267,8 @@ def main():
     bag_start = rosbag2_py.Info().read_metadata(args.bag, 'sqlite3').starting_time.nanoseconds * 1e-9
     offsets = [max(0.0, float(np.interp(s[1] - args.lead, clk[:, 1], clk[:, 0])) - bag_start) for s in stops]
 
-    # NDT のパラメータ：パッケージの値 -> gazebo.yaml の pcl_localization -> この試験用（launch の ndt_params と同じ）
-    env = yaml.safe_load(open(ENV))
-    over = dict(env['parameters'].get('pcl_localization', {}))
+    # NDT のパラメータ：コードの既定値 -> localization_bringup の param/gazebo/pcl_localization.yaml -> この試験用（launch と同じ）
+    over = node_params('gazebo', 'pcl_localization')
     over.update({'base_frame_id': args.base, 'stamp_mode': 'stamp',
                  'publish_tf': False, 'use_tf_init_guess': True, 'tf_init_guess_timeout': 0.2,
                  'use_sim_time': True})
@@ -290,8 +287,7 @@ def main():
         node.rng = np.random.default_rng(p)
         ndt = subprocess.Popen(
             ['ros2', 'run', 'pcl_localization_ros2', 'pcl_localization_node', '--ros-args',
-             '-r', '__node:=pcl_localization', '--params-file', NDT_PARAM, '--params-file', param_path,
-             '-r', 'velodyne_points:=/velodyne_points', '-r', 'pcl_pose:=/current_pose'],
+             '-r', '__node:=pcl_localization', '--params-file', param_path],
             stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         try:
             change_state(node, Transition.TRANSITION_CONFIGURE)   # 地図の読み込み

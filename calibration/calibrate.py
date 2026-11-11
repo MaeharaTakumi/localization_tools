@@ -6,13 +6,14 @@
 推定の設定（区間の取り方・窓など）は calibration/param/calibrate.yaml（各プログラムの既定値）。
 target ごとの値は設定から読む（calibrate_noise.py・calibrate_mount_scale.py の既定は Gazebo 用なので、ここで渡す）：
   - 指令のトピック：drive/config/<target>.yaml の command.topic
-  - オドメトリのトピック・基準と LiDAR のフレーム・今の倍率 odom_scale：localization_bringup の param/env/<target>.yaml
-  - 車輪の間隔（R_omega の計算）：Gazebo は calibrate.yaml の noise.gazebo_tread、実機は whill_odometry の param/odometry.yaml の
-    tread_width（env の parameters.whill_odometry にあればそちら）
+  - オドメトリのトピック：/wheelchair/odom（localization_bringup の launch が ekf_localizer の odom をここにつなぐ）
+  - 基準と LiDAR のフレーム・今の倍率 odom_scale：localization_bringup の param/<target>/ekf_localizer.yaml
+  - 車輪の間隔（R_omega の計算）：Gazebo は calibrate.yaml の noise.gazebo_tread、実機は param/<target>/whill_odometry.yaml の tread_width
+  書いていない項目はコードの既定値（odom_scale [1, 1]、base_link、velodyne、tread_width 0.495）
 R は R_odom・R_ndt とも走行中の残差（前後 window/2 秒の滑らかな動きからのばらつき）から求める（calibrate_noise.py）。
 NDT の R を「真値 + ノイズ」の初期値で求める calibrate_ndt_noise.py（Gazebo だけ）は 2026-10-15 にユーザー指示でここから外した（単独では使える）。
 出力（既定 /root/ros2_ws/fig/calibration/<bag 名>/）：noise.*（calibrate_noise.py）、mount_scale.*・mount_scale_yaw.png
-（calibrate_mount_scale.py）、summary.yaml（env に入れる候補と今の値。env の yaml には書き込まない）。
+（calibrate_mount_scale.py）、summary.yaml（param/<target>/ekf_localizer.yaml などに入れる候補と今の値。yaml には書き込まない）。
 Gazebo は --truth で真値との比較も出す。
 """
 import argparse
@@ -24,14 +25,12 @@ import sys
 import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, 'drive'), os.path.join(ROOT, 'calibration')]
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'drive', 'calibration')]
 from drive_test import load_config  # noqa: E402
+from env_files import env_dir, node_params  # noqa: E402
 import params  # noqa: E402
 
-
-def share(pkg):
-    from ament_index_python.packages import get_package_share_directory
-    return get_package_share_directory(pkg)
+ODOM_TOPIC = '/wheelchair/odom'   # localization_bringup の launch が ekf_localizer の odom をここにつなぐ
 
 
 def main():
@@ -48,24 +47,18 @@ def main():
 
     cfg = load_config(args.target)
     settings = params.settings()
-    env_path = os.path.join(share('localization_bringup'), 'param', 'env', f'{args.target}.yaml')
-    env = yaml.safe_load(open(env_path))
-    env_params = env.get('parameters') or {}
-    scale = (env_params.get('odom_relay') or {}).get('odom_scale', [1.0, 1.0])
-    ekf_yaml = yaml.safe_load(open(os.path.join(share('ekf_localizer'), 'param', 'ekf.yaml')))['/**']['ros__parameters']
+    ekf = node_params(args.target, 'ekf_localizer')
+    scale = ekf.get('odom_scale', [1.0, 1.0])
     if args.target == 'gazebo':
         tread, tread_from = float(settings['noise']['gazebo_tread']), 'calibration/param/calibrate.yaml'
     else:
-        odo_path = os.path.join(share('whill_odometry'), 'param', 'odometry.yaml')
-        tread = yaml.safe_load(open(odo_path))['whill_odometry']['ros__parameters']['tread_width']
-        tread_from = odo_path
-        if 'tread_width' in (env_params.get('whill_odometry') or {}):
-            tread, tread_from = env_params['whill_odometry']['tread_width'], env_path
-    common = ['--odom', env['nodes']['odom_relay']['topics']['odom'], '--cmd', cfg['command']['topic'],
-              '--base', env['base_frame_id'], '--lidar', env['lidar_frame_id']]
+        tread = node_params(args.target, 'whill_odometry').get('tread_width', 0.495)
+        tread_from = f'{env_dir(args.target)}/whill_odometry.yaml'
+    common = ['--odom', ODOM_TOPIC, '--cmd', cfg['command']['topic'],
+              '--base', ekf.get('base_frame_id', 'base_link'), '--lidar', ekf.get('lidar_frame_id', 'velodyne')]
     truth = ['--truth'] if args.target == 'gazebo' else []
     sc = f'{scale[0]},{scale[1]}'
-    print(f'== {args.target}: env {env_path}, odom_scale {scale}, tread {tread} m ({tread_from})', flush=True)
+    print(f'== {args.target}: env {env_dir(args.target)}, odom_scale {scale}, tread {tread} m ({tread_from})', flush=True)
 
     py = sys.executable
     print('\n== observation noise (calibration/calibrate_noise.py)', flush=True)
@@ -91,16 +84,15 @@ def main():
     new_scale = [r4(mount_scale.get('v_scale', scale[0])), r4(mount_scale.get('omega_scale', scale[1]))]
     summary = {
         'bag': bag, 'target': args.target,
-        'candidate': {   # env（param/env/<target>.yaml）の parameters に入れる候補
-            'odom_relay': {'odom_scale': new_scale},
-            'ekf_localizer': {'R_odom': [r3(x) for x in noise['R_odom']], 'R_ndt': [r3(x) for x in noise['R_ndt']]},
+        'candidate': {   # param/<target>/ekf_localizer.yaml に入れる候補
+            'ekf_localizer': {'odom_scale': new_scale, 'R_odom': [r3(x) for x in noise['R_odom']],
+                              'R_ndt': [r3(x) for x in noise['R_ndt']]},
         },
         'current': {
-            'odom_relay': {'odom_scale': scale},
-            'ekf_localizer': {'R_odom': env_params.get('ekf_localizer', {}).get('R_odom', ekf_yaml['R_odom']),
-                              'R_ndt': env_params.get('ekf_localizer', {}).get('R_ndt', '(ekf.yaml)')},
+            'ekf_localizer': {'odom_scale': scale, 'R_odom': ekf.get('R_odom', '(code default)'),
+                              'R_ndt': ekf.get('R_ndt', '(code default)')},
         },
-        'mount': {   # base -> LiDAR（実機は env の static_tfs、Gazebo は URDF）
+        'mount': {   # base -> LiDAR（実機は param/<target>/env.yaml の static_tfs、Gazebo は URDF）
             'calibrated': {'x': r4(mount_scale['mount_xy'][0]) if 'mount_xy' in mount_scale else None,
                           'y': r4(mount_scale['mount_xy'][1]) if 'mount_xy' in mount_scale else None,
                           'z': r4(mount_scale['mount_z']) if 'mount_z' in mount_scale else None,
@@ -120,7 +112,7 @@ def main():
         ],
     }
     with open(f'{out}/summary.yaml', 'w') as f:
-        f.write(f'# calibration/calibrate.py {args.target} {bag}\n# env の yaml には書き込んでいない。candidate を確かめてから入れる\n')
+        f.write(f'# calibration/calibrate.py {args.target} {bag}\n# 環境の yaml には書き込んでいない。candidate を確かめてから入れる\n')
         yaml.safe_dump(summary, f, sort_keys=False, allow_unicode=True)
 
     print(f'\n== summary ({out}/summary.yaml)')

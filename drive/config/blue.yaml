@@ -19,7 +19,7 @@ sim_omega_scale: 1.0      # 実機の旋回の倍率は未校正
 # 速度の指令（whill_driver）
 command: {topic: /Drp5_whill_blue/whill_node/cmd_vel, type: twist, rate: 50.0}
 # 走行中の車体の姿勢：自己位置推定の /ekf_pose（map -> LiDAR）を取付で車体（base_link）に直す。
-# mount は base_link -> velodyne（localization_bringup の param/env/red.yaml などの static_tfs と同じにする）
+# mount は base_link -> velodyne（localization_bringup の param/<色>/env.yaml の static_tfs と同じにする）
 feedback:
   topic: /ekf_pose
   type: pose_with_covariance
@@ -43,7 +43,6 @@ record_topics:
   - /tf_static
   - /tf
   - /initialpose
-  - /localization/odom
   - /ekf_pose
   - /ekf_odom
   - /ndt_pose

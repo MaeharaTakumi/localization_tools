@@ -1,6 +1,6 @@
 """Gazebo の車椅子モデル（URDF・diff_drive_controller）の定数.
 
-Gazebo の録画の評価・再生・図で使う。実機の値は環境ファイル（localization_bringup の param/env/<色>.yaml）と録画の /tf_static から取る。
+Gazebo の録画の評価・再生・図で使う。実機の値は環境（localization_bringup の param/<色>/）と録画の /tf_static から取る。
 """
 from pose_math import vec_to_matrix
 

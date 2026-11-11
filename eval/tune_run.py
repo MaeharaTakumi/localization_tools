@@ -4,10 +4,11 @@
   python3 tune_run.py <入力 bag> <試行名> '<parameters の JSON>' ['<launch の追加引数>']
 
 - ROS_DOMAIN_ID=99 で動かす（Gazebo・MATLAB とは混ざらない）
-- 入力 bag は最初の動作（<bag>_phases.txt の最も早い時刻。左右 1 周なら「左回転」）の LEAD 秒前から、最後（stop）の TAIL 秒後まで再生する。/tf_static が流れないので、調整用の env にだけ
-  URDF と同じ取付（base_footprint -> base_link -> velodyne_base_link -> velodyne）を static_tfs で書く
-- parameters の JSON は env の parameters にそのまま入れる。キー "__env__" の中身は env の最上位を上書きする
-  （例 {"__env__": {"stamp_mode": "auto"}}。null の項目は消す。nodes などは節ごと置き換わる）
+- 入力 bag は最初の動作（<bag>_phases.txt の最も早い時刻。左右 1 周なら「左回転」）の LEAD 秒前から、最後（stop）の TAIL 秒後まで再生する。
+- 環境は localization_bringup の param/gazebo/ を /tmp/tune_env_<試行名>/ に写して使う（common/env_files.py）。/tf_static が流れないので、
+  その env.yaml にだけ URDF と同じ取付（base_footprint -> base_link -> velodyne_base_link -> velodyne）を static_tfs で書く
+- parameters の JSON（{ノード名: {パラメータ: 値}}。ノードは ekf_localizer・pcl_localization・whill_odometry）は、写した <ノード名>.yaml に
+  上書きする。キー "__env__" の中身は env.yaml の最上位を上書きする（例 {"__env__": {"use_sim_time": true}}。null の項目は消す）
 - 推定器は ekf_localizer（launch の追加引数 use_ekf:=false なら NDT 単体。結果の estimator は ndt_only）
 - 出力：入力と同じ側の tune/<試行名>（/root/ros2_ws/bags/gazebo/tune か /root/ros2_ws/bags/real/tune。bag_paths.py）と、
   指標の 1 行 JSON（標準出力の最後の行。out_bag に出力の bag のパス）
@@ -24,10 +25,10 @@ import numpy as np
 from rclpy.serialization import deserialize_message
 import rosbag2_py
 from rosidl_runtime_py.utilities import get_message
-import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
+from env_files import make_env  # noqa: E402
 from gazebo_model import URDF_TFS  # noqa: E402
 from bag_io import phases_of  # noqa: E402
 from plot_spin import load_run  # noqa: E402
@@ -36,7 +37,6 @@ from bag_paths import tune_dir  # noqa: E402
 
 LEAD = 8.0
 TAIL = 4.0
-ENV_BASE = '/root/ros2_ws/install/localization_bringup/share/localization_bringup/param/env/gazebo.yaml'
 OUT_TOPICS = ['/clock', '/wheelchair/pose', '/ekf_pose', '/ndt_pose', '/localization_debug', '/ekf_odom']
 IN_TOPICS = ['/clock', '/velodyne_points', '/wheelchair/odom', '/wheelchair/joint_states', '/wheelchair/pose']
 
@@ -105,16 +105,12 @@ def metrics(bag, pose_topic='/ekf_pose'):
     }
 
 
-def launch_and_play(name, env, in_bag, out_bag, record_topics, play, launch_args=(), tag='tune'):
-    """env（環境ファイルの内容）で自己位置推定を起動し、in_bag を再生して record_topics を out_bag に録る。ログのパスを返す.
+def launch_and_play(name, env_path, in_bag, out_bag, record_topics, play, launch_args=(), tag='tune'):
+    """環境のフォルダ env_path で自己位置推定を起動し、in_bag を再生して record_topics を out_bag に録る。ログのパスを返す.
 
     ROS_DOMAIN_ID=99 で動かす（動いている推定・Gazebo・MATLAB とは混ざらない）。play() は地図の読み込みを待ったあとに呼ばれ、
-    (ros2 bag play の追加の引数, 再生にかかる時間 [s]) を返す。record_topics が空なら録らない。
-    環境ファイルの写しとログは /tmp/<tag>_env_<name>.yaml・/tmp/<tag>_<name>.log。
+    (ros2 bag play の追加の引数, 再生にかかる時間 [s]) を返す。record_topics が空なら録らない。ログは /tmp/<tag>_<name>.log。
     """
-    env_path = f'/tmp/{tag}_env_{name}.yaml'
-    with open(env_path, 'w') as f:
-        yaml.safe_dump(env, f)
     penv = dict(os.environ, ROS_DOMAIN_ID='99')
     log_path = f'/tmp/{tag}_{name}.log'
     log = open(log_path, 'w')
@@ -153,17 +149,8 @@ def replay(in_bag, name, params, extra=(), out_topics=OUT_TOPICS, whole_bag=Fals
     with open(out_bag + '_phases.txt', 'w') as f:
         f.writelines(f'{k} {v:.3f}\n' for k, v in phases.items())
 
-    with open(ENV_BASE) as f:
-        env = yaml.safe_load(f)
-    env['static_tfs'] = URDF_TFS
-    env.setdefault('parameters', {})
-    for key, value in (params.pop('__env__', None) or {}).items():
-        if value is None:
-            env.pop(key, None)
-        else:
-            env[key] = value
-    for node, p in params.items():
-        env['parameters'][node] = {**(env['parameters'].get(node) or {}), **p}   # env の節が空（None）でもよい
+    env_values = {'static_tfs': URDF_TFS, **(params.pop('__env__', None) or {})}
+    env = make_env('gazebo', f'/tmp/tune_env_{name}', env_values, params)
 
     def play():
         offset, duration = (0.0, bag_duration(in_bag)) if whole_bag else play_window(in_bag, phases)

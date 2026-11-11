@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""bag のオドメトリ（diff_drive の /wheelchair/odom と、車輪の角速度からの /localization/wheel_odom）の、
+"""bag のオドメトリ（diff_drive の /wheelchair/odom と、車輪の角速度からの /localization/wheel_odom。2026-10 の録画だけ。
+joint_state_odometry は 2026-11-11 にやめた）の、
 真値に対する遅れ（変化の半分に達した時刻の差）と、回転中の omega の平均・ばらつきを出す（コンテナ test 内で実行）.
 
   python3 compare_odom_timing.py <bag>

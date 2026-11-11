@@ -6,10 +6,10 @@
 
 出力は入力と同じ側の tune/<試行名>（bag_paths.tune_dir）。ROS_DOMAIN_ID=99 で動かす（動いている推定とは混ざらない）。
   Gazebo：tune_run.replay（gazebo.yaml と URDF の取付、入力は /clock を含む IN_TOPICS）で、録画全体を再生する（whole_bag=True）。
-  実機  ：環境ファイルの写し（use_sim_time: true）で起動し、点群とオドメトリ（whill_odometry の motor_speed）を
+  実機  ：環境（param/<env>/）の写し（/tmp/replay_env_<試行名>/、use_sim_time: true）で起動し、点群とオドメトリ（whill_odometry の motor_speed）を
           --clock で流す（起動・録画・再生・停止の流れは Gazebo と同じ tune_run.launch_and_play）。RATE（環境変数、既定 1.0）で再生の速さを変えられる。
 PARAMS（環境変数、JSON）でノードのパラメータを上書きする（例 '{"ekf_localizer": {"tf_future_steps": 2}}'。
-tune_run.py の parameters と同じ形で、env の parameters.<ノード名> に足す）。
+tune_run.py の parameters と同じ形で、写した環境の <ノード名>.yaml に足す）。
 RECORD=0（環境変数）なら出力を録らない（Gazebo は tune_run が /clock だけ録る。MATLAB で確かめるとき。matlab/replay_matlab.sh）。
 大きい点群をコンテナの中で流すと、受け取る側で点群が落ちることがある（実機 blue の録画では NDT が解いたのは
 半分ほど。ソケットの受信バッファ 208 kB に 314 kB の点群が収まらないため。ホストの net.core.rmem_max・rmem_default を
@@ -20,14 +20,13 @@ import os
 import subprocess
 import sys
 
-import yaml
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'eval')]
 from bag_paths import source_of, tune_dir  # noqa: E402
+from env_files import make_env, node_params  # noqa: E402
 import tune_run  # noqa: E402
 
 OUTPUTS = ['/tf', '/tf_static', '/ndt_pose', '/ekf_pose', '/localization_debug']
-ENV_DIR = '/root/ros2_ws/install/localization_bringup/share/localization_bringup/param/env'
 
 
 def params_from_env():
@@ -50,13 +49,9 @@ def replay_real(in_bag, name, env_name, map_path):
     phases = in_bag.rstrip('/') + '_phases.txt'
     if os.path.exists(phases) and record_outputs():
         subprocess.run(['cp', phases, out_bag + '_phases.txt'])
-    with open(os.path.join(ENV_DIR, env_name + '.yaml')) as f:
-        env = yaml.safe_load(f)
-    env['use_sim_time'] = True   # 録画の時刻（--clock）で動かす
-    env.setdefault('parameters', {})
-    for node, p in params_from_env().items():
-        env['parameters'][node] = {**(env['parameters'].get(node) or {}), **p}
-    inputs = ['/velodyne_points', env['nodes']['whill_odometry']['topics']['motor_speed']]
+    # 録画の時刻（--clock）で動かす
+    env = make_env(env_name, f'/tmp/replay_env_{name}', {'use_sim_time': True}, params_from_env())
+    inputs = ['/velodyne_points', node_params(env, 'whill_odometry')['input_topic_name']]
     rate = float(os.environ.get('RATE', '1.0'))
 
     def play():

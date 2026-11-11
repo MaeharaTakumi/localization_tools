@@ -5,7 +5,7 @@
 
 出力:
   <接頭辞>_zoom.png     速度が急に変わる 4 つの瞬間の omega・v（真値、/wheelchair/odom、0.09 s 戻したもの、
-                        joint_states から計算した /localization/wheel_odom）
+                        joint_states から計算した /localization/wheel_odom。2026-10 の録画だけ。joint_state_odometry は 2026-11-11 にやめた）
   <接頭辞>_summary.png  同じ録画の再生での指標（NDT 単体、各推定器の「平均 + 0.09 s」と「車輪の角速度」。2 回の平均と幅）
 """
 import json
