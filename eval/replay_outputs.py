@@ -10,6 +10,7 @@
           --clock で流す（起動・録画・再生・停止の流れは Gazebo と同じ tune_run.launch_and_play）。RATE（環境変数、既定 1.0）で再生の速さを変えられる。
 PARAMS（環境変数、JSON）でノードのパラメータを上書きする（例 '{"ekf_localizer": {"tf_future_steps": 2}}'。
 tune_run.py の parameters と同じ形で、写した環境の <ノード名>.yaml に足す）。
+LAUNCH_ARGS（環境変数、空白区切り）で launch の引数を足す（例 'matcher:=lidarslam' で NDT の代わりに lidarslam。'use_ekf:=false'）。
 RECORD=0（環境変数）なら出力を録らない（Gazebo は tune_run が /clock だけ録る。MATLAB で確かめるとき。matlab/replay_matlab.sh）。
 大きい点群をコンテナの中で流すと、受け取る側で点群が落ちることがある（実機 blue の録画では NDT が解いたのは
 半分ほど。ソケットの受信バッファ 208 kB に 314 kB の点群が収まらないため。ホストの net.core.rmem_max・rmem_default を
@@ -26,11 +27,15 @@ from bag_paths import source_of, tune_dir  # noqa: E402
 from env_files import make_env, node_params  # noqa: E402
 import tune_run  # noqa: E402
 
-OUTPUTS = ['/tf', '/tf_static', '/ndt_pose', '/ekf_pose', '/localization_debug']
+OUTPUTS = ['/tf', '/tf_static', '/ndt_pose', '/slam_pose', '/ekf_pose', '/localization_debug']
 
 
 def params_from_env():
     return json.loads(os.environ.get('PARAMS') or '{}')
+
+
+def launch_args():
+    return os.environ.get('LAUNCH_ARGS', '').split()
 
 
 def record_outputs():
@@ -39,7 +44,7 @@ def record_outputs():
 
 def replay_gazebo(in_bag, name):
     out_topics = sorted(set(tune_run.OUT_TOPICS) | set(OUTPUTS)) if record_outputs() else ['/clock']
-    return tune_run.replay(in_bag, name, params_from_env(), out_topics=out_topics, whole_bag=True)
+    return tune_run.replay(in_bag, name, params_from_env(), extra=launch_args(), out_topics=out_topics, whole_bag=True)
 
 
 def replay_real(in_bag, name, env_name, map_path):
@@ -59,7 +64,7 @@ def replay_real(in_bag, name, env_name, map_path):
 
     log_path = tune_run.launch_and_play(
         name, env, in_bag, out_bag, ['/clock', *OUTPUTS] if record_outputs() else [], play,
-        launch_args=[f'map_path:={map_path}'], tag='replay')
+        launch_args=[f'map_path:={map_path}', *launch_args()], tag='replay')
     print(f'log: {log_path}')
     return out_bag
 

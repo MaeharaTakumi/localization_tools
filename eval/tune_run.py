@@ -9,7 +9,8 @@
   その env.yaml にだけ URDF と同じ取付（base_footprint -> base_link -> velodyne_base_link -> velodyne）を static_tfs で書く
 - parameters の JSON（{ノード名: {パラメータ: 値}}。ノードは ekf_localizer・pcl_localization・whill_odometry）は、写した <ノード名>.yaml に
   上書きする。キー "__env__" の中身は env.yaml の最上位を上書きする（例 {"__env__": {"use_sim_time": true}}。null の項目は消す）
-- 推定器は ekf_localizer（launch の追加引数 use_ekf:=false なら NDT 単体。結果の estimator は ndt_only）
+- 推定器は ekf_localizer（launch の追加引数 use_ekf:=false なら NDT 単体。結果の estimator は ndt_only）。
+  launch の追加引数 matcher:=lidarslam なら NDT の代わりに lidarslam（scan_matcher）。EKF なしの指標は /slam_pose（estimator は slam_only）
 - 出力：入力と同じ側の tune/<試行名>（/root/ros2_ws/bags/gazebo/tune か /root/ros2_ws/bags/real/tune。bag_paths.py）と、
   指標の 1 行 JSON（標準出力の最後の行。out_bag に出力の bag のパス）
 """
@@ -37,7 +38,7 @@ from bag_paths import tune_dir  # noqa: E402
 
 LEAD = 8.0
 TAIL = 4.0
-OUT_TOPICS = ['/clock', '/wheelchair/pose', '/ekf_pose', '/ndt_pose', '/localization_debug', '/ekf_odom']
+OUT_TOPICS = ['/clock', '/wheelchair/pose', '/ekf_pose', '/ndt_pose', '/slam_pose', '/localization_debug', '/ekf_odom']
 IN_TOPICS = ['/clock', '/velodyne_points', '/wheelchair/odom', '/wheelchair/joint_states', '/wheelchair/pose']
 
 
@@ -80,7 +81,16 @@ def stop(proc):
         proc.wait()
 
 
+def _mean(a):
+    return float(a.mean()) if a.size else float('nan')
+
+
+def _max(a):
+    return float(a.max()) if a.size else float('nan')
+
+
 def metrics(bag, pose_topic='/ekf_pose'):
+    """指標。angle_diff（/localization_debug）は NDT だけが出す（lidarslam では NaN、n_ndt は 0）."""
     r = load_run(bag, pose_topic)
     ph = r['phases']
     t, e = r['t'], r['err']
@@ -94,12 +104,12 @@ def metrics(bag, pose_topic='/ekf_pose'):
     return {
         **transition_metrics(bag, pose_topic),
         'yaw_rot': float(np.abs(e[rot, 2]).mean()),
-        'ang_mean': float(ang[amotion].mean()),
-        'ang_max': float(ang[amotion].max()),
+        'ang_mean': _mean(ang[amotion]),
+        'ang_max': _max(ang[amotion]),
         'xy_mean': float(e[motion, 0].mean()),
         'xy_max': float(e[motion, 0].max()),
         'spike_yaw': float(np.abs(e[switch, 2]).max()),
-        'spike_ang': float(ang[aswitch].max()),
+        'spike_ang': _max(ang[aswitch]),
         'yaw_max': float(np.abs(e[motion, 2]).max()),
         'n_pose': int(motion.sum()), 'n_ndt': int(amotion.sum()),
     }
@@ -176,9 +186,12 @@ def main():
     in_bag, name, params_json = sys.argv[1:4]
     extra = sys.argv[4].split() if len(sys.argv) > 4 else []
     out_bag = replay(in_bag, name, json.loads(params_json), extra)
-    ndt_only = 'use_ekf:=false' in extra
-    print(json.dumps({'name': name, 'estimator': 'ndt_only' if ndt_only else 'ekf_localizer', 'out_bag': out_bag,
-                      **metrics(out_bag, '/ndt_pose' if ndt_only else '/ekf_pose')}))
+    slam = 'matcher:=lidarslam' in extra
+    if 'use_ekf:=false' in extra:   # 点群の位置合わせ単体（NDT か lidarslam）
+        estimator, topic = ('slam_only', '/slam_pose') if slam else ('ndt_only', '/ndt_pose')
+    else:
+        estimator, topic = ('ekf_localizer_slam' if slam else 'ekf_localizer'), '/ekf_pose'
+    print(json.dumps({'name': name, 'estimator': estimator, 'out_bag': out_bag, **metrics(out_bag, topic)}))
 
 
 if __name__ == '__main__':
