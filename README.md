@@ -288,10 +288,14 @@ python3 drive/drive_test.py <gazebo|red|blue|white> <動き> --simulate    # 計
   2026-11-07 にユーザー指示でやめた。
   whill_driver も、指令が 1 s 途切れると止まり、ジョイスティックの操作を優先する。
 - **Gazebo**：起動し直して車椅子を初期位置に戻し、推定器を起動して走らせ、`/root/ros2_ws/bags/gazebo/<bag 名>` に録る。
-- **実機**：自己位置推定（`/ekf_pose`）・whill_driver・LiDAR が動いていることを確かめてから、`/root/ros2_ws/bags/real/<bag 名>` に録る
-  （推定の起動は自分で行う。地図と初期姿勢が要るため）。test の `.bashrc` の通信設定を実機用にしておく。
-  車椅子は `run_test.sh <red|blue|white>` の色で選ぶ（`config/<色>.yaml`。自己位置推定の launch の `env:=<色>` と同じ色にする。
-  選んだ色の `cmd_vel` を受けるノードが無ければ、見つかった車椅子を表示して止める）。録画するのは点群・`motor_speed_ts`・
+- **実機**：`/root/ros2_ws/bags/real/<bag 名>` に録りながら走る（推定の起動は自分で行う。地図と初期姿勢が要るため）。
+  test の `.bashrc` の通信設定を実機用にしておく。
+  車椅子は `run_test.sh <red|blue|white>` の色で選ぶ（`config/<色>.yaml`。自己位置推定の launch の `env:=<色>` と同じ色にする）。
+- **走る前の確認**（Gazebo・実機共通。録画を始めた後に `drive_test.py` が 1 つのノードで行う。2026-11-13 から）：姿勢（実機は `/ekf_pose`）が
+  15 s 以内に届いて新しいこと、指令のトピック（実機は選んだ色の `cmd_vel`）を受けるノードが 5 s 以内に見つかること（録画の `ros2 bag record`
+  は数えない）。どちらかが欠けたら走らずに止める（見つかった車椅子の `cmd_vel` も表示する。録画は短いまま残り、情報ファイルのメモに理由を書く）。
+  録画するトピックで無いものは表示して続ける。Enter の指示が出るまで約 1.3 s（開発用 PC のコンテナの中。それまでの `ros2` の CLI の確認 3 つでは約 15 s）。
+- **録画するトピック**：点群・`motor_speed_ts`・
   `cmd_vel`・バッテリーと推定の出力（`motor_angle_ts`・`joy_ts`・`speed_mode`・GNSS は録らない）。
 
   ```bash

@@ -8,6 +8,8 @@
   --profiles <yaml> で動きのファイルを変える（既定 drive/profiles.yaml。推定用の動きは calibration/motion.py が作る）
     target：gazebo、実機の車椅子 red・blue・white（drive/config/<target>.yaml）、または設定の yaml のパス
 
+走る前に確かめる（1 つのノードで。どれかが欠けたら走らずに止める）：姿勢（feedback）が 15 s 以内に届き新しいこと、
+指令のトピックを受けるノード（実機は whill_driver。録画は数えない）が 5 s 以内に見つかること。録画するトピックで無いものは表示するだけ。
 走る前に、出発時の姿勢を基準に計算した軌跡を表示する（走ってよい範囲の確認は 2026-11-07 にユーザー指示でやめた）。
 走行中は次のどれかで止める（0 の指令を出して終わる。終了コード 1）：
   - feedback_timeout より新しい姿勢が無い（姿勢は feedback：Gazebo は真値、実機は /ekf_pose を取付で車体に直したもの。
@@ -312,6 +314,22 @@ def run(cfg, segs, name, args):
             rclpy.spin_once(node, timeout_sec=0.05)
         if stale() > cfg['feedback_timeout']:
             raise RuntimeError(f"姿勢（{fb_cfg['topic']}）が {stale():.1f} s 更新されていない")
+
+        def receivers(topic=cmd_cfg['topic']):
+            """指令を受けるノード（録画の ros2 bag record も購読するので数えない）."""
+            return [i.node_name for i in node.get_subscriptions_info_by_topic(topic)
+                    if not i.node_name.startswith('rosbag2')]
+        t_wait = _time.monotonic()   # 見つかるまで（ふつう 0.1 s 以内、ときどき 1 s 余り）
+        while not receivers() and _time.monotonic() - t_wait < 5.0:
+            rclpy.spin_once(node, timeout_sec=0.05)
+        names = [t for t, _ in node.get_topic_names_and_types()]
+        if not receivers():
+            found = ', '.join(t for t in names if t.endswith('whill_node/cmd_vel') and receivers(t)) or 'なし'
+            raise RuntimeError(f"{cmd_cfg['topic']} を受けるノードが無い（実機は whill_driver。車椅子の色（run_test.sh <red|blue|white>）"
+                               f"と自己位置推定の env:=<色> を確かめる）。見つかった車椅子の指令：{found}")
+        missing = [t for t in cfg.get('record_topics', []) if t not in names]
+        if missing:
+            print(f"まだ無いトピック（録画は続ける）：{', '.join(missing)}", flush=True)
         if joy_cfg and node.joy > joy_cfg['threshold']:
             raise RuntimeError('ジョイスティックが倒れている')
         print(plan_report(cfg, segs, name), flush=True)
@@ -392,15 +410,11 @@ def main():
     ap.add_argument('--list', action='store_true')
     ap.add_argument('--record-topics', action='store_true')
     ap.add_argument('--describe', action='store_true', help='動きと設定を 1 行で（録画の情報ファイル用）')
-    ap.add_argument('--command-topic', action='store_true', help='指令のトピック（run_test.sh が使う）')
     ap.add_argument('--get', metavar='KEY', help='設定の値（無ければ空。run_test.sh が gazebo_launch_args・localization に使う）')
     # parse_args は省略できる位置引数（動き）がオプションの後にあると受け取れない（unrecognized arguments になる）ので、
     # オプションと位置引数が混ざっていても読めるようにする
     args = ap.parse_intermixed_args()
     cfg = load_config(args.target)
-    if args.command_topic:
-        print(cfg['command']['topic'])
-        return 0
     if args.get:
         v = cfg.get(args.get, '')
         print(str(v).lower() if isinstance(v, bool) else v)

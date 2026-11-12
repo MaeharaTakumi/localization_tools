@@ -106,11 +106,11 @@ if [ "$target" = gazebo ]; then
   if [ "$use_loc" = false ]; then
     echo "== start recording（自己位置推定は起動しない）"
     cbg "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$tag.log 2>&1"
-    sleep 5
+    sleep 1
   else
     echo "== start recording and localization ${extra:+($extra)}"
     cbg "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$tag.log 2>&1"
-    sleep 3
+    sleep 1
     cbg "ros2 launch localization_bringup localization.launch.py env:=gazebo rviz:=false $extra > /tmp/launch_$tag.log 2>&1"
     sleep 25   # 地図の読み込みと NDT の収束を待つ
   fi
@@ -118,24 +118,12 @@ if [ "$target" = gazebo ]; then
   cx "$DT $profile --yes 2>&1 | tee /tmp/drive_$tag.log; exit \${PIPESTATUS[0]}"
   status=$?
 else
-  echo "== check the real robot"
+  # 自己位置推定（/ekf_pose）・指令を受ける whill_driver・録画するトピックは drive_test.py が確かめる（欠けていれば走らずに止める）
   if cx "test -e $BAGS/$bag"; then echo "$BAGS/$bag は既にある（別の名前にする）"; exit 1; fi
-  cx "timeout 8 ros2 topic echo --once --no-daemon --spin-time 3 /ekf_pose > /dev/null 2>&1" || { echo "/ekf_pose が来ない（自己位置推定を起動し、初期姿勢を合わせる）"; exit 1; }
-  cmd=$(cx "$DT --command-topic" | tail -1)
-  subs=$(cx "ros2 topic info --no-daemon --spin-time 3 $cmd" | sed -n 's/Subscription count: //p')
-  if [ "${subs:-0}" -lt 1 ]; then
-    echo "$cmd を受けるノード（whill_driver）が無い。車椅子の色（run_test.sh <red|blue|white>）と自己位置推定の env:=<色> を確かめる。見つかった車椅子："
-    cx "ros2 topic list --no-daemon --spin-time 3" | grep "whill_node/cmd_vel" | sed 's/^/  /'
-    exit 1
-  fi
-  present=$(cx "ros2 topic list --no-daemon --spin-time 3")
-  for t in $topics; do
-    echo "$present" | grep -qx "$t" || echo "  （まだ無いトピック：$t。録画は続ける）"
-  done
   echo "== start recording"
   cbg "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$tag.log 2>&1"
-  sleep 3
-  echo "== drive（計画を確かめて Enter で走り出す。止めるときは Ctrl-C かジョイスティック）"
+  sleep 1   # 録画が購読し終えるまで（最初のメッセージまで約 0.1 s）
+  echo "== drive（推定・whill_driver を確かめ、計画を表示して Enter で走り出す。止めるときは Ctrl-C かジョイスティック）"
   cit "$DT $profile 2>&1 | tee /tmp/drive_$tag.log; exit \${PIPESTATUS[0]}"
   status=$?
 fi
