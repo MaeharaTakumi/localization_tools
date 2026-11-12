@@ -261,7 +261,9 @@ matlab/replay_matlab.sh /root/ros2_ws/bags/real/blue_spin5_20261016_160557 ../..
 
 `run_test.sh` はホストからでも、自己位置推定のコンテナの中（docker が無い）からでも実行できる。ホストからは `docker exec` で
 コンテナ（`LOC`、既定 `test`）に入って動かし、コンテナの中ではその場で直接動かす（そのスクリプトのある
-`localization_tools` を使うので、置き場所は `/root/localization_tools` でもよい）。コンテナの中からは Gazebo を起動し直せないので、
+`localization_tools` を使うので、置き場所は `/root/localization_tools` でもよい）。ホストからでも動くのはコンテナの
+`/root/ros2_ws/localization_tools` なので、ホストで直したら先に `deploy.sh`（か `sync.sh push`）で写しておく
+（ほかのプログラムと同じ。2026-11-13 から走行のスクリプトも自分では写さない）。コンテナの中からは Gazebo を起動し直せないので、
 Gazebo のときは Gazebo が動いていて車椅子が初期位置にあること。
 
 ```bash

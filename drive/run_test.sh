@@ -3,7 +3,7 @@
 #
 # どこで実行してもよい：
 #   - ホスト（docker がある）：コンテナ test（環境変数 LOC で変えられる）に docker exec で入って動かす。
-#     始めに sync.sh push でホストの localization_tools をコンテナの /root/ros2_ws/localization_tools に写す
+#     コンテナの /root/ros2_ws/localization_tools を使う（ホストで直したら、先に deploy.sh か sync.sh push で写しておく。ここでは写さない）
 #   - 自己位置推定のコンテナの中（docker が無い）：その場で直接動かす。このスクリプトのある localization_tools を使う
 #
 #   drive/run_test.sh gazebo <動き> [<bag 名> [launch の追加引数（例 use_ekf:=false）]]
@@ -75,8 +75,6 @@ count_loc() {
 # pkill -f のパターンの先頭を [x] にして、pkill を動かす bash 自身（コマンド行にパターンを含む）に当たらないようにする
 stop_bg() { cx "pkill -INT -f '[${1:0:1}]${1:1}'"; }
 
-# ホストから：localization_tools 一式をコンテナの /root/ros2_ws/localization_tools に写す（走行・描画・評価もそこで行う）
-[ $INSIDE = 1 ] || "$root/sync.sh" push
 cx "$DT $profile --simulate" || { echo "動き $profile・設定が読めない"; exit 1; }
 topics=$(cx "$DT --record-topics" | tail -1)
 cx "mkdir -p $(dirname $BAGS/$bag) && touch $(dirname $BAGS)/COLCON_IGNORE"

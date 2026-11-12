@@ -8,7 +8,8 @@
 #     推定は calibrate.py（観測ノイズ R・オドメトリの倍率・LiDAR の取付）。推定の設定は
 #     calibration/param/calibrate.yaml。結果は /root/ros2_ws/fig/calibration/<bag 名>/（summary.yaml に env に入れる候補。env の yaml には書き込まない）。
 #   走行を途中で止めたときは推定しない（録画が残るので calibration/calibrate.py <target> <bag> で推定はできる）。
-#   ホストからでも、自己位置推定のコンテナの中からでも実行できる（run_test.sh と同じ）。
+#   ホストからでも、自己位置推定のコンテナの中からでも実行できる（run_test.sh と同じ）。ホストからでもコンテナの
+#   /root/ros2_ws/localization_tools を使う（ホストで直したら、先に deploy.sh か sync.sh push で写しておく。ここでは写さない）。
 set -u
 target=${1:?gazebo・red・blue・white のどれか}
 bag=${2:-${target}_calibration_$(date +%Y%m%d_%H%M%S)}
@@ -19,7 +20,6 @@ LOC=${LOC:-test}
 PROF=/tmp/calibration_profiles.yaml   # 推定用の動き（コンテナの中）
 
 if command -v docker > /dev/null 2>&1; then
-  "$root/sync.sh" push > /dev/null
   cx() { docker exec $LOC bash -ic "$1" 2>&1 | grep -v "terminal process group\|no job control"; return ${PIPESTATUS[0]}; }
   T=/root/ros2_ws/localization_tools
 else
