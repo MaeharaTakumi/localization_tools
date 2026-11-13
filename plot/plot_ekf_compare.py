@@ -8,7 +8,7 @@
   {"before": [ラベル, 試行名, 色], "after": [ラベル, 試行名, 色],
    "conditions": [[試行名の接頭辞（正規表現）, ラベル, 色], ...], "title": 図の題の補足, "runs": 棒グラフの題の補足}
 省略時（spin360_w1_ekf）：
-  w1cmp_ekf_w10_*  移動平均 10（変更前。make_window_bag.py で同じ走行から作った入力）
+  w1cmp_ekf_w10_*  移動平均 10（変更前。同じ走行から作った入力。作る make_window_bag.py は 2026-11-13 に消した）
   w1cmp_ekf_js_*   車輪の角速度（/wheelchair/joint_states、joint_state_odometry）
   w1cmp_ekf_w1_*   移動平均 1（変更後。/wheelchair/odom そのもの）
   w1cmp_ndt_only   NDT 単体（参考）

@@ -4,6 +4,7 @@
 #   車椅子は世界の原点 x 0・y 0、ground_plane（z −0.7 m）の 0.3 m 上（z −0.4）、yaw 0 に置く。周りに障害物は無い
 #   （ground_plane は 100 m 四方。建物の 4 階の床は z 11.2 m より上）。地図が無いので自己位置推定は起動しない。
 #   上限は v 1.0 m/s・omega 1.0 rad/s にして、動きの割合がそのまま m/s・rad/s になるようにする。
+#   2026-11-13 から真値 /wheelchair/pose を録らない（ユーザー指示）ので、録画からは真値の速度と比べられない。
 target: gazebo
 use_sim_time: true
 limits: {v_max: 1.0, v_reverse_max: 0.8, w_max: 1.0}
@@ -25,7 +26,6 @@ record_topics:
   - /velodyne_points
   - /wheelchair/odom
   - /wheelchair/joint_states
-  - /wheelchair/pose
   - /wheelchair/diff_drive_controller/cmd_vel
   - /tf_static
   - /tf

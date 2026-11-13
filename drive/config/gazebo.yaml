@@ -16,13 +16,12 @@ max_segment_time: 60.0    # 1 区間の打ち切り [s]
 confirm: false            # true なら走り出す前に確認する
 joystick: null            # 手での操作を検知して止める（実機だけ）
 
-# 録画するトピック（run_test.sh）。推定の出力も録る（再生では使わない）
+# 録画するトピック（run_test.sh）。推定の出力も録る（再生では使わない）。真値 /wheelchair/pose は 2026-11-13 から録らない（ユーザー指示）
 record_topics:
   - /clock
   - /velodyne_points
   - /wheelchair/odom
   - /wheelchair/joint_states
-  - /wheelchair/pose
   - /wheelchair/diff_drive_controller/cmd_vel
   - /tf_static
   - /tf

@@ -38,7 +38,7 @@ python3 eval/bag_info.py write <bag> --source gazebo|real --drive '...' --purpos
 |---|---|
 | `common/` | **共通部品**（2026-11-11 にまとめた。各スクリプトは `common`・`plot`・`eval`・`calibration` を `sys.path` に入れて import する）：`env_files.py`（localization_bringup の環境のフォルダ `param/<env>/` を読む・写して書き換える。`make_env`。書き換えられるノードは `ekf_localizer`・`pcl_localization`・`whill_odometry`）、`bag_io.py`（bag の読み込み `read_bag`・`open_reader`、動作の開始時刻 `phases_of`、stamp の変換 `stamp_sec`・`stamp_ns`、`/tf_static` からの取付 `mount_from_tf_static`）、`pose_math.py`（姿勢と 4x4 行列の変換、角度の折り返し `wrap`）、`plot_style.py`（色・線幅・`setup`・`style`・`box_on`・`capitalize_labels`・`widths_back_to_front`）、`gazebo_model.py`（Gazebo の車椅子の定数：車輪の半径と間隔、オドメトリの倍率、URDF の取付） |
 | `calibration/` | **パラメータ推定（プログラムとパラメータ）**：`run_calibration.sh`（推定用の動きで走って、続けて推定する）、`motion.py`（推定用の動き）、`calibrate.py`（録画から R・倍率・取付をまとめて推定）、`calibrate_noise.py`（観測ノイズ R、真値なし）、`calibrate_mount_scale.py`（LiDAR の取付位置とオドメトリの倍率、真値なし）、図は `plot_noise.py`・`plot_mount_scale.py`。設定は `param/motion.yaml`（推定用の動き）と `param/calibrate.yaml`（推定。各プログラムのオプションの既定値） |
-| `eval/` | 録画の再生・評価・パラメータの調整：`tune_run.py`（回転の前後を再生して指標）、`tune_batch.py`（候補ごとに `tune_run.py`）、`summarize.py`・`aggregate.py`（結果の表。`aggregate.py` は候補ごとの平均と幅、`SHOW_RUNS=1` で 1 回ごと）、`transition_eval.py`（速度が急に変わる瞬間の yaw 誤差）、`compare_run.py`（いろいろな動きの録画での比較）、`replay_outputs.py`・`outputs_batch.py`（録画全体の再生と MATLAB 用の出力の指標）、`evaluate_bag.py`（録画の `/ekf_pose`・`/ekf_odom` を Gazebo の真値と比べる）、`make_window_bag.py`（オドメトリの移動平均の個数を変えた録画を作る）、`bag_info.py`（録画の情報ファイル）、`bag_paths.py`（録画の置き場所）。候補は `batches/`、結果は `results/`。起動・録画・再生・停止の流れは `tune_run.launch_and_play` の 1 つ（Gazebo の `tune_run.replay` も、実機の `replay_outputs.replay_real` もこれを使う） |
+| `eval/` | 録画の再生・評価・パラメータの調整：`tune_run.py`（回転の前後を再生して指標）、`tune_batch.py`（候補ごとに `tune_run.py`）、`aggregate.py`（結果の表。候補ごとの平均と幅、`SHOW_RUNS=1` で 1 回ごと）、`transition_eval.py`（速度が急に変わる瞬間の yaw 誤差）、`compare_run.py`（いろいろな動きの録画での比較）、`replay_outputs.py`・`outputs_batch.py`（録画全体の再生と MATLAB 用の出力の指標）、`bag_info.py`（録画の情報ファイル）、`bag_paths.py`（録画の置き場所）。候補は `batches/`、結果は `results/`。起動・録画・再生・停止の流れは `tune_run.launch_and_play` の 1 つ（Gazebo の `tune_run.replay` も、実機の `replay_outputs.replay_real` もこれを使う） |
 | `plot/` | 図（`plot_*.py`、`check_*.py`）。bag の読み込みや図の書式は `common/`。`rerender_results.sh` で `Docker/localization/results` の図を全部描き直す（環境変数 `OUT` で出力先、`T0` でツールの場所を変えられるので、ツールを直したときは別の場所に描いて前の図とファイルごとに比べる） |
 | `record_rviz.sh` | **RViz の画面の録画（ホストで実行）**。下の「RViz の画面の録画」 |
 | `drive/` | **テスト走行と録画（Gazebo・実機共通）**：`run_test.sh`（ホストかコンテナの中で実行）、`drive_test.py`（走らせる）、`profiles.yaml`（動き）、`config/gazebo.yaml`・`config/red.yaml`・`blue.yaml`・`white.yaml`（実機の車椅子ごと。速さの上限・トピック・録画するトピック）、`config/real_in_gazebo.yaml`（実機の設定を Gazebo で試す）、`config/gazebo_ground.yaml` と `profiles_velocity.yaml`（Gazebo の地面でオドメトリと真値の速度を比べる） |
@@ -85,7 +85,7 @@ python3 calibration/calibrate.py <gazebo|red|blue|white> <bag>    # 録画から
 - 推定は `calibrate.py`：`calibrate_noise.py`（R_odom・R_ndt とも走行中の残差から）、`calibrate_mount_scale.py`（倍率・取付）を、
   target に合わせたトピック・フレーム・倍率・車輪の間隔で動かす（指令は `drive/config/<target>.yaml`、
   フレーム・`odom_scale` は localization_bringup の `param/<target>/ekf_localizer.yaml`（オドメトリは `/wheelchair/odom`）、車輪の間隔は Gazebo が `param/calibrate.yaml` の
-  `noise.gazebo_tread`、実機が whill_odometry の `tread_width`）。Gazebo は真値との比較（`--truth`）も出す。
+  `noise.gazebo_tread`、実機が whill_odometry の `tread_width`）。Gazebo は、録画に真値があれば真値との比較（`--truth`）も出す（2026-11-13 より後の録画には真値が無い）。
 - 推定の設定（区間の取り方・窓・直進の安定の判定など）は `param/calibrate.yaml`（各プログラムのオプションの既定値。オプションで上書きできる）。
 - 推定にかかる時間は数秒（252 s の録画で 8 s）。
 - 結果は 1 回ごとに `/root/ros2_ws/fig/calibration/<bag 名>/`：`summary.yaml`（`param/<target>/ekf_localizer.yaml` に入れる候補 `candidate` と今の値。**yaml には書き込まない**）、
@@ -119,10 +119,12 @@ python3 calibration/calibrate_mount_scale.py /root/ros2_ws/bags/gazebo/<録画> 
 ```bash
 python3 eval/tune_run.py <録画> <試行名> '<parameters の JSON>' ['use_ekf:=false']
 python3 eval/tune_batch.py <録画> eval/batches/<候補>.json eval/results/<結果>.jsonl
-SCORE_KEYS=trans_max_mean,steady_mean,ang_mean,xy_mean python3 eval/summarize.py eval/results/<結果>.jsonl <基準の接頭辞>
+python3 eval/aggregate.py eval/results/<結果>.jsonl <基準の接頭辞>   # 候補ごとの平均と幅（SHOW_RUNS=1 で 1 回ごと）
 ```
 
 `ROS_DOMAIN_ID=99` で再生するので Gazebo・MATLAB とは混ざらない。指標（`tune_run.py` の出力）は真値を使う（Gazebo だけ）。
+**2026-11-13 から Gazebo の録画に真値 `/wheelchair/pose` を入れない（ユーザー指示）ので、真値を使う評価・図（`tune_run.py`・`compare_run.py`・
+`--truth`・真値を描く図）に使えるのはそれより前の録画だけ。**
 環境は localization_bringup の `param/gazebo/` を `/tmp/tune_env_<試行名>/` に写して使う（`common/env_files.py`）。parameters の JSON は
 `{"ekf_localizer": {"Q": [...]}, "pcl_localization": {...}}` のように `{ノード名: {パラメータ: 値}}` で、写した `<ノード名>.yaml` に上書きする。
 `"__env__"` の中身は `env.yaml` を上書きする。ノードは `ekf_localizer`・`pcl_localization`・`whill_odometry` だけ（2026-11-11 から。
@@ -280,6 +282,7 @@ python3 drive/drive_test.py <gazebo|red|blue|white> <動き> --simulate    # 計
   録画するトピックで無いものは表示して続ける。Enter の指示が出るまで約 1.3 s（開発用 PC のコンテナの中。それまでの `ros2` の CLI の確認 3 つでは約 15 s）。
 - **録画するトピック**：点群・`motor_speed_ts`・
   `cmd_vel`・バッテリーと推定の出力（`motor_angle_ts`・`joy_ts`・`speed_mode`・GNSS は録らない）。
+  Gazebo は `/clock`・点群・オドメトリ・`joint_states`・指令と推定の出力（真値 `/wheelchair/pose` は 2026-11-13 から録らない。走行中の姿勢には今も使う）。
 
   ```bash
   localization_tools/drive/run_test.sh red spin real_red_spin_01

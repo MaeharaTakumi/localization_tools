@@ -17,7 +17,6 @@ record_topics:
   - /velodyne_points
   - /wheelchair/odom
   - /wheelchair/joint_states
-  - /wheelchair/pose
   - /wheelchair/diff_drive_controller/cmd_vel
   - /tf_static
   - /tf
