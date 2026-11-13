@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """テスト走行（drive/drive_test.py）の軌跡を、出発時の車体の位置・向きを基準に描く（コンテナ test 内で実行）.
 
-  python3 plot_drive_paths.py <出力 png> <設定（gazebo・real・yaml のパス）> <動き>=<bag>[@<姿勢のトピック>] ...
+  python3 plot_drive_paths.py <出力 png> <設定（gazebo・red・blue・white・yaml のパス）> <動き>=<bag> ...
 
-姿勢のトピックの既定は Gazebo の真値 /wheelchair/pose（base_footprint）。/ekf_pose（LiDAR）なら録画の /tf_static の取付
-（localization_bringup の param/<target>/ekf_localizer.yaml の base_frame_id -> lidar_frame_id）で車体に直す。出発は最初の動作の時刻の姿勢。設定に area（走ってよい範囲。2026-11-07 に drive の設定から外した）があれば
+車体の姿勢は録画の /tf の map -> base（自己位置推定の出力。フレームは localization_bringup の param/<target>/ekf_localizer.yaml の
+map_frame_id・base_frame_id。同じ stamp が何度も届くので、stamp ごとに最後に届いた値）。時刻は stamp。出発は最初の動作の時刻の姿勢。設定に area（走ってよい範囲。2026-11-07 に drive の設定から外した）があれば
 塗りつぶして重ねる。点線は使わない。
 """
 import math
@@ -18,31 +18,25 @@ import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration', 'drive')]
-from drive_test import load_config, quat_matrix  # noqa: E402
-from bag_io import mount_from_tf_static, phases_of, read_bag  # noqa: E402
+from drive_test import load_config, yaw_of  # noqa: E402
+from bag_io import phases_of, read_bag, stamp_sec  # noqa: E402
 from env_files import node_params  # noqa: E402
 from plot_style import BAND, capitalize_labels, GRID, INK, INK2, SERIES, SURFACE  # noqa: E402
 
 
-def base_path(bag, topic, frames=None):
-    """frames（base, LiDAR）を渡すと、姿勢を LiDAR のものとして録画の /tf_static の取付で車体に直す."""
-    d = read_bag(bag, ['/clock', topic, '/tf_static'])
-    mount = np.linalg.inv(mount_from_tf_static(d['/tf_static'], *frames, required=True)) if frames else None
-    clk = np.array([(t, m.clock.sec + m.clock.nanosec * 1e-9) for t, m in d['/clock']]) if d.get('/clock') else None
-    ts, xs, ys, yaws = [], [], [], []
-    for t, m in d[topic]:
-        p = m.pose.pose if hasattr(m, 'pose') and hasattr(m.pose, 'pose') else m
-        tm = np.eye(4)
-        tm[:3, :3] = quat_matrix(p.orientation)
-        tm[:3, 3] = (p.position.x, p.position.y, p.position.z)
-        if mount is not None:
-            tm = tm @ mount
-        ts.append(np.interp(t, clk[:, 0], clk[:, 1]) if clk is not None else t)
-        xs.append(tm[0, 3])
-        ys.append(tm[1, 3])
-        yaws.append(math.atan2(tm[1, 0], tm[0, 0]))
-    o = np.argsort(ts)
-    return np.array(ts)[o], np.array(xs)[o], np.array(ys)[o], np.array(yaws)[o]
+def base_path(bag, frames):
+    """録画の /tf の frames[0] -> frames[1]（map -> base）を stamp の順に（時刻 [s], x, y, yaw）."""
+    poses = {}
+    for _, m in read_bag(bag, ['/tf'])['/tf']:
+        for tr in m.transforms:
+            if tr.header.frame_id == frames[0] and tr.child_frame_id == frames[1]:
+                t = tr.transform
+                poses[stamp_sec(tr)] = (t.translation.x, t.translation.y, yaw_of(t.rotation))
+    if not poses:
+        raise RuntimeError(f'no /tf {frames[0]} -> {frames[1]} in {bag}')
+    ts = np.array(sorted(poses))
+    xs, ys, yaws = (np.array(v) for v in zip(*(poses[t] for t in ts)))
+    return ts, xs, ys, yaws
 
 
 def main():
@@ -50,19 +44,16 @@ def main():
     cfg = load_config(target)
     area = cfg.get('area')
     items = [a.split('=', 1) for a in sys.argv[3:]]
+    ekf = node_params(cfg['target'], 'ekf_localizer')
+    frames = (ekf.get('map_frame_id', 'map'), ekf.get('base_frame_id', 'base_link'))
     plt.rcParams.update({'font.size': 10, 'axes.edgecolor': GRID, 'axes.labelcolor': INK2, 'xtick.color': INK2,
                          'ytick.color': INK2, 'axes.titlesize': 10.5})
     n = len(items)
     cols = 3
     rows = (n + cols - 1) // cols
     fig, axes = plt.subplots(rows, cols, figsize=(4.2 * cols, 5.2 * rows), facecolor=SURFACE, squeeze=False)
-    for ax, (name, spec) in zip(axes.flat, items):
-        bag, topic = (spec.split('@', 1) + ['/wheelchair/pose'])[:2]
-        frames = None
-        if topic == '/ekf_pose':
-            ekf = node_params(cfg['target'], 'ekf_localizer')
-            frames = (ekf.get('base_frame_id', 'base_link'), ekf.get('lidar_frame_id', 'velodyne'))
-        t, x, y, yaw = base_path(bag, topic, frames)
+    for ax, (name, bag) in zip(axes.flat, items):
+        t, x, y, yaw = base_path(bag, frames)
         ph = phases_of(bag)
         t0, t1 = min(ph.values()), max(ph.values()) + 2.0
         k = int(np.searchsorted(t, t0))

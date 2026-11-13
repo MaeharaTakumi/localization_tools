@@ -2,7 +2,7 @@
 """calibrate_noise.py の図（calibrate_noise.py から呼ぶ）.
 
   plot_segments：使った区間（指令が一定）と、オドメトリ・NDT の残差の時間推移
-  plot_summary ：標準偏差の比較（真値なしの推定：動いている区間・停止、--truth なら真値との差）
+  plot_summary ：標準偏差の比較（動いている区間・その R_eff・停止）
   plot_hist    ：残差のヒストグラムと正規分布
 """
 import math
@@ -16,11 +16,11 @@ import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
-from plot_style import BAND, capitalize_labels, GRID, INK, INK2, setup, style, SURFACE, widths_back_to_front  # noqa: E402
+from plot_style import BAND, capitalize_labels, INK, INK2, setup, style, SURFACE, widths_back_to_front  # noqa: E402
 
 CLASS_LABEL = {'stopped': 'Stopped', 'turning': 'Turning', 'straight': 'Straight', 'curve': 'Curve'}
 C_OMEGA, C_V, C_YAW, C_X, C_Y = '#2a78d6', '#eb6834', '#4a3aa7', '#1baf7a', '#eda100'
-C_EST, C_EFF, C_STOP, C_TRUTH = '#2a78d6', '#4a3aa7', '#1baf7a', '#eb6834'
+C_EST, C_EFF, C_STOP = '#2a78d6', '#4a3aa7', '#1baf7a'
 
 
 def plot_segments(path, ot, ov, ow, nt, used, odom_rows, ndt_rows, segs, half):
@@ -68,29 +68,27 @@ def plot_segments(path, ot, ov, ow, nt, used, odom_rows, ndt_rows, segs, half):
     print(f'saved {path}')
 
 
-def plot_summary(path, var_odom, var_ndt, tru_odom, tru_ndt, tau=None):
+def plot_summary(path, var_odom, var_ndt, tau=None):
     setup()
-    groups = [('Odometry v [m/s]', var_odom, tru_odom, [('v', 'V')], 1.0),
-              ('Odometry omega [rad/s]', var_odom, tru_odom, [('omega', 'Omega')], 1.0),
-              ('NDT position (map frame) [mm]', var_ndt, tru_ndt, [('x', 'X'), ('y', 'Y'), ('z', 'Z')], 1e3),
-              ('NDT angle [deg]', var_ndt, tru_ndt, [('roll', 'Roll'), ('pitch', 'Pitch'), ('yaw', 'Yaw')],
+    groups = [('Odometry v [m/s]', var_odom, [('v', 'V')], 1.0),
+              ('Odometry omega [rad/s]', var_odom, [('omega', 'Omega')], 1.0),
+              ('NDT position (map frame) [mm]', var_ndt, [('x', 'X'), ('y', 'Y'), ('z', 'Z')], 1e3),
+              ('NDT angle [deg]', var_ndt, [('roll', 'Roll'), ('pitch', 'Pitch'), ('yaw', 'Yaw')],
                math.degrees(1.0))]
-    bars = [('No truth: moving', C_EST, lambda e, t, k: e['moving'][k][0]),
-            ('No truth: stopped', C_STOP, lambda e, t, k: e['stopped'][k][0])]
+    bars = [('Moving', C_EST, lambda e, k: e['moving'][k][0]),
+            ('Stopped', C_STOP, lambda e, k: e['stopped'][k][0])]
     if tau is not None:   # 時間的なつながりの補正をした R_eff（分散 x tau_int）
-        bars.insert(1, ('No truth: moving x correlation time (R_eff)', C_EFF,
-                        lambda e, t, k: e['moving'][k][0] * tau[k]))
-    if tru_odom is not None:
-        bars.append(('Truth check: moving (Gazebo only)', C_TRUTH, lambda e, t, k: t['moving'][k][0]))
+        bars.insert(1, ('Moving x correlation time (R_eff)', C_EFF,
+                        lambda e, k: e['moving'][k][0] * tau[k]))
     fig, axes = plt.subplots(1, 4, figsize=(18, 4.8), facecolor=SURFACE,
                              gridspec_kw={'width_ratios': [1.3, 1.3, 2.4, 2.4]})
     width = 0.8 / len(bars)
-    for ax, (title, var_cls, tru, keys, f) in zip(axes, groups):
+    for ax, (title, var_cls, keys, f) in zip(axes, groups):
         style(ax)
         top = 0.0
         for j, (label, color, get) in enumerate(bars):
             for i, (k, _) in enumerate(keys):
-                var = get(var_cls, tru, k)
+                var = get(var_cls, k)
                 s = math.sqrt(var) * f if np.isfinite(var) else 0.0
                 x = i + (j - (len(bars) - 1) / 2) * width
                 ax.bar(x, s, width * 0.92, color=color, zorder=3, label=label if i == 0 else None)

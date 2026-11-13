@@ -11,7 +11,7 @@
 #     （コンテナの中からは Gazebo を起動し直せないので、Gazebo が動いていて車椅子が初期位置にあること）。
 #     録画は /root/ros2_ws/bags/gazebo/<bag 名>（同じ名前があれば上書き）
 #   drive/run_test.sh <red|blue|white> <動き> [<bag 名>]
-#     実機の車椅子（色）。自己位置推定（/ekf_pose。launch の env:=<色> と同じ色）・whill_driver・LiDAR が動いていること
+#     実機の車椅子（色）。自己位置推定（/tf の map -> base_link。launch の env:=<色> と同じ色）・whill_driver・LiDAR が動いていること
 #     （推定の起動は自分で行う。地図・初期姿勢が要るため）。走り出す前に計画を表示して確認するので、端末から実行する。
 #     録画は /root/ros2_ws/bags/real/<bag 名>（同じ名前は止める）
 #
@@ -23,8 +23,6 @@
 #   環境変数：PROFILES（動きのファイルのコンテナ内のパス。既定 drive/profiles.yaml。calibration/run_calibration.sh が使う）、
 #             PURPOSE（録画の用途。<bag 名>_info.yaml に書く）、CONFIG（設定の yaml のコンテナ内のパス。既定は target の設定。
 #             例 CONFIG=real_in_gazebo で実機の設定を Gazebo で試す）
-#   設定の gazebo_launch_args（Gazebo の launch の引数。例 "x:=0 y:=0 z:=-0.4 yaw:=0" で車椅子の初期位置を変える）と
-#   localization（false なら自己位置推定を起動しない）は Gazebo だけ（例 CONFIG=gazebo_ground。地図の無い地面で走る）
 #   録画の隣に <bag 名>_phases.txt（動作の開始時刻）、<bag 名>_drive.log（drive_test.py の出力）、<bag 名>_info.yaml（eval/bag_info.py）を書く。
 set -u
 # ros2 topic の CLI は --no-daemon で使う。timeout の中で最初の ros2 が CLI のデーモンを起動すると、デーモンが timeout の
@@ -81,17 +79,15 @@ cx "mkdir -p $(dirname $BAGS/$bag) && touch $(dirname $BAGS)/COLCON_IGNORE"
 
 if [ "$target" = gazebo ]; then
   extra=${4:-}
-  gz_args=$(cx "$DT --get gazebo_launch_args" | tail -1)
-  use_loc=$(cx "$DT --get localization" | tail -1)
   if [ $INSIDE = 0 ]; then
-    echo "== restart Gazebo ${gz_args:+($gz_args)}"
+    echo "== restart Gazebo"
     docker exec $GZ bash -c 'pkill -INT -f "[r]os2 launch connection_wheelchair"'
     for _ in $(seq 30); do
       [ "$(docker exec $GZ bash -c 'pgrep -c -x gzserver; pgrep -c -x gzclient' | paste -sd+ | bc)" = 0 ] && break
       sleep 1
     done
     docker exec $GZ pkill -KILL -x gzserver 2>/dev/null; docker exec $GZ pkill -KILL -x gzclient 2>/dev/null
-    docker exec -d $GZ bash -ic "ros2 launch connection_wheelchair connection_wheelchair.launch.py $gz_args > /tmp/claude_gazebo_launch.log 2>&1"
+    docker exec -d $GZ bash -ic "ros2 launch connection_wheelchair connection_wheelchair.launch.py > /tmp/claude_gazebo_launch.log 2>&1"
     for _ in $(seq 60); do
       cx 'timeout 5 ros2 topic echo --once --no-daemon --spin-time 3 /wheelchair/odom > /dev/null 2>&1' && break
       sleep 2
@@ -103,22 +99,16 @@ if [ "$target" = gazebo ]; then
   fi
   [ "$(count_loc)" = 0 ] || { echo "localization processes are still running in ${WHERE:-this container}"; exit 1; }
   cx "rm -rf $BAGS/$bag $BAGS/${bag}_phases.txt $BAGS/${bag}_drive.log $BAGS/${bag}_info.yaml"
-  if [ "$use_loc" = false ]; then
-    echo "== start recording（自己位置推定は起動しない）"
-    cbg "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$tag.log 2>&1"
-    sleep 1
-  else
-    echo "== start recording and localization ${extra:+($extra)}"
-    cbg "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$tag.log 2>&1"
-    sleep 1
-    cbg "ros2 launch localization_bringup localization.launch.py env:=gazebo rviz:=false $extra > /tmp/launch_$tag.log 2>&1"
-    sleep 25   # 地図の読み込みと NDT の収束を待つ
-  fi
+  echo "== start recording and localization ${extra:+($extra)}"
+  cbg "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$tag.log 2>&1"
+  sleep 1
+  cbg "ros2 launch localization_bringup localization.launch.py env:=gazebo rviz:=false $extra > /tmp/launch_$tag.log 2>&1"
+  sleep 25   # 地図の読み込みと NDT の収束を待つ
   echo "== drive"
   cx "$DT $profile --yes 2>&1 | tee /tmp/drive_$tag.log; exit \${PIPESTATUS[0]}"
   status=$?
 else
-  # 自己位置推定（/ekf_pose）・指令を受ける whill_driver・録画するトピックは drive_test.py が確かめる（欠けていれば走らずに止める）
+  # 自己位置推定（/tf の map -> base）・指令を受ける whill_driver・録画するトピックは drive_test.py が確かめる（欠けていれば走らずに止める）
   if cx "test -e $BAGS/$bag"; then echo "$BAGS/$bag は既にある（別の名前にする）"; exit 1; fi
   echo "== start recording"
   cbg "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$tag.log 2>&1"
@@ -132,7 +122,7 @@ cx "cp /tmp/drive_phases.txt $BAGS/${bag}_phases.txt; cp /tmp/drive_$tag.log $BA
 sleep 3
 echo "== stop"
 stop_bg "ros2 bag record -o $BAGS/$bag"
-if [ "$target" = gazebo ] && [ "$use_loc" != false ]; then
+if [ "$target" = gazebo ]; then
   stop_bg "ros2 launch localization_bringup"
   sleep 8
   echo "remaining localization processes: $(count_loc)"

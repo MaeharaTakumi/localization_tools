@@ -2,7 +2,7 @@
 """calibrate_mount_scale.py の図（calibrate_mount_scale.py から呼ぶ）.
 
   左：その場の旋回の LiDAR の位置（回転の中心からの位置）と、推定した取付・今の取付の円
-  中・右：区間ごとの omega・v の倍率（推定値と今の設定の線。--truth なら真値からの倍率の点）
+  中・右：区間ごとの omega・v の倍率（推定値と今の設定の線）
 plot_mount_yaw：直進の区間の各時刻の取付の yaw（RANSAC のインライア・外れ値）と、最終的な取付の yaw（<出力>_yaw.png）
 """
 import math
@@ -18,7 +18,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localizat
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
 from plot_style import capitalize_labels, INK, setup, style, SURFACE, TRUTH_COLOR, TRUTH_LW  # noqa: E402
 
-C_EST, C_SEG, C_TRUTH, C_OUT = '#2a78d6', '#1baf7a', '#eb6834', '#eda100'
+C_EST, C_SEG, C_OUT = '#2a78d6', '#1baf7a', '#eda100'
 
 
 def plot_mount_scale(path, turns, sol, out, now):
@@ -58,9 +58,6 @@ def plot_mount_scale(path, turns, sol, out, now):
         ax.axhline(cur, color=TRUTH_COLOR, lw=TRUTH_LW, zorder=2, label=f'Current setting {cur:.3f}')
         ax.axhline(out[key], color=C_EST, lw=1.4, zorder=3, label=f'Estimated {out[key]:.4f}')
         ax.scatter(x, [r['ratio'] for r in rows], s=46, color=C_SEG, zorder=4, label='Each segment (NDT / odometry)')
-        if 'truth_ratio' in rows[0]:
-            ax.scatter(x, [r['truth_ratio'] for r in rows], s=18, color=C_TRUTH, zorder=5,
-                       label='Truth / odometry (Gazebo only)')
         vals = [r['ratio'] for r in rows] + [cur, out[key]]
         lo, hi = min(vals), max(vals)
         ax.set_ylim(lo - (hi - lo) * 0.6 - 0.005, hi + (hi - lo) * 0.9 + 0.005)

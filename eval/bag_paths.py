@@ -2,7 +2,7 @@
 
   /root/ros2_ws/bags/gazebo/<名前>          Gazebo の録画（<名前>_phases.txt：動作の開始時刻、<名前>_drive.log：走行のログ、
                                             <名前>_info.yaml：録画の情報）
-  /root/ros2_ws/bags/gazebo/tune/<試行名>   その再生の出力（tune_run.py・compare_run.py）
+  /root/ros2_ws/bags/gazebo/tune/<試行名>   その再生の出力（replay_outputs.py）
   /root/ros2_ws/bags/gazebo/check/<名前>    ツールの動作確認などの録画（比較・調整には使わない。run_test.sh の bag 名を check/<名前> にする）
   /root/ros2_ws/bags/real/<名前>            実機の録画（同じく _info.yaml を付ける）
   /root/ros2_ws/bags/real/tune/<試行名>     その再生の出力

@@ -25,7 +25,6 @@ record_topics:
   - /wheelchair/diff_drive_controller/cmd_vel
   - /tf_static
   - /tf
-  - /ekf_pose
   - /ekf_odom
   - /ndt_pose
   - /localization_debug

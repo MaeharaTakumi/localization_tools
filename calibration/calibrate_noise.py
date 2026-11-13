@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """観測ノイズの共分散 R（オドメトリ・NDT）を、真値を使わずに録画から求める（コンテナ test 内で実行）.
 
-  python3 calibrate_noise.py <bag> [--out <出力の接頭辞>] [--truth] [オプション]（オプションの既定値は param/calibrate.yaml）
+  python3 calibrate_noise.py <bag> [--out <出力の接頭辞>] [オプション]（オプションの既定値は param/calibrate.yaml）
 
 考え方（実機と同じく真値なしで求める）
 - 指令（cmd_vel）が一定の区間（変化の --settle 秒後から次の変化の --margin 秒前まで）では、車体の真の速度・姿勢は
@@ -19,7 +19,6 @@
 - 時間的なつながりの補正（既定で有効、--no-correlation で無効）：EKF は観測ノイズを毎回独立とみなすが、実際の誤差は
   つながっている（同じ情報が何度も来るのと同じ）。長めの窓（--corr-window）の残差の自己相関 rho_k から
   積分相関時間 tau_int = 1 + 2 sum rho_k（rho_k が正の間、--max-lag 秒まで）を求め、R_eff = 分散 x tau_int を推奨値にする
-- --truth（Gazebo だけ）：同じ区間で真値（/wheelchair/pose）との差の分散も出して比べる。R の決定には使わない
 
 出力：表（標準出力）、<接頭辞>.yaml（env の parameters に貼れる形）、<接頭辞>.json、
       <接頭辞>_segments.png（区間と残差）、<接頭辞>_summary.png（標準偏差の比較）、
@@ -126,27 +125,6 @@ def ndt_residuals(t, mats, mount, half):
     return {key: res[:, i] for i, key in enumerate(NDT_KEYS)}
 
 
-def truth_errors(d, to_sim, ot, ov, ow, nt, mats, mount):
-    """（--truth）オドメトリと NDT の、真値との差（区間ごとの平均は後で引く）."""
-    from plot_velocity import truth_velocity
-    tt, tv, tw = truth_velocity(d)
-    odom = {'v': ov - np.interp(ot, tt, tv), 'omega': ow - np.interp(ot, tt, tw)}
-    pt = to_sim([t for t, _ in d['/wheelchair/pose']])
-    pv = np.array([matrix_to_vec(pose_msg_to_matrix(m)) for _, m in d['/wheelchair/pose']])
-    o = np.argsort(pt)
-    pt, pv = pt[o], pv[o]
-    pv[:, 5] = np.unwrap(pv[:, 5])
-    ndt = np.full((len(nt), 6), np.nan)
-    for k, (t, m) in enumerate(zip(nt, mats)):
-        if not pt[0] <= t <= pt[-1]:
-            continue
-        ref = vec_to_matrix([np.interp(t, pt, pv[:, i]) for i in range(6)]) @ mount
-        z, r = matrix_to_vec(m), matrix_to_vec(ref)
-        ndt[k, :3] = z[:3] - r[:3]
-        ndt[k, 3:] = wrap(z[3:] - r[3:])
-    return odom, {key: ndt[:, i] for i, key in enumerate(NDT_KEYS)}
-
-
 def correlation_time(rows, keys, rate, max_lag):
     """残差の自己相関から積分相関時間 tau_int（サンプル数）と rho_1..（各成分）を求める.
 
@@ -233,13 +211,11 @@ def main():
     ap.add_argument('--corr-window', type=float, default=noi['corr_window'], help='時間的なつながりを測るときの局所 1 次式の窓 [s]')
     ap.add_argument('--max-lag', type=float, default=noi['max_lag'], help='自己相関を足す最大の遅れ [s]')
     ap.add_argument('--no-correlation', action='store_true', help='時間的なつながりの補正をしない（R = 分散）')
-    ap.add_argument('--truth', action='store_true', help='Gazebo の真値との差も出す（比較だけ）')
     args = ap.parse_args()
     sv, sw = (float(x) for x in args.scale.split(','))
     half = args.window / 2.0
 
-    d = read_bag(args.bag, ['/clock', '/tf_static', args.odom, args.ndt, args.cmd]
-                 + (['/wheelchair/pose'] if args.truth else []))
+    d = read_bag(args.bag, ['/clock', '/tf_static', args.odom, args.ndt, args.cmd])
     if '/clock' in d:
         clk = np.array([(t, m.clock.sec + m.clock.nanosec * 1e-9) for t, m in d['/clock']])
 
@@ -262,10 +238,8 @@ def main():
     mats = [m for _, m in nd]
     t_begin, t_end = max(ot[0], nt[0]), min(ot[-1], nt[-1])
     segs = command_segments(d, args.cmd, to_sim, t_begin, t_end, args.cmd_timeout)
-    if args.truth:
-        terr_odom, terr_ndt = truth_errors(d, to_sim, ot, ov, ow, nt, mats, mount)
 
-    odom_rows, ndt_rows, truth_odom_rows, truth_ndt_rows, used = [], [], [], [], []
+    odom_rows, ndt_rows, used = [], [], []
     corr_odom, corr_ndt = [], []   # 時間的なつながりを測る残差（動いている区間、長めの窓）
     corr_straight = []             # 同じく直進の区間だけ（R_v 用）
     half_c = args.corr_window / 2.0
@@ -284,9 +258,6 @@ def main():
             corr_ndt.append(ndt_residuals(nt[mn], [mats[i] for i in np.where(mn)[0]], mount, half_c))
             if cls == 'straight':
                 corr_straight.append(corr_odom[-1])
-        if args.truth:   # 区間ごとの平均（一定のずれ）を引いた真値との差
-            truth_odom_rows.append((cls, {k: terr_odom[k][mo] - np.nanmean(terr_odom[k][mo]) for k in ODOM_KEYS}))
-            truth_ndt_rows.append((cls, {k: terr_ndt[k][mn] - np.nanmean(terr_ndt[k][mn]) for k in NDT_KEYS}))
 
     # 動いている区間（旋回 + 直進）をまとめたものを推奨値にする
     def with_moving(rows):
@@ -294,21 +265,18 @@ def main():
     classes = CLASSES + ('moving',)
     var_odom = pooled(with_moving(odom_rows), ODOM_KEYS, classes)
     var_ndt = pooled(with_moving(ndt_rows), NDT_KEYS, classes)
-    tru_odom = pooled(with_moving(truth_odom_rows), ODOM_KEYS, classes) if args.truth else None
-    tru_ndt = pooled(with_moving(truth_ndt_rows), NDT_KEYS, classes) if args.truth else None
 
     print(f'segments used (settle {args.settle} s, margin {args.margin} s, window {args.window} s):')
     for a, b, cls in used:
         print(f'  {a:8.2f} - {b:8.2f} s  {cls:<9} ({b - a:.1f} s)')
     unit = {'v': ('m/s', 1.0), 'omega': ('rad/s', 1.0), 'x': ('mm', 1e3), 'y': ('mm', 1e3), 'z': ('mm', 1e3),
             'roll': ('deg', math.degrees(1.0)), 'pitch': ('deg', math.degrees(1.0)), 'yaw': ('deg', math.degrees(1.0))}
-    print(f"\n{'std (sigma)':<14}" + ''.join(f'{c:>13}' for c in classes) + ('   truth(moving)' if args.truth else ''))
-    for keys, var, tru in ((ODOM_KEYS, var_odom, tru_odom), (NDT_KEYS, var_ndt, tru_ndt)):
+    print(f"\n{'std (sigma)':<14}" + ''.join(f'{c:>13}' for c in classes))
+    for keys, var in ((ODOM_KEYS, var_odom), (NDT_KEYS, var_ndt)):
         for k in keys:
             u, f = unit[k]
             cells = ''.join(f'{math.sqrt(var[c][k][0]) * f:13.4f}' if var[c][k][1] else f'{"-":>13}' for c in classes)
-            extra = f'{math.sqrt(tru["moving"][k][0]) * f:16.4f}' if tru else ''
-            print(f'{k + " [" + u + "]":<14}' + cells + extra)
+            print(f'{k + " [" + u + "]":<14}' + cells)
     print('  (n = ' + ', '.join(f'{c} {var_odom[c]["v"][1]}/{var_ndt[c]["x"][1]}' for c in classes)
           + '  [odom/ndt samples])')
 
@@ -365,7 +333,7 @@ def main():
         yaml.safe_dump(snippet, f, sort_keys=False)
     with open(args.out + '.json', 'w') as f:
         json.dump({'bag': args.bag, 'segments': used, 'odom': var_odom, 'ndt': var_ndt,
-                   'truth_odom': tru_odom, 'truth_ndt': tru_ndt, 'R_odom': r_odom, 'R_ndt': r_ndt,
+                   'R_odom': r_odom, 'R_ndt': r_ndt,
                    'R_odom_white': [r_v_white, r_w_tread_white], 'R_ndt_white': r_ndt_white,
                    'R_odom_moving': r_odom_moving, 'R_odom_moving_white': r_odom_white,
                    'R_v_from': v_from, 'tau_v': tau_v, 'tread': args.tread, 'scale': [sv, sw],
@@ -376,7 +344,7 @@ def main():
     from plot_noise import plot_segments, plot_summary
     plot_segments(args.out + '_segments.png', ot, ov, ow, nt, used, odom_rows, ndt_rows, segs, half)
     tau = None if args.no_correlation else {k: v[0] for k, v in list(tau_odom.items()) + list(tau_ndt.items())}
-    plot_summary(args.out + '_summary.png', var_odom, var_ndt, tru_odom, tru_ndt, tau)
+    plot_summary(args.out + '_summary.png', var_odom, var_ndt, tau)
     plot_residual_hist(args.out + '_hist.png', odom_rows, ndt_rows, math.sqrt(r_w_tread_white), args)
 
 

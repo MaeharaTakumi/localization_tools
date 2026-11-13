@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """LiDAR の取付位置とオドメトリの倍率を、NDT の解とオドメトリから推定する（真値なし。コンテナ test 内で実行）.
 
-  python3 calibrate_mount_scale.py <bag> [<bag> ...] [--out /root/ros2_ws/fig/mount_scale] [--truth] [--map <地図の pcd>]
+  python3 calibrate_mount_scale.py <bag> [<bag> ...] [--out /root/ros2_ws/fig/mount_scale] [--map <地図の pcd>]
 
 使う走行：その場の旋回（取付位置・omega の倍率）と直進（v の倍率・取付の yaw）。区間は指令（cmd_vel）が一定のところ
 （変化の --settle 秒後から次の変化の --margin 秒前まで）。パラメータ推定用の動き（calibration/param/motion.yaml）や drive の spin・stops の走行で求まる。
@@ -21,7 +21,6 @@
   この方法に決めた）
 - 取付の z・roll・pitch（参考）：止まっている区間の NDT の roll・pitch（床が水平と仮定）と、--map の地図から求めた
   床の高さとの差（地図の床が正しいと仮定）
-- --truth（Gazebo だけ）：/tf_static の取付と、真値の yaw の変化・移動距離から求めた倍率を並べて出す
 入力の odom は倍率を掛ける前の値（/wheelchair/odom など）。今の設定（--current-scale、/tf_static の取付）と比べる。
 """
 import argparse
@@ -47,8 +46,7 @@ def rot(a):
 
 
 def load(bag, args):
-    d = read_bag(bag, ['/clock', '/tf_static', args.odom, args.ndt, args.cmd]
-                 + (['/wheelchair/pose'] if args.truth else []))
+    d = read_bag(bag, ['/clock', '/tf_static', args.odom, args.ndt, args.cmd])
     if '/clock' in d:
         clk = np.array([(t, m.clock.sec + m.clock.nanosec * 1e-9) for t, m in d['/clock']])
 
@@ -64,16 +62,8 @@ def load(bag, args):
     nv = np.array([v for _, v in nd])
     nv[:, 5] = np.unwrap(nv[:, 5])
     segs = command_segments(d, args.cmd, to_sim, max(ot[0], nt[0]), min(ot[-1], nt[-1]), args.cmd_timeout)
-    truth = None
-    if args.truth and '/wheelchair/pose' in d:
-        pt = to_sim([t for t, _ in d['/wheelchair/pose']])
-        pv = np.array([matrix_to_vec(pose_msg_to_matrix(m)) for _, m in d['/wheelchair/pose']])
-        o = np.argsort(pt)
-        pt, pv = pt[o], pv[o]
-        pv[:, 5] = np.unwrap(pv[:, 5])
-        truth = (pt, pv)
     return {'name': os.path.basename(bag.rstrip('/')), 'd': d, 'ot': ot, 'ov': ov, 'ow': ow, 'nt': nt, 'nv': nv,
-            'segs': segs, 'truth': truth}
+            'segs': segs}
 
 
 def integrate(t, y, a, b):
@@ -228,14 +218,13 @@ def main():
     ap.add_argument('--ransac-iterations', type=int, default=ms['ransac_iterations'], help='取付の yaw：RANSAC の回数')
     ap.add_argument('--current-scale', default='1.0,0.922', help='今の odom_scale [v, omega]（比べるだけ）')
     ap.add_argument('--map', default='', help='地図の pcd（取付の z を床の高さから求めるとき）')
-    ap.add_argument('--truth', action='store_true', help='Gazebo の真値でも同じ量を求めて並べる（比較だけ）')
     args = ap.parse_args()
 
     runs = [load(b, args) for b in args.bags]
     mount_now = mount_from_tf_static(runs[0]['d'].get('/tf_static', []), args.base, args.lidar)
     cur_v, cur_w = (float(x) for x in args.current_scale.split(','))
 
-    turns, w_rows, v_rows, yaw_rows, stops = [], [], [], [], []
+    turns, w_rows, v_rows, stops = [], [], [], []
     for r in runs:
         for t0, t1, v, w in r['segs']:
             a, b = t0 + args.settle, t1 - args.margin
@@ -248,16 +237,10 @@ def main():
             nt, nv = r['nt'][mn], r['nv'][mn]
             ta, tb = nt[0], nt[-1]
             row = {'bag': r['name'], 'cls': cls, 't0': float(ta), 't1': float(tb)}
-            if r['truth'] is not None:
-                pt, pv = r['truth']
-                tru_a = np.array([np.interp(ta, pt, pv[:, i]) for i in range(6)])
-                tru_b = np.array([np.interp(tb, pt, pv[:, i]) for i in range(6)])
             if cls == 'turning':
                 dyaw = float(nv[-1, 5] - nv[0, 5])
                 odom = integrate(r['ot'], r['ow'], ta, tb)
                 row.update(dyaw=dyaw, odom=odom, ratio=dyaw / odom)
-                if r['truth'] is not None:
-                    row['truth_ratio'] = float((tru_b[5] - tru_a[5]) / odom)
                 w_rows.append(row)
                 turns.append((nt, nv[:, :2], nv[:, 5]))
             elif cls == 'straight':
@@ -266,8 +249,6 @@ def main():
                 mo = (r['ot'] >= a) & (r['ot'] <= b)
                 row.update(dist=dist, odom=odom, ratio=dist / abs(odom),
                            _nt=nt, _nv=nv, _ot=r['ot'][mo], _ov=r['ov'][mo], _ow=r['ow'][mo])
-                if r['truth'] is not None:
-                    row['truth_ratio'] = float(np.hypot(*(tru_b[:2] - tru_a[:2])) / abs(odom))
                 v_rows.append(row)
             elif cls == 'stopped':
                 stops.append({'bag': r['name'], 'vec': nv.mean(axis=0)})
@@ -279,17 +260,15 @@ def main():
         out['omega_scale'] = sw
         print(f'\nomega scale (NDT yaw change / odometry): {sw:.4f}   now {cur_w}')
         for x in w_rows:
-            extra = f"  truth {x['truth_ratio']:.4f}" if 'truth_ratio' in x else ''
             print(f"  {x['bag']:<18} {x['t0']:8.2f}-{x['t1']:8.2f}  {math.degrees(x['dyaw']):8.1f} deg / "
-                  f"{math.degrees(x['odom']):8.1f} deg = {x['ratio']:.4f}{extra}")
+                  f"{math.degrees(x['odom']):8.1f} deg = {x['ratio']:.4f}")
     if v_rows:
         sv = sum(x['dist'] for x in v_rows) / sum(abs(x['odom']) for x in v_rows)
         out['v_scale'] = sv
         print(f'\nv scale (NDT distance / odometry): {sv:.4f}   now {cur_v}')
         for x in v_rows:
-            extra = f"  truth {x['truth_ratio']:.4f}" if 'truth_ratio' in x else ''
             print(f"  {x['bag']:<18} {x['t0']:8.2f}-{x['t1']:8.2f}  {x['dist']:7.3f} m / {abs(x['odom']):7.3f} m = "
-                  f"{x['ratio']:.4f}{extra}")
+                  f"{x['ratio']:.4f}")
     now = matrix_to_vec(mount_now) if mount_now is not None else np.full(6, np.nan)
     if turns:
         m_rot, m_sd, rms, sol = fit_offset(turns)

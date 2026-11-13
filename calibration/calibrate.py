@@ -13,8 +13,6 @@ target ごとの値は設定から読む（calibrate_noise.py・calibrate_mount_
 R は R_odom・R_ndt とも走行中の残差（前後 window/2 秒の滑らかな動きからのばらつき）から求める（calibrate_noise.py）。
 出力（既定 /root/ros2_ws/fig/calibration/<bag 名>/）：noise.*（calibrate_noise.py）、mount_scale.*・mount_scale_yaw.png
 （calibrate_mount_scale.py）、summary.yaml（param/<target>/ekf_localizer.yaml などに入れる候補と今の値。yaml には書き込まない）。
-Gazebo は、録画に真値（/wheelchair/pose）があれば --truth で真値との比較も出す（2026-11-13 から Gazebo の録画に真値を入れないので、
-それより後の録画では出ない）。
 """
 import argparse
 import json
@@ -56,19 +54,16 @@ def main():
         tread_from = f'{env_dir(args.target)}/whill_odometry.yaml'
     common = ['--odom', ODOM_TOPIC, '--cmd', cfg['command']['topic'],
               '--base', ekf.get('base_frame_id', 'base_link'), '--lidar', ekf.get('lidar_frame_id', 'velodyne')]
-    with open(os.path.join(bag, 'metadata.yaml')) as f:
-        recorded = {t['topic_metadata']['name'] for t in yaml.safe_load(f)['rosbag2_bagfile_information']['topics_with_message_count']}
-    truth = ['--truth'] if args.target == 'gazebo' and '/wheelchair/pose' in recorded else []
     sc = f'{scale[0]},{scale[1]}'
     print(f'== {args.target}: env {env_dir(args.target)}, odom_scale {scale}, tread {tread} m ({tread_from})', flush=True)
 
     py = sys.executable
     print('\n== observation noise (calibration/calibrate_noise.py)', flush=True)
     subprocess.run([py, os.path.join(ROOT, 'calibration', 'calibrate_noise.py'), bag, '--out', f'{out}/noise',
-                    '--scale', sc, '--tread', str(tread)] + common + truth, check=True)
+                    '--scale', sc, '--tread', str(tread)] + common, check=True)
     print('\n== odometry scale and LiDAR mount (calibration/calibrate_mount_scale.py)', flush=True)
     subprocess.run([py, os.path.join(ROOT, 'calibration', 'calibrate_mount_scale.py'), bag, '--out', f'{out}/mount_scale',
-                    '--current-scale', sc] + common + truth + (['--map', args.map] if args.map else []), check=True)
+                    '--current-scale', sc] + common + (['--map', args.map] if args.map else []), check=True)
 
     noise = json.load(open(f'{out}/noise.json'))
     mount_scale = json.load(open(f'{out}/mount_scale.json'))
@@ -110,7 +105,7 @@ def main():
             f"{noise['R_odom_moving'][1]:.3g}（動いている区間）",
             'R はいまの odom_scale を掛けたオドメトリで求めた。odom_scale を変えるなら、変えてから走り直すと R も合う',
             'roll・pitch は床が水平、z は地図の床が正しいと仮定（参考）。角度は rad',
-            '入れる前に録画の再生（eval/tune_run.py など）で確かめる（R を小さくすると NDT の別の解に飛びついて振動することがある）',
+            '入れる前に録画の再生（eval/replay_outputs.py）で確かめる（R を小さくすると NDT の別の解に飛びついて振動することがある）',
         ],
     }
     with open(f'{out}/summary.yaml', 'w') as f:

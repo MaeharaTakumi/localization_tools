@@ -4,7 +4,7 @@
   python3 plot_matlab_outputs.py <出力を録った bag> <出力 png> [--input <入力 bag>]                     1 回分の確かめと図
   python3 plot_matlab_outputs.py compare <出力 png> <ラベル>=<bag>[,<bag>...] ... [--input <入力 bag>]  ラベルごとの平均と幅、分布の図
 
-出力の bag は eval/replay_outputs.py で録ったもの（/tf・/tf_static・/ndt_pose・/clock。Gazebo は /wheelchair/pose も）。
+出力の bag は eval/replay_outputs.py で録ったもの（/tf・/tf_static・/ndt_pose・/clock）。
 確かめること（結果は標準出力。最後の行は METRICS <1 行 JSON>）：
   tf          map -> base の /tf の stamp の間隔（predict_rate の周期か）と、stamp から受信までの時間
   tf_wait     点群の stamp（/ndt_pose の stamp）より後の /tf が届くまでの時間（点群の stamp から）。NDT と MATLAB が
@@ -18,8 +18,7 @@
   prior_ndt   prior − NDT の解（/ndt_pose）。NDT が初期値からどれだけ動いたか
   prior_post  prior − NDT で更新した直後の値（/tf_ndt_update に取付）。2026-10-26 まで MATLAB が使っていた vlp16_pose との差。
               /tf_ndt_update は 2026-10-26 にやめたので、それより前の録画（dev_log.md の 68 の再生など）だけ
-  Gazebo だけ prior_truth・post_truth（真値の LiDAR との差。真値は /wheelchair/pose に URDF の取付）
-差は水平の位置 [mm] と |yaw| [deg]。prior_ndt・prior_truth は |z| [mm]・|roll|・|pitch| [deg] も（2026-11-05）。受信の時刻は bag の時刻（壁時計）。stamp は /clock で壁時計に直す。
+差は水平の位置 [mm] と |yaw| [deg]。prior_ndt は |z| [mm]・|roll|・|pitch| [deg] も（2026-11-05）。受信の時刻は bag の時刻（壁時計）。stamp は /clock で壁時計に直す。
 図（1 回分）：(1) 点群の stamp から TF が届くまでの時間の分布、(2)(3) prior − NDT の解、prior − NDT で更新した直後の値の時間推移。
 """
 import json
@@ -37,7 +36,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localizat
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]   # 共通部品（common/）などを import する
 from bag_io import mount_from_tf_static, phases_of, read_bag, stamp_ns  # noqa: E402
 from plot_style import box_on, capitalize_labels, INK2, SERIES, setup, style, SURFACE, widths_back_to_front  # noqa: E402
-from pose_math import matrix_to_vec, pose_msg_to_matrix, transform_msg_to_matrix, vec_to_matrix  # noqa: E402
+from pose_math import matrix_to_vec, pose_msg_to_matrix, transform_msg_to_matrix  # noqa: E402
 
 LIDAR_FRAME = 'velodyne'   # 環境ファイルの lidar_frame_id
 
@@ -183,16 +182,10 @@ def check(bag, in_bag=None):
     out['n_ndt'] = len(ndt)
     out['ndt_latency'] = stats('/ndt_pose: cloud stamp -> receipt', [(t - to_wall(k)) * 1e3 for k, (t, _) in ndt.items()])
 
-    truth = None
-    if '/wheelchair/pose' in read_bag(bag, ['/wheelchair/pose']):
-        from compare_run import load, truth_lidar  # noqa: E402  Gazebo だけ
-        tt, tv, *_ = load(bag)
-        truth = (tt, tv, truth_lidar)
-
     delays = cloud_delays(in_bag) if in_bag else {}
     waits = []   # 点群が届いてから TF が揃うまで [ms]
-    rows = []   # [stamp s, tf_wait ms, prior-ndt xy, yaw, prior-post xy, yaw, prior-truth xy, yaw, post-truth xy, yaw]
-    zrp = {'prior_ndt': [], 'prior_truth': []}   # z, roll, pitch の差（rows と同じ順）
+    rows = []   # [stamp s, tf_wait ms, prior-ndt xy, yaw, prior-post xy, yaw]
+    zrp = {'prior_ndt': []}   # z, roll, pitch の差（rows と同じ順）
     for k in sorted(ndt):
         avail = interp.available(k)
         if avail is None:
@@ -211,12 +204,6 @@ def check(bag, in_bag=None):
         row = [k * 1e-9, (avail - to_wall(k)) * 1e3, *diff(prior, ndt[k][1])]
         row += [*diff(prior, post[k] @ mount)] if k in post else [np.nan, np.nan]
         zrp['prior_ndt'].append(diff_zrp(prior, ndt[k][1]))
-        if truth is not None:
-            tt, tv, truth_lidar = truth
-            Tl = vec_to_matrix(truth_lidar(tt, tv, [k * 1e-9])[0])
-            row += [*diff(prior, Tl)]
-            zrp['prior_truth'].append(diff_zrp(prior, Tl))
-            row += [*diff(post[k] @ mount, Tl)] if k in post else [np.nan, np.nan]
         rows.append(row)
     rows = np.array(rows)
     out['tf_wait'] = stats('cloud stamp -> the first /tf after it (receipt)', rows[:, 1])
@@ -224,7 +211,7 @@ def check(bag, in_bag=None):
         out['tf_wait_receipt'] = stats('cloud receipt -> the TF at the cloud stamp available', waits)
         out['waited'] = float(np.mean(np.array(waits) > 0))
         print(f'  waited for the TF: {out["waited"] * 100:.1f} % of {len(waits)} clouds')
-    names = [('prior_ndt', 2), ('prior_post', 4)] + ([('prior_truth', 6), ('post_truth', 8)] if truth else [])
+    names = [('prior_ndt', 2), ('prior_post', 4)]
     for name, i in names:
         ok = ~np.isnan(rows[:, i])
         out[name] = {'xy': stats(f'{name} (horizontal)', rows[ok, i] * 1e3, 'mm'),
@@ -290,8 +277,7 @@ def compare(out, groups, in_bag=None):
             ('ndt_latency', 'mean'), ('n_ndt', None),
             ('prior_ndt', 'xy', 'mean'), ('prior_ndt', 'xy', 'max'), ('prior_ndt', 'yaw', 'mean'),
             ('prior_ndt', 'yaw', 'max'), ('prior_post', 'xy', 'mean'), ('prior_post', 'xy', 'max'),
-            ('prior_post', 'yaw', 'mean'), ('prior_post', 'yaw', 'max'), ('prior_truth', 'xy', 'mean'),
-            ('prior_truth', 'yaw', 'mean'), ('post_truth', 'xy', 'mean'), ('post_truth', 'yaw', 'mean')]
+            ('prior_post', 'yaw', 'mean'), ('prior_post', 'yaw', 'max')]
 
     def get(m, key):
         for p in key:

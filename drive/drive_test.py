@@ -8,14 +8,13 @@
   --profiles <yaml> で動きのファイルを変える（既定 drive/profiles.yaml。推定用の動きは calibration/motion.py が作る）
     target：gazebo、実機の車椅子 red・blue・white（drive/config/<target>.yaml）、または設定の yaml のパス
 
-走る前に確かめる（1 つのノードで。どれかが欠けたら走らずに止める）：取付（feedback の lidar: true のとき）が TF から 5 s 以内に引けること、
-姿勢（feedback）が 15 s 以内に届き新しいこと、
+走る前に確かめる（1 つのノードで。どれかが欠けたら走らずに止める）：姿勢（feedback）が 15 s 以内に届き新しいこと、
 指令のトピックを受けるノード（実機は whill_driver。録画は数えない）が 5 s 以内に見つかること。録画するトピックで無いものは表示するだけ。
 走る前に、出発時の姿勢を基準に計算した軌跡を表示する（走ってよい範囲の確認は 2026-11-07 にユーザー指示でやめた）。
 走行中は次のどれかで止める（0 の指令を出して終わる。終了コード 1）：
-  - feedback_timeout より新しい姿勢が無い（姿勢は feedback：Gazebo は真値、実機は /ekf_pose（LiDAR）を取付で車体に直したもの。
-    取付は base -> LiDAR の TF（実機は launch の static_tfs、Gazebo は URDF）。フレームは localization_bringup の
-    param/<target>/ekf_localizer.yaml の base_frame_id・lidar_frame_id。実機で自己位置推定が止まった）
+  - feedback_timeout より新しい姿勢が無い（姿勢は feedback：Gazebo は真値 /wheelchair/pose、実機は自己位置推定の /tf の
+    map -> base（type: tf。ekf_localizer が 50 Hz で出す。フレームは localization_bringup の param/<target>/ekf_localizer.yaml の
+    map_frame_id・base_frame_id。1 つのメッセージに入っている刻みのうち、今の時刻以下で最も新しいもの）。実機で自己位置推定が止まった）
   - ジョイスティックが倒された（実機。whill_driver も手での操作を優先する）
   - 1 区間が max_segment_time を超えた、Ctrl-C
 confirm: true（実機）なら、計画を表示して Enter を押すまで走らない（何か入力して Enter なら取りやめ。--yes で省く）。
@@ -195,11 +194,9 @@ def plan_report(cfg, segs, name):
 # 走らせる（ROS）
 # ---------------------------------------------------------------------------
 
-def quat_matrix(q):
-    x, y, z, w = q.x, q.y, q.z, q.w
-    return np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
-                     [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
-                     [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+def yaw_of(q):
+    """クォータニオンの yaw [rad]（Z-Y-X のオイラー角の Z）."""
+    return math.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z))
 
 
 def run(cfg, segs, name, args):
@@ -208,14 +205,17 @@ def run(cfg, segs, name, args):
     import rclpy
     from rclpy.node import Node
     from rclpy.parameter import Parameter
-    from rclpy.qos import qos_profile_sensor_data, QoSProfile, ReliabilityPolicy, DurabilityPolicy
+    from rclpy.qos import qos_profile_sensor_data, QoSProfile, ReliabilityPolicy
 
     fb_cfg, cmd_cfg, joy_cfg = cfg['feedback'], cfg['command'], cfg.get('joystick')
-    if fb_cfg.get('lidar'):   # 姿勢は LiDAR のもの。取付（base -> LiDAR）を TF から引いて車体に直す
+    if fb_cfg['type'] == 'tf':   # 自己位置推定の /tf の map -> base
         sys.path.insert(0, os.path.join(ROOT, 'common'))
         from env_files import node_params
         ekf = node_params(cfg['target'], 'ekf_localizer')
-        frames = (ekf.get('base_frame_id', 'base_link'), ekf.get('lidar_frame_id', 'velodyne'))
+        frames = (ekf.get('map_frame_id', 'map'), ekf.get('base_frame_id', 'base_link'))
+        fb_name = f'/tf の {frames[0]} -> {frames[1]}'
+    else:
+        fb_name = fb_cfg['topic']
 
     class Driver(Node):
 
@@ -234,51 +234,43 @@ def run(cfg, segs, name, args):
             if fb_cfg['type'] == 'pose':
                 from geometry_msgs.msg import Pose
                 self.create_subscription(Pose, fb_cfg['topic'], lambda m: self.on_pose(m), qos_profile_sensor_data)
+            elif fb_cfg['type'] == 'tf':
+                from tf2_msgs.msg import TFMessage
+                self.create_subscription(TFMessage, '/tf', self.on_tf,
+                                         QoSProfile(depth=100, reliability=ReliabilityPolicy.RELIABLE))
             else:
-                from geometry_msgs.msg import PoseWithCovarianceStamped
-                qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
-                                 durability=DurabilityPolicy.TRANSIENT_LOCAL)
-                self.create_subscription(PoseWithCovarianceStamped, fb_cfg['topic'],
-                                         lambda m: self.on_pose(m.pose.pose), qos)
-            self.mount = None       # T_BL⁻¹（T_B = T_L · T_BL⁻¹）。lidar: true のとき TF から引く
-            if fb_cfg.get('lidar'):
-                import tf2_ros
-                self.tf_buffer = tf2_ros.Buffer()
-                self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self, spin_thread=False)
+                raise SystemExit(f"feedback の type は pose か tf：{fb_cfg['type']}")
             self.joy = 0.0
             if joy_cfg:
                 from geometry_msgs.msg import Vector3Stamped
                 self.create_subscription(Vector3Stamped, joy_cfg['topic'], self.on_joy, qos_profile_sensor_data)
 
         def on_pose(self, p):
+            """車体の姿勢（geometry_msgs/Pose）."""
             if self.now() == 0.0:
-                return   # sim time の時計が動き出す前（transient_local の古い値が先に届く）。受け取った時刻が分からない
-            if fb_cfg.get('lidar') and self.mount is None:
-                return   # 取付がまだ引けていない
-            t = np.eye(4)
-            t[:3, :3] = quat_matrix(p.orientation)
-            t[:3, 3] = (p.position.x, p.position.y, p.position.z)
-            if self.mount is not None:
-                t = t @ self.mount
-            self.pose = (t[0, 3], t[1, 3], math.atan2(t[1, 0], t[0, 0]))
+                return   # sim time の時計が動き出す前。受け取った時刻が分からない
+            self.pose = (p.position.x, p.position.y, yaw_of(p.orientation))
             self.pose_time = self.now()
             self.pose_mono = _time.monotonic()
 
-        def lookup_mount(self):
-            """base -> LiDAR の TF を引けたら self.mount に入れる."""
-            from rclpy.time import Time
-            try:
-                tr = self.tf_buffer.lookup_transform(frames[0], frames[1], Time()).transform
-            except Exception:
-                return False
-            m = np.eye(4)
-            m[:3, :3] = quat_matrix(tr.rotation)
-            m[:3, 3] = (tr.translation.x, tr.translation.y, tr.translation.z)
-            self.mount = np.linalg.inv(m)
-            r = math.atan2(m[2, 1], m[2, 2]); pi = math.asin(-max(-1.0, min(1.0, m[2, 0]))); y = math.atan2(m[1, 0], m[0, 0])
-            print(f'mount {frames[0]} -> {frames[1]} (from TF): xyz [{m[0, 3]:.3f}, {m[1, 3]:.3f}, {m[2, 3]:.3f}], '
-                  f'rpy [{r:.4f}, {pi:.4f}, {y:.4f}]', flush=True)
-            return True
+        def on_tf(self, m):
+            """/tf の map -> base。ekf_localizer は 1 つのメッセージで前後の刻みを送り直すので、今の時刻以下で最も新しい stamp を使う."""
+            now = self.now()
+            if now == 0.0:
+                return
+            best = None
+            for tr in m.transforms:
+                if tr.header.frame_id != frames[0] or tr.child_frame_id != frames[1]:
+                    continue
+                st = tr.header.stamp.sec + tr.header.stamp.nanosec * 1e-9
+                if st <= now and (best is None or st > best[0]):
+                    best = (st, tr.transform)
+            if best is None:
+                return
+            t = best[1]
+            self.pose = (t.translation.x, t.translation.y, yaw_of(t.rotation))
+            self.pose_time = now
+            self.pose_mono = _time.monotonic()
 
         def on_joy(self, m):
             self.joy = max(abs(m.vector.x), abs(m.vector.y))
@@ -321,24 +313,17 @@ def run(cfg, segs, name, args):
         return _time.monotonic() - node.pose_mono
 
     try:
-        if fb_cfg.get('lidar'):
-            t_wait = _time.monotonic()
-            while not node.lookup_mount() and _time.monotonic() - t_wait < 5.0:
-                rclpy.spin_once(node, timeout_sec=0.05)
-            if node.mount is None:
-                raise RuntimeError(f'取付の TF（{frames[0]} -> {frames[1]}）が 5 s 引けない。'
-                                   '自己位置推定（実機は launch が static_tfs を出す）・Gazebo が動いているか確かめる')
         wall_limit = 15.0
         t_wait = _time.monotonic()
         while (node.now() == 0.0 or node.pose is None) and _time.monotonic() - t_wait < wall_limit:
             rclpy.spin_once(node, timeout_sec=0.1)
         if node.pose is None:
-            raise RuntimeError(f"姿勢（{fb_cfg['topic']}）が {wall_limit:.0f} s 届かない。自己位置推定（実機）・Gazebo が動いているか確かめる")
+            raise RuntimeError(f"姿勢（{fb_name}）が {wall_limit:.0f} s 届かない。自己位置推定（実機）・Gazebo が動いているか確かめる")
         t_wait = _time.monotonic()   # 新しい姿勢が届き続けていること（止まった推定の最後の値で走り出さない）
         while stale() > cfg['feedback_timeout'] and _time.monotonic() - t_wait < 3.0:
             rclpy.spin_once(node, timeout_sec=0.05)
         if stale() > cfg['feedback_timeout']:
-            raise RuntimeError(f"姿勢（{fb_cfg['topic']}）が {stale():.1f} s 更新されていない")
+            raise RuntimeError(f"姿勢（{fb_name}）が {stale():.1f} s 更新されていない")
 
         def receivers(topic=cmd_cfg['topic']):
             """指令を受けるノード（録画の ros2 bag record も購読するので数えない）."""
@@ -359,7 +344,7 @@ def run(cfg, segs, name, args):
             raise RuntimeError('ジョイスティックが倒れている')
         print(plan_report(cfg, segs, name), flush=True)
         if cfg.get('confirm') and not args.yes:
-            print(f"\n指令のトピック {cmd_cfg['topic']}、姿勢 {fb_cfg['topic']}。周りの安全を確かめ、"
+            print(f"\n指令のトピック {cmd_cfg['topic']}、姿勢 {fb_name}。周りの安全を確かめ、"
                   "ジョイスティックですぐ止められるようにしてから、Enter を押すと走り出す（何か入力して Enter なら取りやめ）：",
                   flush=True)
             if input().strip():
@@ -367,7 +352,7 @@ def run(cfg, segs, name, args):
             for _ in range(10):   # 入力を待つ間に溜まった姿勢を読む
                 rclpy.spin_once(node, timeout_sec=0.02)
             if stale() > cfg['feedback_timeout']:
-                raise RuntimeError(f"姿勢（{fb_cfg['topic']}）が {stale():.1f} s 更新されていない")
+                raise RuntimeError(f"姿勢（{fb_name}）が {stale():.1f} s 更新されていない")
         for s in segs:
             t0 = node.now()
             m0 = _time.monotonic()          # 区間の打ち切りは壁時計でも測る
@@ -399,7 +384,7 @@ def run(cfg, segs, name, args):
                 if kind == 'distance' and dist >= target:
                     break
                 if stale() > cfg['feedback_timeout']:
-                    raise RuntimeError(f"姿勢が {stale():.2f} s 届いていない（{fb_cfg['topic']}）")
+                    raise RuntimeError(f"姿勢が {stale():.2f} s 届いていない（{fb_name}）")
                 if joy_cfg and node.joy > joy_cfg['threshold']:
                     raise RuntimeError('ジョイスティックが倒された（手での操作）')
                 if el > cfg['max_segment_time'] or mono - m0 > cfg['max_segment_time']:
@@ -435,15 +420,10 @@ def main():
     ap.add_argument('--list', action='store_true')
     ap.add_argument('--record-topics', action='store_true')
     ap.add_argument('--describe', action='store_true', help='動きと設定を 1 行で（録画の情報ファイル用）')
-    ap.add_argument('--get', metavar='KEY', help='設定の値（無ければ空。run_test.sh が gazebo_launch_args・localization に使う）')
     # parse_args は省略できる位置引数（動き）がオプションの後にあると受け取れない（unrecognized arguments になる）ので、
     # オプションと位置引数が混ざっていても読めるようにする
     args = ap.parse_intermixed_args()
     cfg = load_config(args.target)
-    if args.get:
-        v = cfg.get(args.get, '')
-        print(str(v).lower() if isinstance(v, bool) else v)
-        return 0
     profiles = load_yaml(args.profiles)
     if args.record_topics:
         print(' '.join(cfg['record_topics']))

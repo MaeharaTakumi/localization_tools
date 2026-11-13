@@ -14,7 +14,6 @@
                /wheelchair/joint_states の車輪の角速度から計算した omega に 1 個・10 個の移動平均を掛け、
                /wheelchair/odom の omega に近いほうを選ぶ（判定できなければ unknown）
   odom_omega_ratio  オドメトリの omega / 車輪から計算した omega（回転中）。1 なら Gazebo の wheel_separation_multiplier は 1
-  odom_truth_omega_ratio  オドメトリの omega / 真値の omega（回転中、Gazebo）。滑りのため普段は約 1.085
   drive・purpose・notes  走らせ方・用途・メモ（指定したもの）
 既にある情報ファイルを書き直すときは、指定しなかった drive・purpose・notes は前の値を残す。
 """
@@ -28,7 +27,8 @@ import numpy as np
 import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
-sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration')]
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'eval')]
+from bag_io import read_bag  # noqa: E402
 from gazebo_model import WHEEL_RADIUS, WHEEL_SEPARATION  # noqa: E402
 from bag_paths import CHECK, SOURCES, source_dir  # noqa: E402
 
@@ -59,17 +59,13 @@ def estimator_of(topics):
 
 
 def odom_check(bag):
-    """{odom_window, odom_omega_ratio, odom_truth_omega_ratio}.
+    """{odom_window, odom_omega_ratio}.
 
     odom_window：車輪の角速度から計算した omega（直進だけなら v）に 1 個・10 個の移動平均を掛け、
     /wheelchair/odom に近いほう。odom_omega_ratio：オドメトリの omega / 車輪から計算した omega（回転中）。
-    odom_truth_omega_ratio：オドメトリの omega / 真値の omega（Gazebo の /wheelchair/pose の微分、回転中。
-    滑りのため普段は約 1.085、wheel_separation_multiplier 1.085 を試した録画では約 1.0）。
     """
-    from plot_spin import read_bag
-    from plot_velocity import truth_velocity
-    d = read_bag(bag, ['/clock', '/wheelchair/odom', '/wheelchair/joint_states', '/wheelchair/pose'])
-    out = {'odom_window': 'unknown', 'odom_omega_ratio': None, 'odom_truth_omega_ratio': None}
+    d = read_bag(bag, ['/wheelchair/odom', '/wheelchair/joint_states'])
+    out = {'odom_window': 'unknown', 'odom_omega_ratio': None}
     od = d.get('/wheelchair/odom', [])
     if len(od) < 100:
         return out
@@ -84,14 +80,6 @@ def odom_check(bag):
     def fit(pred, obs, moving):
         k = float(np.dot(pred[moving], obs[moving]) / np.dot(pred[moving], pred[moving]))
         return k, float(np.sqrt(np.mean((obs - k * pred)[moving] ** 2)))
-
-    # 真値との omega の比（Gazebo の真値があるとき）
-    if d.get('/wheelchair/pose') and d.get('/clock'):
-        tt, _, tw = truth_velocity(d)
-        tw_o = np.interp(ot, tt, tw)
-        moving = np.abs(tw_o) > 0.2
-        if moving.sum() >= 50:
-            out['odom_truth_omega_ratio'] = round(fit(tw_o, sig_odom['omega'], moving)[0], 3)
 
     # 車輪の角速度との比較
     jt, jsig = [], {'omega': [], 'v': []}
@@ -138,8 +126,8 @@ def write(args):
     check = odom_check(bag) if args.source == 'gazebo' else {}
     if args.odom_window:
         check['odom_window'] = args.odom_window
-    if args.source == 'real':   # 実機は whill_odometry（Gazebo の移動平均・真値は無い）
-        check = {'odom_window': 'n/a', 'odom_omega_ratio': None, 'odom_truth_omega_ratio': None}
+    if args.source == 'real':   # 実機は whill_odometry（Gazebo の移動平均は無い）
+        check = {'odom_window': 'n/a', 'odom_omega_ratio': None}
     info = {
         'source': args.source,
         'recorded': meta['recorded'],
@@ -149,7 +137,6 @@ def write(args):
         'estimator': args.estimator or estimator_of(meta['topics']),
         'odom_window': check.get('odom_window', 'unknown'),
         'odom_omega_ratio': check.get('odom_omega_ratio'),
-        'odom_truth_omega_ratio': check.get('odom_truth_omega_ratio'),
         'purpose': args.purpose or old.get('purpose', 'unknown'),
         'notes': args.notes or old.get('notes', ''),
         'topics': meta['topics'],
@@ -158,7 +145,7 @@ def write(args):
         f.write(f'# 録画の情報（localization_tools/eval/bag_info.py が書いた。{datetime.datetime.now():%Y-%m-%d %H:%M}）\n')
         yaml.safe_dump(info, f, sort_keys=False, allow_unicode=True)
     print(f"saved {info_path(bag)}: {info['source']}, {info['recorded']}, odom_window {info['odom_window']}, "
-          f"ratio wheels {info['odom_omega_ratio']} truth {info['odom_truth_omega_ratio']}, estimator {info['estimator']}")
+          f"ratio wheels {info['odom_omega_ratio']}, estimator {info['estimator']}")
 
 
 def list_bags(args):
@@ -169,11 +156,11 @@ def list_bags(args):
             with open(path) as f:
                 i = yaml.safe_load(f)
             rows.append((source, os.path.relpath(path, d)[:-len('_info.yaml')], i))
-    print(f"{'source':<7} {'name':<28} {'recorded':<17} {'dur[s]':>7} {'MB':>5} {'odom_w':>7} {'w/truth':>7} "
+    print(f"{'source':<7} {'name':<28} {'recorded':<17} {'dur[s]':>7} {'MB':>5} {'odom_w':>7} {'w/whl':>7} "
           f"{'estimator':<19} purpose")
     for source, name, i in rows:
         print(f"{source:<7} {name:<28} {i['recorded'][:16]:<17} {i['duration_s']:>7.1f} {i['size_mb']:>5.0f} "
-              f"{str(i['odom_window']):>7} {str(i.get('odom_truth_omega_ratio')):>7} {i['estimator']:<19} {i['purpose']}")
+              f"{str(i['odom_window']):>7} {str(i.get('odom_omega_ratio')):>7} {i['estimator']:<19} {i['purpose']}")
 
 
 def main():
