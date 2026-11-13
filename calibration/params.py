@@ -17,8 +17,3 @@ def load(name):
 def settings():
     return load('calibrate')
 
-
-def ndt_noise_sigma(e=None):
-    """ndt_noise の初期値のノイズの標準偏差 [x, y, z, roll, pitch, yaw]（m, m, m, deg, deg, deg）."""
-    s = (e or settings())['ndt_noise']['sigma']
-    return [float(s[k]) for k in ('x', 'y', 'z', 'roll_deg', 'pitch_deg', 'yaw_deg')]

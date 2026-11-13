@@ -1,6 +1,7 @@
 #!/bin/bash
 # results の図をすべて描き直す（コンテナ test 内で実行。図は /root/ros2_ws/fig に出る。ホストで sync.sh pull すると Docker/localization/results へ）
-# 真値なしの R・取付と倍率の推定は録画から計算し直す（数分）。NDT の R（ndt_init_stops、NDT を計算し直すので約 9 分）は FULL=1 のときだけ
+# 真値なしの R・取付と倍率の推定は録画から計算し直す（数分）。NDT の R を「真値 + ノイズ」の初期値で求めた図（ndt_init_stops・*/ndt_noise）は
+# プログラム（calibrate_ndt_noise.py）を 2026-11-13 に消したので描き直さない
 # robot_localization を含む図（spin_results・spin360_*・axes_*・transition_compare・velocity*・scale_*・compare_*・qg_*）は
 # 2026-10-15 に robot_localization を廃止して録画・再生の出力を消したので描き直さない（results/ の図は開発ログの記録として残す）
 # 環境変数 OUT で図の出力先、T0 でツールの場所を変えられる（ツールを直したとき、別の場所に描いて前の図と比べる）
@@ -34,18 +35,12 @@ for b in blue_spin5_20261016_160557 blue_calibration_20261016_141128; do run pyt
 tf4() { echo $1_1,$1_2,$1_3,$1_4; }
 run python3 plot_matlab_outputs.py compare $O/matlab_outputs/tf_compare_gazebo_spin5.png "Gazebo before (update)=$(tf4 $T/tfcmp_before_gazebo)" "Gazebo after (50 Hz)=$(tf4 $T/tfcmp_after_gazebo)"
 run python3 plot_matlab_outputs.py compare $O/matlab_outputs/tf_compare_blue_spin5.png "Blue before (cloud)=$(tf4 /root/ros2_ws/bags/real/tune/tfcmp_before_blue)" "Blue after (50 Hz)=$(tf4 /root/ros2_ws/bags/real/tune/tfcmp_after_blue)"
-# NDT の R を「真値 + ノイズ」の初期値で求める（15）
-[ "${FULL:-0}" = 1 ] && run python3 ../calibration/calibrate_ndt_noise.py $B/stops_ekf --out $O/ndt_init_stops
-# FULL=1 でなければ、前の結果（json）から図とヒストグラムだけ描き直す
-[ "${FULL:-0}" = 1 ] || [ ! -f $O/ndt_init_stops.json ] || run python3 ../calibration/calibrate_ndt_noise.py --from-json $O/ndt_init_stops.json --out $O/ndt_init_stops
 # パラメータ推定用の動き（当時の calib）で走った録画から、R・倍率・取付をまとめて推定する（46）
 run python3 ../calibration/calibrate.py gazebo $B/gazebo_calib_test --out $O/calib_gazebo
-# 推定用の動き（4 方向に 12 s ずつ止まる・片道。47）。NDT の R（calibrate_ndt_noise.py、約 5 分）は FULL=1 のときだけ
+# 推定用の動き（4 方向に 12 s ずつ止まる・片道。47）
 run python3 ../calibration/calibrate.py gazebo $B/gazebo_calib --out $O/calib_gazebo2
-[ "${FULL:-0}" = 1 ] && run python3 ../calibration/calibrate_ndt_noise.py $B/gazebo_calib --out $O/calib_gazebo2/ndt_noise
-# 推定用の動き（止まる → 左に 4 周 → 片道。48）。NDT の R（約 2.5 分）は FULL=1 のときだけ
+# 推定用の動き（止まる → 左に 4 周 → 片道。48）
 run python3 ../calibration/calibrate.py gazebo $B/gazebo_calibration --out $O/calibration_gazebo
-[ "${FULL:-0}" = 1 ] && run python3 ../calibration/calibrate_ndt_noise.py $B/gazebo_calibration --out $O/calibration_gazebo/ndt_noise
 # LiDAR を 5° 回した Gazebo での取付の yaw の試験（49）
 run python3 ../calibration/calibrate.py gazebo $B/gazebo_calibration_yaw5 --out $O/calibration_gazebo_yaw5
 ls $O

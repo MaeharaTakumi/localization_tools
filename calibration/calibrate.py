@@ -11,7 +11,6 @@ target ごとの値は設定から読む（calibrate_noise.py・calibrate_mount_
   - 車輪の間隔（R_omega の計算）：Gazebo は calibrate.yaml の noise.gazebo_tread、実機は param/<target>/whill_odometry.yaml の tread_width
   書いていない項目はコードの既定値（odom_scale [1, 1]、base_link、velodyne、tread_width 0.495）
 R は R_odom・R_ndt とも走行中の残差（前後 window/2 秒の滑らかな動きからのばらつき）から求める（calibrate_noise.py）。
-NDT の R を「真値 + ノイズ」の初期値で求める calibrate_ndt_noise.py（Gazebo だけ）は 2026-10-15 にユーザー指示でここから外した（単独では使える）。
 出力（既定 /root/ros2_ws/fig/calibration/<bag 名>/）：noise.*（calibrate_noise.py）、mount_scale.*・mount_scale_yaw.png
 （calibrate_mount_scale.py）、summary.yaml（param/<target>/ekf_localizer.yaml などに入れる候補と今の値。yaml には書き込まない）。
 Gazebo は --truth で真値との比較も出す。

@@ -37,9 +37,9 @@ python3 eval/bag_info.py write <bag> --source gazebo|real --drive '...' --purpos
 | フォルダ | 内容 |
 |---|---|
 | `common/` | **共通部品**（2026-11-11 にまとめた。各スクリプトは `common`・`plot`・`eval`・`calibration` を `sys.path` に入れて import する）：`env_files.py`（localization_bringup の環境のフォルダ `param/<env>/` を読む・写して書き換える。`make_env`。書き換えられるノードは `ekf_localizer`・`pcl_localization`・`whill_odometry`）、`bag_io.py`（bag の読み込み `read_bag`・`open_reader`、動作の開始時刻 `phases_of`、stamp の変換 `stamp_sec`・`stamp_ns`、`/tf_static` からの取付 `mount_from_tf_static`）、`pose_math.py`（姿勢と 4x4 行列の変換、角度の折り返し `wrap`）、`plot_style.py`（色・線幅・`setup`・`style`・`box_on`・`capitalize_labels`・`widths_back_to_front`）、`gazebo_model.py`（Gazebo の車椅子の定数：車輪の半径と間隔、オドメトリの倍率、URDF の取付） |
-| `calibration/` | **パラメータ推定（プログラムとパラメータ）**：`run_calibration.sh`（推定用の動きで走って、続けて推定する）、`motion.py`（推定用の動き）、`calibrate.py`（録画から R・倍率・取付をまとめて推定）、`calibrate_noise.py`（観測ノイズ R、真値なし）、`calibrate_ndt_noise.py`（NDT の R を「真値 + ノイズ」の初期値で計算し直して求める。Gazebo）、`calibrate_mount_scale.py`（LiDAR の取付位置とオドメトリの倍率、真値なし）、図は `plot_noise.py`・`plot_mount_scale.py`。設定は `param/motion.yaml`（推定用の動き）と `param/calibrate.yaml`（推定。各プログラムのオプションの既定値） |
+| `calibration/` | **パラメータ推定（プログラムとパラメータ）**：`run_calibration.sh`（推定用の動きで走って、続けて推定する）、`motion.py`（推定用の動き）、`calibrate.py`（録画から R・倍率・取付をまとめて推定）、`calibrate_noise.py`（観測ノイズ R、真値なし）、`calibrate_mount_scale.py`（LiDAR の取付位置とオドメトリの倍率、真値なし）、図は `plot_noise.py`・`plot_mount_scale.py`。設定は `param/motion.yaml`（推定用の動き）と `param/calibrate.yaml`（推定。各プログラムのオプションの既定値） |
 | `eval/` | 録画の再生・評価・パラメータの調整：`tune_run.py`（回転の前後を再生して指標）、`tune_batch.py`（候補ごとに `tune_run.py`）、`summarize.py`・`aggregate.py`（結果の表。`aggregate.py` は候補ごとの平均と幅、`SHOW_RUNS=1` で 1 回ごと）、`transition_eval.py`（速度が急に変わる瞬間の yaw 誤差）、`compare_run.py`（いろいろな動きの録画での比較）、`replay_outputs.py`・`outputs_batch.py`（録画全体の再生と MATLAB 用の出力の指標）、`evaluate_bag.py`（録画の `/ekf_pose`・`/ekf_odom` を Gazebo の真値と比べる）、`make_window_bag.py`（オドメトリの移動平均の個数を変えた録画を作る）、`bag_info.py`（録画の情報ファイル）、`bag_paths.py`（録画の置き場所）。候補は `batches/`、結果は `results/`。起動・録画・再生・停止の流れは `tune_run.launch_and_play` の 1 つ（Gazebo の `tune_run.replay` も、実機の `replay_outputs.replay_real` もこれを使う） |
-| `plot/` | 図（`plot_*.py`、`check_*.py`）。bag の読み込みや図の書式は `common/`。`rerender_results.sh` で `Docker/localization/results` の図を全部描き直す（NDT の R の図は計算に約 9 分かかるので `FULL=1` のときだけ。環境変数 `OUT` で出力先、`T0` でツールの場所を変えられるので、ツールを直したときは別の場所に描いて前の図とファイルごとに比べる） |
+| `plot/` | 図（`plot_*.py`、`check_*.py`）。bag の読み込みや図の書式は `common/`。`rerender_results.sh` で `Docker/localization/results` の図を全部描き直す（環境変数 `OUT` で出力先、`T0` でツールの場所を変えられるので、ツールを直したときは別の場所に描いて前の図とファイルごとに比べる） |
 | `record_rviz.sh` | **RViz の画面の録画（ホストで実行）**。下の「RViz の画面の録画」 |
 | `drive/` | **テスト走行と録画（Gazebo・実機共通）**：`run_test.sh`（ホストかコンテナの中で実行）、`drive_test.py`（走らせる）、`profiles.yaml`（動き）、`config/gazebo.yaml`・`config/red.yaml`・`blue.yaml`・`white.yaml`（実機の車椅子ごと。速さの上限・トピック・録画するトピック）、`config/real_in_gazebo.yaml`（実機の設定を Gazebo で試す）、`config/gazebo_ground.yaml` と `profiles_velocity.yaml`（Gazebo の地面でオドメトリと真値の速度を比べる） |
 
@@ -68,25 +68,6 @@ python3 calibration/calibrate_noise.py /root/ros2_ws/bags/gazebo/<録画> --out 
 - 真値は使わないので実機の録画にも使える（オドメトリ・NDT・指令・`/tf_static` を録っておく。トピック名はオプションで変える）。
   `--truth` は Gazebo だけで、真値との差の分散を並べて出す（比較用。R には使わない）。
 
-## NDT の R を「真値 + ノイズ」の初期値で求める（`calibration/calibrate_ndt_noise.py`、Gazebo）
-
-```bash
-python3 calibration/calibrate_ndt_noise.py /root/ros2_ws/bags/gazebo/<止まる区間のある録画> --out /root/ros2_ws/fig/ndt_noise_<名前>   # コンテナ
-python3 calibration/calibrate_ndt_noise.py --from-json <出力の json> --out <...>   # 計算し直さず図だけ
-```
-
-- 録画は止まる区間のある Gazebo の走行（パラメータ推定用の動き、drive の `stops` など。区間は `<bag>_phases.txt` の `stop_*`）。
-  `calibration gazebo` の推定（`calibrate.py`）からは呼ばない（2026-10-15 に外した。下記）。
-- 使うのは各区間の、止まってから `settle`（1 s）後から `use_time`（10 s）。真値はその間の `/wheelchair/pose` の平均。
-- NDT だけを Gazebo の設定で `ROS_DOMAIN_ID=99` に起動し、**使う区間（とその前の `lead` 1 s）だけを**、区間ごとに
-  `ros2 bag play --start-offset` で途中から速さ 1 倍で流す（区間の終わりの点群が届いたら止める）。点群が届くたびに「真値 + ノイズ」を
-  初期値として TF で出す。1 回目はノイズなし、2 回目以降はノイズあり（`passes` 回）。
-- ノイズは 6 軸それぞれ正規分布 N(0, σ²)。σ は `param/calibrate.yaml` の `ndt_noise.sigma`（x, y 0.02 m、z 0.01 m、roll, pitch 0.3°、
-  yaw 1.0°：運用中の EKF の誤差の rms の 2〜4 倍）。
-- 時間は 区間の数 x（`lead` + `use_time` + 約 1 s）x（`passes` + 1）。推定用の動き（3 区間）で約 2.5 分。
-- NDT の解と真値の差から、止まった区間ごとの平均（地図と Gazebo の一定のずれ）を引いた分散を R_ndt とする。
-  初期値のずれが解に残る傾きと、図（初期値のずれと解の誤差の散布図 `.png`、誤差のヒストグラムと正規分布 `_hist.png`）も出す。
-
 ## パラメータ推定を走行とセットで（`calibration/run_calibration.sh`、コマンド `calibration`）
 
 ```bash
@@ -109,7 +90,7 @@ python3 calibration/calibrate.py <gazebo|red|blue|white> <bag>    # 録画から
 - 推定にかかる時間は数秒（252 s の録画で 8 s）。
 - 結果は 1 回ごとに `/root/ros2_ws/fig/calibration/<bag 名>/`：`summary.yaml`（`param/<target>/ekf_localizer.yaml` に入れる候補 `candidate` と今の値。**yaml には書き込まない**）、
   `noise.*`（`noise_hist.png` など）、`mount_scale.*`・`mount_scale_yaw.png`。
-- NDT の R を「真値 + ノイズ」の初期値で求める `calibrate_ndt_noise.py`（Gazebo）は、2026-10-15 にユーザー指示で `calibrate.py` から外した（単独では使える）。
+- NDT の R を「真値 + ノイズ」の初期値で求める `calibrate_ndt_noise.py`（Gazebo）は使わなくなったので 2026-11-13 に消した（git の履歴にある。開発ログの 15・49・90）。
 
 ## LiDAR の取付位置とオドメトリの倍率（`calibration/calibrate_mount_scale.py`）
 
