@@ -6,7 +6,7 @@
 
 出力の bag は eval/replay_outputs.py で録ったもの（/tf・/tf_static・/ndt_pose・/clock）。
 確かめること（結果は標準出力。最後の行は METRICS <1 行 JSON>）：
-  tf          map -> base の /tf の stamp の間隔（predict_rate の周期か）と、stamp から受信までの時間
+  tf          map -> base の /tf の stamp の間隔（publish_rate の周期か）と、stamp から受信までの時間
   tf_wait     点群の stamp（/ndt_pose の stamp）より後の /tf が届くまでの時間（点群の stamp から）。NDT と MATLAB が
               点群の stamp の時刻の TF を引けるのはこれより後（点群は stamp から約 15 ms 後に届く）
   prior       点群の stamp の時刻の /tf（tf2 と同じく前後の 2 つを補間。位置は線形、回転は slerp）に取付を掛けた
