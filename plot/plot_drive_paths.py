@@ -3,8 +3,8 @@
 
   python3 plot_drive_paths.py <出力 png> <設定（gazebo・real・yaml のパス）> <動き>=<bag>[@<姿勢のトピック>] ...
 
-姿勢のトピックの既定は Gazebo の真値 /wheelchair/pose（base_footprint）。/ekf_pose（LiDAR）なら設定の feedback の mount で
-車体に直す。出発は最初の動作の時刻の姿勢。設定に area（走ってよい範囲。2026-11-07 に drive の設定から外した）があれば
+姿勢のトピックの既定は Gazebo の真値 /wheelchair/pose（base_footprint）。/ekf_pose（LiDAR）なら録画の /tf_static の取付
+（localization_bringup の param/<target>/ekf_localizer.yaml の base_frame_id -> lidar_frame_id）で車体に直す。出発は最初の動作の時刻の姿勢。設定に area（走ってよい範囲。2026-11-07 に drive の設定から外した）があれば
 塗りつぶして重ねる。点線は使わない。
 """
 import math
@@ -18,13 +18,16 @@ import numpy as np  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # localization_tools
 sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'plot', 'eval', 'calibration', 'drive')]
-from drive_test import load_config, quat_matrix, rpy_matrix  # noqa: E402
-from bag_io import phases_of, read_bag  # noqa: E402
+from drive_test import load_config, quat_matrix  # noqa: E402
+from bag_io import mount_from_tf_static, phases_of, read_bag  # noqa: E402
+from env_files import node_params  # noqa: E402
 from plot_style import BAND, capitalize_labels, GRID, INK, INK2, SERIES, SURFACE  # noqa: E402
 
 
-def base_path(bag, topic, mount):
-    d = read_bag(bag, ['/clock', topic])
+def base_path(bag, topic, frames=None):
+    """frames（base, LiDAR）を渡すと、姿勢を LiDAR のものとして録画の /tf_static の取付で車体に直す."""
+    d = read_bag(bag, ['/clock', topic, '/tf_static'])
+    mount = np.linalg.inv(mount_from_tf_static(d['/tf_static'], *frames, required=True)) if frames else None
     clk = np.array([(t, m.clock.sec + m.clock.nanosec * 1e-9) for t, m in d['/clock']]) if d.get('/clock') else None
     ts, xs, ys, yaws = [], [], [], []
     for t, m in d[topic]:
@@ -55,13 +58,11 @@ def main():
     fig, axes = plt.subplots(rows, cols, figsize=(4.2 * cols, 5.2 * rows), facecolor=SURFACE, squeeze=False)
     for ax, (name, spec) in zip(axes.flat, items):
         bag, topic = (spec.split('@', 1) + ['/wheelchair/pose'])[:2]
-        mount = None
-        if topic != '/wheelchair/pose' and cfg['feedback'].get('mount'):
-            m = np.eye(4)
-            m[:3, :3] = rpy_matrix(*cfg['feedback']['mount']['rpy'])
-            m[:3, 3] = cfg['feedback']['mount']['xyz']
-            mount = np.linalg.inv(m)
-        t, x, y, yaw = base_path(bag, topic, mount)
+        frames = None
+        if topic == '/ekf_pose':
+            ekf = node_params(cfg['target'], 'ekf_localizer')
+            frames = (ekf.get('base_frame_id', 'base_link'), ekf.get('lidar_frame_id', 'velodyne'))
+        t, x, y, yaw = base_path(bag, topic, frames)
         ph = phases_of(bag)
         t0, t1 = min(ph.values()), max(ph.values()) + 2.0
         k = int(np.searchsorted(t, t0))

@@ -261,7 +261,9 @@ python3 drive/drive_test.py <gazebo|red|blue|white> <動き> --simulate    # 計
   `curve`（半径 0.75 m の 8 の字）、`slalom`（波長 2.5 m）、`reverse`（後退・S 字・前後の切り替え）。速さは上限に対する割合、
   直進は距離、旋回は角度、円は半径で決めるので、上限を変えても形・大きさは同じ。
 - **設定**（`config/<target>.yaml`）：速さの上限（Gazebo v 1.5・後退 0.8 m/s・ω 1.0 rad/s、実機 0.5・0.3・0.5）、
-  指令・姿勢・ジョイスティックのトピック、録画するトピック。
+  指令・姿勢・ジョイスティックのトピック、録画するトピック。取付は書かない：姿勢が LiDAR のもの（`/ekf_pose`。`feedback` の `lidar: true`）なら、
+  取付（base -> LiDAR）を TF から引いて車体に直す（実機は launch が `param/<色>/env.yaml` の `static_tfs` を出し、Gazebo は URDF。フレームは
+  localization_bringup の `param/<target>/ekf_localizer.yaml` の `base_frame_id`・`lidar_frame_id`。2026-11-13 から。それまでは設定に `mount` を書いていた）。
 - **安全**：走る前に計算した軌跡（出発時の車体の中心を基準にした前・左の範囲）を表示する。走行中は、姿勢（Gazebo は真値、実機は `/ekf_pose`
   を取付で車体に直したもの）が 0.5 s 届かない・ジョイスティックが倒された（実機）・時計が止まった・区間が 60 s を超えた・Ctrl-C
   のどれかで 0 の指令を出して止める（止めた理由は録画の情報ファイルのメモに書く）。実機は計画を表示して Enter を押すまで走らない
@@ -272,9 +274,9 @@ python3 drive/drive_test.py <gazebo|red|blue|white> <動き> --simulate    # 計
 - **実機**：`/root/ros2_ws/bags/real/<bag 名>` に録りながら走る（推定の起動は自分で行う。地図と初期姿勢が要るため）。
   test の `.bashrc` の通信設定を実機用にしておく。
   車椅子は `run_test.sh <red|blue|white>` の色で選ぶ（`config/<色>.yaml`。自己位置推定の launch の `env:=<色>` と同じ色にする）。
-- **走る前の確認**（Gazebo・実機共通。録画を始めた後に `drive_test.py` が 1 つのノードで行う。2026-11-13 から）：姿勢（実機は `/ekf_pose`）が
-  15 s 以内に届いて新しいこと、指令のトピック（実機は選んだ色の `cmd_vel`）を受けるノードが 5 s 以内に見つかること（録画の `ros2 bag record`
-  は数えない）。どちらかが欠けたら走らずに止める（見つかった車椅子の `cmd_vel` も表示する。録画は短いまま残り、情報ファイルのメモに理由を書く）。
+- **走る前の確認**（Gazebo・実機共通。録画を始めた後に `drive_test.py` が 1 つのノードで行う。2026-11-13 から）：取付の TF が 5 s 以内に
+  引けること（`lidar: true` のとき）、姿勢（実機は `/ekf_pose`）が 15 s 以内に届いて新しいこと、指令のトピック（実機は選んだ色の `cmd_vel`）を受けるノードが 5 s 以内に見つかること（録画の `ros2 bag record`
+  は数えない）。どれかが欠けたら走らずに止める（見つかった車椅子の `cmd_vel` も表示する。録画は短いまま残り、情報ファイルのメモに理由を書く）。
   録画するトピックで無いものは表示して続ける。Enter の指示が出るまで約 1.3 s（開発用 PC のコンテナの中。それまでの `ros2` の CLI の確認 3 つでは約 15 s）。
 - **録画するトピック**：点群・`motor_speed_ts`・
   `cmd_vel`・バッテリーと推定の出力（`motor_angle_ts`・`joy_ts`・`speed_mode`・GNSS は録らない）。

@@ -8,12 +8,14 @@
   --profiles <yaml> で動きのファイルを変える（既定 drive/profiles.yaml。推定用の動きは calibration/motion.py が作る）
     target：gazebo、実機の車椅子 red・blue・white（drive/config/<target>.yaml）、または設定の yaml のパス
 
-走る前に確かめる（1 つのノードで。どれかが欠けたら走らずに止める）：姿勢（feedback）が 15 s 以内に届き新しいこと、
+走る前に確かめる（1 つのノードで。どれかが欠けたら走らずに止める）：取付（feedback の lidar: true のとき）が TF から 5 s 以内に引けること、
+姿勢（feedback）が 15 s 以内に届き新しいこと、
 指令のトピックを受けるノード（実機は whill_driver。録画は数えない）が 5 s 以内に見つかること。録画するトピックで無いものは表示するだけ。
 走る前に、出発時の姿勢を基準に計算した軌跡を表示する（走ってよい範囲の確認は 2026-11-07 にユーザー指示でやめた）。
 走行中は次のどれかで止める（0 の指令を出して終わる。終了コード 1）：
-  - feedback_timeout より新しい姿勢が無い（姿勢は feedback：Gazebo は真値、実機は /ekf_pose を取付で車体に直したもの。
-    実機で自己位置推定が止まった）
+  - feedback_timeout より新しい姿勢が無い（姿勢は feedback：Gazebo は真値、実機は /ekf_pose（LiDAR）を取付で車体に直したもの。
+    取付は base -> LiDAR の TF（実機は launch の static_tfs、Gazebo は URDF）。フレームは localization_bringup の
+    param/<target>/ekf_localizer.yaml の base_frame_id・lidar_frame_id。実機で自己位置推定が止まった）
   - ジョイスティックが倒された（実機。whill_driver も手での操作を優先する）
   - 1 区間が max_segment_time を超えた、Ctrl-C
 confirm: true（実機）なら、計画を表示して Enter を押すまで走らない（何か入力して Enter なら取りやめ。--yes で省く）。
@@ -29,6 +31,7 @@ import numpy as np
 import yaml
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)   # localization_tools
 
 
 def load_yaml(path):
@@ -192,13 +195,6 @@ def plan_report(cfg, segs, name):
 # 走らせる（ROS）
 # ---------------------------------------------------------------------------
 
-def rpy_matrix(r, p, y):
-    cr, sr, cp, sp, cy, sy = math.cos(r), math.sin(r), math.cos(p), math.sin(p), math.cos(y), math.sin(y)
-    return np.array([[cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr],
-                     [sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr],
-                     [-sp, cp * sr, cp * cr]])
-
-
 def quat_matrix(q):
     x, y, z, w = q.x, q.y, q.z, q.w
     return np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
@@ -215,12 +211,11 @@ def run(cfg, segs, name, args):
     from rclpy.qos import qos_profile_sensor_data, QoSProfile, ReliabilityPolicy, DurabilityPolicy
 
     fb_cfg, cmd_cfg, joy_cfg = cfg['feedback'], cfg['command'], cfg.get('joystick')
-    mount = None
-    if fb_cfg.get('mount'):
-        m = np.eye(4)
-        m[:3, :3] = rpy_matrix(*fb_cfg['mount']['rpy'])
-        m[:3, 3] = fb_cfg['mount']['xyz']
-        mount = np.linalg.inv(m)   # T_B = T_L · T_BL⁻¹
+    if fb_cfg.get('lidar'):   # 姿勢は LiDAR のもの。取付（base -> LiDAR）を TF から引いて車体に直す
+        sys.path.insert(0, os.path.join(ROOT, 'common'))
+        from env_files import node_params
+        ekf = node_params(cfg['target'], 'ekf_localizer')
+        frames = (ekf.get('base_frame_id', 'base_link'), ekf.get('lidar_frame_id', 'velodyne'))
 
     class Driver(Node):
 
@@ -245,6 +240,11 @@ def run(cfg, segs, name, args):
                                  durability=DurabilityPolicy.TRANSIENT_LOCAL)
                 self.create_subscription(PoseWithCovarianceStamped, fb_cfg['topic'],
                                          lambda m: self.on_pose(m.pose.pose), qos)
+            self.mount = None       # T_BL⁻¹（T_B = T_L · T_BL⁻¹）。lidar: true のとき TF から引く
+            if fb_cfg.get('lidar'):
+                import tf2_ros
+                self.tf_buffer = tf2_ros.Buffer()
+                self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self, spin_thread=False)
             self.joy = 0.0
             if joy_cfg:
                 from geometry_msgs.msg import Vector3Stamped
@@ -253,14 +253,32 @@ def run(cfg, segs, name, args):
         def on_pose(self, p):
             if self.now() == 0.0:
                 return   # sim time の時計が動き出す前（transient_local の古い値が先に届く）。受け取った時刻が分からない
+            if fb_cfg.get('lidar') and self.mount is None:
+                return   # 取付がまだ引けていない
             t = np.eye(4)
             t[:3, :3] = quat_matrix(p.orientation)
             t[:3, 3] = (p.position.x, p.position.y, p.position.z)
-            if mount is not None:
-                t = t @ mount
+            if self.mount is not None:
+                t = t @ self.mount
             self.pose = (t[0, 3], t[1, 3], math.atan2(t[1, 0], t[0, 0]))
             self.pose_time = self.now()
             self.pose_mono = _time.monotonic()
+
+        def lookup_mount(self):
+            """base -> LiDAR の TF を引けたら self.mount に入れる."""
+            from rclpy.time import Time
+            try:
+                tr = self.tf_buffer.lookup_transform(frames[0], frames[1], Time()).transform
+            except Exception:
+                return False
+            m = np.eye(4)
+            m[:3, :3] = quat_matrix(tr.rotation)
+            m[:3, 3] = (tr.translation.x, tr.translation.y, tr.translation.z)
+            self.mount = np.linalg.inv(m)
+            r = math.atan2(m[2, 1], m[2, 2]); pi = math.asin(-max(-1.0, min(1.0, m[2, 0]))); y = math.atan2(m[1, 0], m[0, 0])
+            print(f'mount {frames[0]} -> {frames[1]} (from TF): xyz [{m[0, 3]:.3f}, {m[1, 3]:.3f}, {m[2, 3]:.3f}], '
+                  f'rpy [{r:.4f}, {pi:.4f}, {y:.4f}]', flush=True)
+            return True
 
         def on_joy(self, m):
             self.joy = max(abs(m.vector.x), abs(m.vector.y))
@@ -303,6 +321,13 @@ def run(cfg, segs, name, args):
         return _time.monotonic() - node.pose_mono
 
     try:
+        if fb_cfg.get('lidar'):
+            t_wait = _time.monotonic()
+            while not node.lookup_mount() and _time.monotonic() - t_wait < 5.0:
+                rclpy.spin_once(node, timeout_sec=0.05)
+            if node.mount is None:
+                raise RuntimeError(f'取付の TF（{frames[0]} -> {frames[1]}）が 5 s 引けない。'
+                                   '自己位置推定（実機は launch が static_tfs を出す）・Gazebo が動いているか確かめる')
         wall_limit = 15.0
         t_wait = _time.monotonic()
         while (node.now() == 0.0 or node.pose is None) and _time.monotonic() - t_wait < wall_limit:
