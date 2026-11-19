@@ -39,7 +39,7 @@ nowTime = ros2time(subNode, "now");
 t0 = int64(nowTime.sec);                                      % キーフレームは t0, t0+1, t0+2 [s]（ナノ秒 0）
 msgs = arrayfun(@(i) tfMsg("map", "base_link", t0 + i - 1, 0, keyP(i, :), keyQ(i, :)), 1:3);
 sendTransform(pubTree, tfMsg("base_link", "velodyne", t0, 0, mountP, mountQ), UseStatic=true)
-for i = 1:numel(msgs)   % 1 つずつ送る（R2024b で配列を 1 回で送ると、受け側には最初の 1 つしか入らなかった）
+for i = 1:numel(msgs)   % 1 つずつ送る（sendTransform は配列を渡しても最初の 1 つしか /tf に出さない。R2024b・R2026a。dev_log.md の 104）
     sendTransform(pubTree, msgs(i))
     pause(0.1)
 end
