@@ -187,6 +187,16 @@ matlab/replay_matlab.sh /root/ros2_ws/bags/gazebo/gazebo_spin5_20261016_111637 .
 matlab/replay_matlab.sh /root/ros2_ws/bags/real/blue_spin5_20261016_160557 ../../results/matlab_outputs/replay_blue_spin5 blue /root/ros2_ws/map/10build_4F_C_20260414.pcd
 ```
 
+`ros2tf` の `getTransform(tftree, 親, 子, stamp)`（CR_debug が点群の stamp で引くのと同じ呼び方）が前後の TF の線形補間（位置は線形、回転は最短経路の
+slerp）を返すかは `matlab/check_tf_interpolation.m` で確かめる（録画・Gazebo は要らない）。MATLAB の中で既知の TF（map → base_link を 1 s おきに 3 つ。
+2 つ目の区間は yaw が 150° → -120° で ±180° をまたぐ。base_link → velodyne を `/tf_static`）を送り、45 個の時刻で引いた値を lerp+slerp・lerp+nlerp・
+Euler 線形・前の TF のままと比べて、各最大誤差と区間の外（最初より前・最後より後）で引けるかを表示する。`ROS_DOMAIN_ID` は `TEST_DOMAIN`（既定 98）：
+
+```bash
+TEST_FIG=../../results/tf_interpolation/tf_interpolation_R2024b.png \
+  /usr/local/MATLAB/R2024b/bin/matlab -batch "run('<localization_tools>/matlab/check_tf_interpolation.m')"   # ホスト
+```
+
 ## 録画の情報（`eval/bag_info.py`）
 
 Gazebo か実機か、録画日時、長さ、走らせ方、用途、録画したときの推定器、Gazebo のオドメトリの移動平均（車輪の角速度から判定）と、
