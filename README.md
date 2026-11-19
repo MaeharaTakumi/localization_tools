@@ -190,12 +190,27 @@ matlab/replay_matlab.sh /root/ros2_ws/bags/real/blue_spin5_20261016_160557 ../..
 `ros2tf` の `getTransform(tftree, 親, 子, stamp)`（CR_debug が点群の stamp で引くのと同じ呼び方）が前後の TF の線形補間（位置は線形、回転は最短経路の
 slerp）を返すかは `matlab/check_tf_interpolation.m` で確かめる（録画・Gazebo は要らない）。MATLAB の中で既知の TF（map → base_link を 1 s おきに 3 つ。
 2 つ目の区間は yaw が 150° → -120° で ±180° をまたぐ。base_link → velodyne を `/tf_static`）を送り、45 個の時刻で引いた値を lerp+slerp・lerp+nlerp・
-Euler 線形・前の TF のままと比べて、各最大誤差と区間の外（最初より前・最後より後）で引けるかを表示する。`ROS_DOMAIN_ID` は `TEST_DOMAIN`（既定 98）：
+Euler 線形・前の TF のままと比べて、各最大誤差と区間の外（最初より前・最後より後）で引けるかを表示する。同じ時刻を送り直したとき
+（ekf_localizer は同じ刻みを 3 回送る）に、時刻ちょうどと間の時刻で何が返るかも表示する。`ROS_DOMAIN_ID` は `TEST_DOMAIN`（既定 98）：
 
 ```bash
 TEST_FIG=../../results/tf_interpolation/tf_interpolation_R2024b.png \
   /usr/local/MATLAB/R2024b/bin/matlab -batch "run('<localization_tools>/matlab/check_tf_interpolation.m')"   # ホスト
 ```
+
+実際の ekf_localizer の `/tf` で確かめるのは `matlab/replay_tf_interpolation.sh`（ホストで実行。MATLAB は既定 R2024b）。MATLAB の
+`matlab/check_tf_interpolation_ekf.m` を先に起動し、購読ができてから `RECORD=0` の `replay_outputs.py` で再生する。MATLAB は再生の間 `ros2tf` に
+溜めながら `/tf` をそのまま記録し、再生が終わったら点群の stamp・刻みの中点・刻みちょうどの時刻で map → base（点群の stamp では map → velodyne も）を
+引いて、記録した TF から計算した 3 つの補間（最後に届いた値どうし、最初に届いた値どうし、前の刻みは最後・後の刻みは最初の値）と比べる。
+図は `matlab/plot_tf_interpolation_ekf.m`（.mat から描き直せる）：
+
+```bash
+matlab/replay_tf_interpolation.sh /root/ros2_ws/bags/gazebo/gazebo_spin5_20261016_111637 ../../results/tf_interpolation/ekf_gazebo_spin5
+matlab/replay_tf_interpolation.sh /root/ros2_ws/bags/real/blue_spin5_20261016_160557 ../../results/tf_interpolation/ekf_blue_spin5 blue /root/ros2_ws/map/10build_4F_C_20260414.pcd
+/usr/local/MATLAB/R2024b/bin/matlab -batch "addpath('matlab'); plot_tf_interpolation_ekf('<.mat>', '<.png>')"
+```
+
+`matlab/TfMath.m` は 2 つの確認で使う四元数（slerp など）と時刻の計算。
 
 ## 録画の情報（`eval/bag_info.py`）
 

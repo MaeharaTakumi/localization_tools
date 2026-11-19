@@ -10,6 +10,7 @@
 % 前の TF のまま（0 次ホールド）。最大誤差が 1e-6 m・1e-4° 未満なら一致とする。区間の外（最初より前・最後より後）は引けるかも見る。
 
 here = fileparts(mfilename("fullpath"));
+addpath(here)   % TfMath
 repo = getenv("REPO");
 if repo == ""
     repo = fullfile(here, "..", "..", "whill_common_matlab-main _ndtDebug");
@@ -25,9 +26,9 @@ fprintf("MATLAB %s, ROS_DOMAIN_ID %d\n", version, domain);
 deg = pi/180;
 keyP = [0 0 0; 2 1 0.3; 3 3 0.1];                         % 位置 [m]
 keyRpy = [0 0 0; 10 -5 150; 0 5 -120] * deg;              % roll, pitch, yaw [rad]
-keyQ = cell2mat(arrayfun(@(i) rpy2q(keyRpy(i, :)), (1:3)', "UniformOutput", false));   % [w x y z]
+keyQ = cell2mat(arrayfun(@(i) TfMath.rpy2q(keyRpy(i, :)), (1:3)', "UniformOutput", false));   % [w x y z]
 mountP = [-0.17 0 1.1377];
-mountQ = rpy2q([0.01 -0.02 0.03]);
+mountQ = TfMath.rpy2q([0.01 -0.02 0.03]);
 
 subNode = ros2node("tf_interp_check_sub", domain);
 pubNode = ros2node("tf_interp_check_pub", domain);
@@ -43,7 +44,7 @@ for i = 1:numel(msgs)   % 1 つずつ送る（sendTransform は配列を渡し�
     sendTransform(pubTree, msgs(i))
     pause(0.1)
 end
-lastStamp = stampMsg(t0 + 2, 0);
+lastStamp = TfMath.stampMsg(t0 + 2, 0);
 ok = false;
 for k = 1:50
     if canTransform(tftree, "map", "base_link", lastStamp) && canTransform(tftree, "map", "velodyne", lastStamp)
@@ -62,7 +63,7 @@ n = numel(relNs);
 gotB = zeros(n, 7);   % map → base_link [x y z w qx qy qz]
 gotV = zeros(n, 7);   % map → velodyne
 for i = 1:n
-    st = stampMsg(t0 + idivide(relNs(i), int64(1e9)), mod(relNs(i), int64(1e9)));
+    st = TfMath.stampMsg(t0 + idivide(relNs(i), int64(1e9)), mod(relNs(i), int64(1e9)));
     gotB(i, :) = lookup(tftree, "map", "base_link", st);
     gotV(i, :) = lookup(tftree, "map", "velodyne", st);
 end
@@ -77,13 +78,13 @@ for i = 1:n
     s = tSec - seg;
     a = seg + 1;  b = seg + 2;
     p = (1 - s) * keyP(a, :) + s * keyP(b, :);
-    cand = {p, slerp(keyQ(a, :), keyQ(b, :), s); ...
-            p, nlerp(keyQ(a, :), keyQ(b, :), s); ...
-            p, rpy2q((1 - s) * keyRpy(a, :) + s * keyRpy(b, :)); ...
+    cand = {p, TfMath.slerp(keyQ(a, :), keyQ(b, :), s); ...
+            p, TfMath.nlerp(keyQ(a, :), keyQ(b, :), s); ...
+            p, TfMath.rpy2q((1 - s) * keyRpy(a, :) + s * keyRpy(b, :)); ...
             keyP(a, :), keyQ(a, :)};
     for m = 1:numel(models)
         errP(i, m) = norm(gotB(i, 1:3) - cand{m, 1});
-        errR(i, m) = qangle(gotB(i, 4:7), cand{m, 2}) / deg;
+        errR(i, m) = TfMath.qangle(gotB(i, 4:7), cand{m, 2}) / deg;
     end
 end
 % map → velodyne は「map → base_link の lerp+slerp」に static の取付を掛けたものと比べる
@@ -93,10 +94,10 @@ for i = 1:n
     tSec = double(relNs(i)) * 1e-9;
     seg = min(floor(tSec), 1);
     s = tSec - seg;
-    qB = slerp(keyQ(seg + 1, :), keyQ(seg + 2, :), s);
+    qB = TfMath.slerp(keyQ(seg + 1, :), keyQ(seg + 2, :), s);
     pB = (1 - s) * keyP(seg + 1, :) + s * keyP(seg + 2, :);
-    errVP(i) = norm(gotV(i, 1:3) - (pB + qrot(qB, mountP)));
-    errVR(i) = qangle(gotV(i, 4:7), qmul(qB, mountQ)) / deg;
+    errVP(i) = norm(gotV(i, 1:3) - (pB + TfMath.qrot(qB, mountP)));
+    errVR(i) = TfMath.qangle(gotV(i, 4:7), TfMath.qmul(qB, mountQ)) / deg;
 end
 
 tolP = 1e-6;  tolR = 1e-4;
@@ -114,11 +115,32 @@ else
     fprintf("→ 線形補間と一致しない（上の表で誤差が最も小さい補間を見る）\n");
 end
 
+%% 同じ時刻を送り直したとき（ekf_localizer は同じ刻みを 3 回送る。dev_log.md の 105）
+% map → resend_link に x だけ変えて、Z(t0+3)、A1(t0+4)、B1(t0+5)、B2(t0+5)、A2(t0+4)、B3(t0+5)、C(t0+6) の順に送る
+seq = {3, -1, "Z"; 4, 0, "A1"; 5, 1, "B1"; 5, 1.2, "B2"; 4, 0.1, "A2"; 5, 1.5, "B3"; 6, 2, "C"};
+for k = 1:size(seq, 1)
+    sendTransform(pubTree, tfMsg("map", "resend_link", t0 + seq{k, 1}, 0, [seq{k, 2} 0 0], [1 0 0 0]))
+    pause(0.1)
+end
+for k = 1:50
+    if canTransform(tftree, "map", "resend_link", TfMath.stampMsg(t0 + 6, 0)), break; end
+    pause(0.1)
+end
+% 期待：tf2 は同じ時刻を置き換えずに重ねて持つ。間の時刻は「その時刻以前で一番後に入った値」と「その次の時刻で一番先に入った値」の補間
+fprintf("\n同じ時刻を送り直したとき（Z -1、A1 0 → A2 0.1、B1 1 → B2 1.2 → B3 1.5、C 2 の x）：\n");
+fprintf("  %-18s %8s %22s %22s\n", "引いた時刻", "x", "最後の値で置き換え", "前は最後・後は最初");
+resendQ = {"A ちょうど", 4, 0, 0.1, 0.1; "B ちょうど", 5, 0, 1.5, 1.5; "Z と A の中点", 3, 5e8, -0.45, -0.5; ...
+           "A と B の中点", 4, 5e8, 0.8, 0.55; "B と C の中点", 5, 5e8, 1.75, 1.75};
+for k = 1:size(resendQ, 1)
+    v = lookup(tftree, "map", "resend_link", TfMath.stampMsg(t0 + resendQ{k, 2}, resendQ{k, 3}));
+    fprintf("  %-18s %8.3f %22.3f %22.3f\n", resendQ{k, 1}, v(1), resendQ{k, 4}, resendQ{k, 5});
+end
+
 %% 区間の外（最初より前・最後より後）
 fprintf("\n区間の外：\n");
 outside = {"最初の TF の 10 ms 前", t0 - 1, int64(990e6); "最後の TF の 10 ms 後", t0 + 2, int64(10e6)};
 for k = 1:size(outside, 1)
-    st = stampMsg(outside{k, 2}, outside{k, 3});
+    st = TfMath.stampMsg(outside{k, 2}, outside{k, 3});
     can = canTransform(tftree, "map", "base_link", st);
     try
         getTransform(tftree, "map", "base_link", st);
@@ -157,16 +179,10 @@ function v = lookup(tftree, parent, child, st)
     v = [t.x t.y t.z q.w q.x q.y q.z];
 end
 
-function st = stampMsg(sec, nanosec)
-    st = ros2message("builtin_interfaces/Time");
-    st.sec = int32(sec);
-    st.nanosec = uint32(nanosec);
-end
-
 function msg = tfMsg(parent, child, sec, nanosec, p, q)
     msg = ros2message("geometry_msgs/TransformStamped");
     msg.header.frame_id = char(parent);
-    msg.header.stamp = stampMsg(sec, nanosec);
+    msg.header.stamp = TfMath.stampMsg(sec, nanosec);
     msg.child_frame_id = char(child);
     msg.transform.translation.x = p(1);
     msg.transform.translation.y = p(2);
@@ -175,53 +191,6 @@ function msg = tfMsg(parent, child, sec, nanosec, p, q)
     msg.transform.rotation.x = q(2);
     msg.transform.rotation.y = q(3);
     msg.transform.rotation.z = q(4);
-end
-
-function q = rpy2q(rpy)
-    % roll, pitch, yaw（ZYX）→ [w x y z]
-    cr = cos(rpy(1)/2); sr = sin(rpy(1)/2);
-    cp = cos(rpy(2)/2); sp = sin(rpy(2)/2);
-    cy = cos(rpy(3)/2); sy = sin(rpy(3)/2);
-    q = [cr*cp*cy + sr*sp*sy, sr*cp*cy - cr*sp*sy, cr*sp*cy + sr*cp*sy, cr*cp*sy - sr*sp*cy];
-end
-
-function yaw = q2yaw(q)
-    yaw = atan2(2*(q(1)*q(4) + q(2)*q(3)), 1 - 2*(q(3)^2 + q(4)^2));
-end
-
-function q = qmul(a, b)
-    q = [a(1)*b(1) - a(2)*b(2) - a(3)*b(3) - a(4)*b(4), ...
-         a(1)*b(2) + a(2)*b(1) + a(3)*b(4) - a(4)*b(3), ...
-         a(1)*b(3) - a(2)*b(4) + a(3)*b(1) + a(4)*b(2), ...
-         a(1)*b(4) + a(2)*b(3) - a(3)*b(2) + a(4)*b(1)];
-end
-
-function v = qrot(q, p)
-    r = qmul(qmul(q, [0 p]), [q(1) -q(2:4)]);
-    v = r(2:4);
-end
-
-function a = qangle(q1, q2)
-    % 2 つの回転の間の角度 [rad]（小さい角度でも精度が落ちない atan2 で）
-    d = qmul([q1(1) -q1(2:4)], q2);
-    a = 2 * atan2(norm(d(2:4)), abs(d(1)));
-end
-
-function q = slerp(a, b, s)
-    % 最短経路の球面線形補間（tf2::Quaternion::slerp と同じく内積が負なら b の符号を反転）
-    if dot(a, b) < 0, b = -b; end
-    th = acos(min(1, dot(a, b)));
-    if th < 1e-12
-        q = a;
-    else
-        q = (sin((1 - s)*th) * a + sin(s*th) * b) / sin(th);
-    end
-end
-
-function q = nlerp(a, b, s)
-    if dot(a, b) < 0, b = -b; end
-    q = (1 - s) * a + s * b;
-    q = q / norm(q);
 end
 
 function plotResult(r, keyQ, figPath)
@@ -233,10 +202,10 @@ function plotResult(r, keyQ, figPath)
     yawSlerp = zeros(size(tt));  yawEuler = zeros(size(tt));
     for i = 1:numel(tt)
         seg = min(floor(tt(i)), 1);  s = tt(i) - seg;
-        yawSlerp(i) = q2yaw(slerp(keyQ(seg + 1, :), keyQ(seg + 2, :), s));
+        yawSlerp(i) = TfMath.q2yaw(TfMath.slerp(keyQ(seg + 1, :), keyQ(seg + 2, :), s));
         yawEuler(i) = (1 - s) * r.keyRpy(seg + 1, 3) + s * r.keyRpy(seg + 2, 3);
     end
-    yawGot = arrayfun(@(i) q2yaw(r.gotBase(i, 4:7)), (1:numel(t))');
+    yawGot = arrayfun(@(i) TfMath.q2yaw(r.gotBase(i, 4:7)), (1:numel(t))');
 
     fig = figure("Visible", "off", "Position", [0 0 760 620], "Color", "w");
     tl = tiledlayout(fig, 2, 1, "TileSpacing", "compact", "Padding", "compact");
