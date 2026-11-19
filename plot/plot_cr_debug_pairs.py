@@ -3,9 +3,10 @@
 
   python3 plot_cr_debug_pairs.py <check_cr_debug.m の結果の .mat> <出力 png>
 
-(1) 軌跡：MATLAB の周期ごとの Plant（最新の /tf map -> base、後輪間中心）と、新しい組の LIDAR_pose
-    （点群の stamp の時刻の /tf と取付、LiDAR）。(2) 新しい組の間隔（LIDAR_new の周期の間）。
-    題に、TF が 1 つも引けず前の組のままにした周期（LIDAR_waiting）の数。
+(1) 軌跡：MATLAB の周期ごとの Plant（今の時刻の /tf map -> base、後輪間中心）と、姿勢の付いた新しい点群の LIDAR_pose
+    （点群の stamp の時刻の /tf と取付、LiDAR）。(2) 姿勢の付いた新しい点群の間隔（7 列目の周期の間）。
+    題に、点群はあるが TF が 1 つも引けず姿勢の無い周期（11 列目）の数。
+2026-11-19 から 7・11・12 列目は check_cr_debug.m が data から求める（それより前は LIDAR_new・LIDAR_waiting・LIDAR_latest_tf）。
 2026-10-26 の 68 より前の結果（10 列）は /localization/base_pose・vlp16_pose を購読していたころのもの。
 """
 import os
@@ -28,7 +29,7 @@ def main():
         sys.exit(1)
     rows = loadmat(sys.argv[1])['rows']
     out = sys.argv[2]
-    paired = ~np.isnan(rows[:, 4])
+    paired = ~np.isnan(rows[:, 4]) & ~np.isnan(rows[:, 5])
     new = rows[:, 6] > 0
     mismatch = int(np.sum(np.abs(rows[paired, 4] - rows[paired, 5]) > 1e-9))
     waiting = int(np.sum(rows[:, 10] > 0)) if rows.shape[1] > 10 else 0
@@ -40,7 +41,7 @@ def main():
     style(ax)
     w = widths_back_to_front(2)
     ax.plot(rows[:, 1], rows[:, 2], color=SERIES[0], lw=w[0],
-            label=f'Plant (latest /tf, rear axle center): {len(rows)} cycles')
+            label=f'Plant (/tf, rear axle center): {len(rows)} cycles')
     ax.plot(rows[new, 7], rows[new, 8], color=SERIES[1], lw=w[1],
             label=f'LIDAR_pose (/tf at the cloud stamp): {int(new.sum())} new pairs')
     ax.set_aspect('equal', adjustable='datalim')

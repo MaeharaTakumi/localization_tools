@@ -8,7 +8,7 @@
 %   MODE       2（Gazebo、既定）か 3（実機の録画。購読するトピックは実機と同じ）
 %   COLOR      実機の車椅子の色（red・blue・white。既定 red）
 %   SIM_TIME   1 なら ROS の時刻を /clock にする（録画の再生。MODE 2 は常に /clock）
-%   STOP_IDLE  新しい組（点群とその stamp の時刻の LiDAR の姿勢）ができなくなってからこの秒数で止める（0 なら TEST_DURATION まで）
+%   STOP_IDLE  姿勢の付いた新しい点群（stamp が前と違う点群）が来なくなってからこの秒数で止める（0 なら TEST_DURATION まで）
 %   READY_FILE 購読を作ったらこのファイルを作る（replay_matlab.sh が再生を始める合図）
 % 記録は TEST_OUT_DIR の userLocal_tmp.mat・userLocal.mat、図と動画は TEST_OUT_DIR/result（MAP が空なら地図なしの動画）。
 repo = getenv("REPO");
@@ -23,7 +23,7 @@ if isempty(color), color = 'red'; end
 
 vehicleInfo.type = "CR_debug";
 vehicleInfo.color = color;
-vehicleInfo.sensor = logical([1 0 0 0 1 0 1]);   % LiDAR, Matching (/tf), Localization Debug, LiDAR pose (/tf)
+vehicleInfo.sensor = logical([1 0 0 0 1 0]);   % LiDAR, Matching（/tf の Plant と LIDAR_pose，/localization_debug）
 vehicleInfo.base_sensor = 1;
 cfg = struct("modeNumber", mode, "isParallel", false, "RID", 99, "rosNamespace", "matlab_cr_debug_plot", ...
     "vehicleInfo", vehicleInfo, "useSimTime", envNumber("SIM_TIME", 0) == 1);
@@ -45,7 +45,8 @@ stopIdle = envNumber("STOP_IDLE", 0);
 timer = rateControl(20);
 reset(timer);
 cnt = 0;
-lastNew = NaN;
+lastNew = NaN;     % 最後に姿勢の付いた新しい点群を受け取った時刻
+lastCloud = NaN;   % その点群の stamp
 while timer.TotalElapsedTime < duration
     cnt = cnt + 1;
     [sens, Plant] = comm.getSensorData();
@@ -57,8 +58,12 @@ while timer.TotalElapsedTime < duration
     resEst.sequence = cnt;
     resCtrl.sequence = cnt;
     dlog.addData(struct('Estimator', resEst, 'Controller', resCtrl));
-    if sens.LIDAR_new
-        lastNew = timer.TotalElapsedTime;
+    if ~isempty(sens.LIDAR) && ~isempty(sens.LIDAR_pose)
+        cs = double(sens.LIDAR.header.stamp.sec) + double(sens.LIDAR.header.stamp.nanosec) * 1e-9;
+        if cs ~= lastCloud
+            lastNew = timer.TotalElapsedTime;
+            lastCloud = cs;
+        end
     end
     if stopIdle > 0 && ~isnan(lastNew) && timer.TotalElapsedTime - lastNew > stopIdle
         break
