@@ -36,6 +36,7 @@ NDT の R を「真値 + ノイズ」で求める `calibrate_ndt_noise.py`（202
 | `eval/` | `replay_outputs.py`（録画を再生して推定器を動かし、出力を録る）、`bag_info.py`（録画の情報ファイル・一覧）、`bag_paths.py`（録画の置き場所） |
 | `plot/` | `plot_drive_paths.py`（走行の軌跡）、`plot_matlab_outputs.py`（MATLAB が `/tf` から引く値）、`plot_prior_posterior.py`（RViz の点群に使う姿勢の違い）、`plot_cr_debug_pairs.py`（MATLAB の CR_debug が受け取った組）、`rerender_results.sh`（今のツールで描ける `results/` の図を描き直す。`OUT` で出力先、`T0` でツールの場所） |
 | `matlab/` | MATLAB（whill_common_matlab の CR_debug）の確認。`replay_matlab.sh` はホストで実行 |
+| `rviz/` | rviz2 が引く TF の確認：`replay_rviz_tf.sh`（再生しながら rviz2 の tf2 の出し入れを記録して比べる。コンテナの中で実行）、`tf_hook.cpp`（`LD_PRELOAD` のフック）、`check_rviz_tf_interpolation.py`（記録と tf2 の決まりを比べる・図） |
 | `common/` | **共通部品**（各スクリプトは `common` などを `sys.path` に入れて import する）：`env_files.py`（localization_bringup の `param/<env>/` を読む・写して書き換える。`make_env`・`node_params`）、`bag_io.py`（`read_bag`・`phases_of`・`stamp_sec`・`stamp_ns`・`mount_from_tf_static`）、`pose_math.py`（姿勢と 4x4 行列）、`plot_style.py`（色・線幅・`setup`・`style`・`box_on`・`capitalize_labels`・`widths_back_to_front`）、`gazebo_model.py`（Gazebo の車輪の半径と間隔、URDF の取付） |
 | `record_rviz.sh` | **RViz の画面の録画（ホストで実行）** |
 
@@ -211,6 +212,24 @@ matlab/replay_tf_interpolation.sh /root/ros2_ws/bags/real/blue_spin5_20261016_16
 ```
 
 `matlab/TfMath.m` は 2 つの確認で使う四元数（slerp など）と時刻の計算。
+
+## RViz2 が引く TF（`rviz/`）
+
+rviz2 が ekf_localizer の `/tf` から実際に引いた値を確かめるのは `rviz/replay_rviz_tf.sh`（コンテナの中で実行。rviz2 の画面が開く）。
+`rviz/tf_hook.cpp` を `LD_PRELOAD` で rviz2（自己位置推定と同じ `localization2.rviz`、`use_sim_time`）に入れ、tf2 に入った TF（`setTransform`）と
+rviz2 が引いた TF（`lookupTransform`）をすべて `rviz_tf.log` に書く（値は変えない）。`RECORD=0` の `replay_outputs.py` で再生し
+（`ROS_DOMAIN_ID=99`）、終わったら `rviz/check_rviz_tf_interpolation.py` が、引いたときに入っていた TF から tf2 の決まり
+（刻みの間は前の刻みの最後・後の刻みの最初の値の補間、最新（時刻 0）は一番新しい刻みの最後の値）で計算した値と比べる。
+点群の stamp で引いたものは、再生の後の値（後から届いた分も入れた決まりの値、最後に届いた値どうしの補間）とも比べる：
+
+```bash
+rviz/replay_rviz_tf.sh /root/ros2_ws/bags/gazebo/gazebo_spin5_20261016_111637 /root/ros2_ws/fig/rviz_tf/gazebo_spin5
+rviz/replay_rviz_tf.sh /root/ros2_ws/bags/real/blue_spin5_20261016_160557 /root/ros2_ws/fig/rviz_tf/blue_spin5 blue /root/ros2_ws/map/10build_4F_C_20260414.pcd
+python3 rviz/check_rviz_tf_interpolation.py <rviz_tf.log> <図の .png>   # 記録から描き直す
+```
+
+rviz2 は点群 1 つにつき同じ stamp で 2 回引く。1 回目は tf2_ros の MessageFilter の `waitForTransform`（値は使わない）、2 回目は点群を処理するとき（この値で描く）なので、解析は 2 つを分けて表示し、図は 2 回目を描く。最新（時刻 0）で引くのは視点の Target Frame と TF の表示。
+出力は `rviz_tf.log`・`rviz_tf_interpolation.png`・`summary.txt`・`rviz.log`・`replay.log`。フックは tf2 0.25（Humble）・x86-64 に合わせてある。
 
 ## 録画の情報（`eval/bag_info.py`）
 
