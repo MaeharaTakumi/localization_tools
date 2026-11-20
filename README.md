@@ -35,8 +35,8 @@ NDT の R を「真値 + ノイズ」で求める `calibrate_ndt_noise.py`（202
 | `calibration/` | **パラメータ推定**：`run_calibration.sh`（推定用の動きで走って、続けて推定する。コマンド `calibration`）、`motion.py`（推定用の動き）、`calibrate.py`（R・倍率・取付をまとめて推定。`run_calibration.sh` が呼ぶ）、`calibrate_noise.py`（観測ノイズ R）、`calibrate_mount_scale.py`（LiDAR の取付とオドメトリの倍率）、図は `plot_noise.py`・`plot_mount_scale.py`。設定は `param/motion.yaml`（推定用の動き）と `param/calibrate.yaml`（各プログラムのオプションの既定値。`params.py` が読む） |
 | `eval/` | `replay_outputs.py`（録画を再生して推定器を動かし、出力を録る）、`bag_info.py`（録画の情報ファイル・一覧）、`bag_paths.py`（録画の置き場所） |
 | `plot/` | `plot_drive_paths.py`（走行の軌跡）、`plot_matlab_outputs.py`（MATLAB が `/tf` から引く値）、`plot_prior_posterior.py`（RViz の点群に使う姿勢の違い）、`plot_cr_debug_pairs.py`（MATLAB の CR_debug が受け取った組）、`rerender_results.sh`（今のツールで描ける `results/` の図を描き直す。`OUT` で出力先、`T0` でツールの場所） |
-| `matlab/` | MATLAB（whill_common_matlab の CR_debug）の確認。`replay_matlab.sh` はホストで実行 |
-| `rviz/` | rviz2 が引く TF の確認：`replay_rviz_tf.sh`（再生しながら rviz2 の tf2 の出し入れを記録して比べる。コンテナの中で実行）、`tf_hook.cpp`（`LD_PRELOAD` のフック）、`check_rviz_tf_interpolation.py`（記録と tf2 の決まりを比べる・図） |
+| `matlab/` | MATLAB（whill_common_matlab の CR_debug）の確認。`replay_matlab.sh`・`replay_tf_interpolation.sh`・`replay_cr_debug_rviz.sh` はホストで実行 |
+| `rviz/` | rviz2 が引く TF の確認：`replay_rviz_tf.sh`（再生しながら rviz2 の tf2 の出し入れを記録して比べる。コンテナの中で実行）、`tf_hook.cpp`（`LD_PRELOAD` のフック）、`check_rviz_tf_interpolation.py`（記録と tf2 の決まりを比べる・図）、`compare_rviz_cr_debug.py`（同じ再生の CR_debug の値と点群ごとに比べる・図） |
 | `common/` | **共通部品**（各スクリプトは `common` などを `sys.path` に入れて import する）：`env_files.py`（localization_bringup の `param/<env>/` を読む・写して書き換える。`make_env`・`node_params`）、`bag_io.py`（`read_bag`・`phases_of`・`stamp_sec`・`stamp_ns`・`mount_from_tf_static`）、`pose_math.py`（姿勢と 4x4 行列）、`plot_style.py`（色・線幅・`setup`・`style`・`box_on`・`capitalize_labels`・`widths_back_to_front`）、`gazebo_model.py`（Gazebo の車輪の半径と間隔、URDF の取付） |
 | `record_rviz.sh` | **RViz の画面の録画（ホストで実行）** |
 
@@ -179,6 +179,11 @@ REPO="<whill_common_matlab のフォルダ>" TEST_DURATION=70 TEST_OUT=/tmp/cr_d
 python3 plot/plot_cr_debug_pairs.py /root/ros2_ws/fig/matlab_outputs/cr_debug.mat /root/ros2_ws/fig/matlab_outputs/cr_debug.png   # コンテナ（.mat を写して）
 ```
 
+`check_cr_debug.m` の環境変数（省略可）：`MODE`・`COLOR`・`SIM_TIME`（`check_cr_debug_plot.m` と同じ。実機の録画は `MODE=3 SIM_TIME=1`）、
+`READY_FILE`（購読を作ったら作る）、`STOP_IDLE`（姿勢の付いた新しい点群が来なくなってからこの秒数で止める）、`TEST_LIDAR_THRESHOLD`、
+`TEST_POSES`（点群のある周期ごとに `getSensorData` の前・後の CLOCK_MONOTONIC [ns]、点群の stamp の sec・nanosec、`LIDAR_pose` の X Y Z Roll Pitch Yaw Stamp を
+1 行ずつ書くテキスト。姿勢が無ければ nan。rviz2 と比べるのに使う）。
+
 main.m と同じ流れ（Estimate2・Control2・DataLogger。指令は配信しない）で記録し、図と動画（`TEST_OUT_DIR/result`。地図は `MAP`）まで作るのは
 `matlab/check_cr_debug_plot.m`。録画の再生・MATLAB・図と動画を 1 回で行うのは `matlab/replay_matlab.sh`（ホストで実行。MATLAB を先に起動して
 購読ができてから `RECORD=0` の `replay_outputs.py` で再生し、新しい組が `STOP_IDLE`（既定 5）秒できなくなったら止まって図と動画を作る）：
@@ -230,6 +235,22 @@ python3 rviz/check_rviz_tf_interpolation.py <rviz_tf.log> <図の .png>   # 記�
 
 rviz2 は点群 1 つにつき同じ stamp で 2 回引く。1 回目は tf2_ros の MessageFilter の `waitForTransform`（値は使わない）、2 回目は点群を処理するとき（この値で描く）なので、解析は 2 つを分けて表示し、図は 2 回目を描く。最新（時刻 0）で引くのは視点の Target Frame と TF の表示。
 出力は `rviz_tf.log`・`rviz_tf_interpolation.png`・`summary.txt`・`rviz.log`・`replay.log`。フックは tf2 0.25（Humble）・x86-64 に合わせてある。
+
+同じ再生で、MATLAB の CR_debug（`data.LIDAR_pose`）と rviz2 が点群の stamp で引いた値を点群ごとに比べるのは `matlab/replay_cr_debug_rviz.sh`
+（ホストで実行。MATLAB は既定 R2024b）。`matlab/check_cr_debug.m`（`TEST_POSES`）を先に起動し、購読ができてから、コンテナで `rviz/replay_rviz_tf.sh` を動かす。
+MATLAB は新しい点群が `STOP_IDLE`（既定 5）秒来なくなったら止まり、最後に `rviz/compare_rviz_cr_debug.py` が比べる。
+CR_debug の各周期の値を、rviz2 が描いた値（同じ点群の 2 回目）、再生の後の決まりの値、最後に届いた値どうしの補間と比べる。
+点群の stamp で引けずに最新の TF を使った周期は、そのときの rviz2 の tf2 の最新と、点群の stamp の値と比べる。
+時刻は CLOCK_MONOTONIC でそろえる（フックの `steady_clock` と Java の `System.nanoTime`）。
+出力はコンテナの `/root/ros2_ws/fig/rviz_cr_debug/<名前>`（ホストの `docker/data/fig/rviz_cr_debug/<名前>`）：
+
+```bash
+matlab/replay_cr_debug_rviz.sh /root/ros2_ws/bags/gazebo/gazebo_spin5_20261016_111637 gazebo_spin5
+matlab/replay_cr_debug_rviz.sh /root/ros2_ws/bags/real/blue_spin5_20261016_160557 blue_spin5 blue /root/ros2_ws/map/10build_4F_C_20260414.pcd
+python3 rviz/compare_rviz_cr_debug.py /root/ros2_ws/fig/rviz_cr_debug/<名前>   # コンテナ。記録から比べ直す
+```
+
+出力は MATLAB の `cr_debug_poses.txt`・`cr_debug.mat`・`matlab.log`、rviz2 の `rviz_tf.log` など（上と同じ）、比べた結果の `compare.txt`・`rviz_cr_debug.png`。
 
 ## 録画の情報（`eval/bag_info.py`）
 

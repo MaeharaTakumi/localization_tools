@@ -101,7 +101,7 @@ def parse(path):
             if not p:
                 continue
             if p[0] == 'S' and len(p) == 16:
-                sets.append(dict(seq=int(p[1]), buf=p[3], stamp=int(p[4]), parent=p[5], child=p[6],
+                sets.append(dict(seq=int(p[1]), wall=int(p[2]), buf=p[3], stamp=int(p[4]), parent=p[5], child=p[6],
                                  static=p[7] == '1', inserted=p[8] == '1', v=np.array([float(x) for x in p[9:16]])))
             elif p[0] == 'L' and len(p) == 16:
                 looks.append(dict(kind='L', before=int(p[1]), after=int(p[2]), wall=int(p[3]), buf=p[4], target=p[5], source=p[6],
