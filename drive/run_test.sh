@@ -15,6 +15,10 @@
 #     （推定の起動は自分で行う。地図・初期姿勢が要るため）。走り出す前に計画を表示して確認するので、端末から実行する。
 #     録画は /root/ros2_ws/bags/real/<bag 名>（同じ名前は止める）
 #
+#   drive/run_test.sh <red|blue|white> manual [<bag 名>]
+#     速度指令を送らず、録画だけする（車椅子は手で動かす。Enter か Ctrl-C で終える）。実機用（gazebo は止める）。
+#     自己位置推定が動いていなくても録画する（姿勢が届いているか・publish するノードが無いトピックを表示するだけ）
+#
 #   <bag 名> を省くと <target>_<動き>_<年月日_時分秒>（例 red_spin5_20261015_153012）にする。
 #   <bag 名> を check/<名前> にすると bags/<gazebo|real>/check/ に録る（ツールの動作確認など、比較・調整に使わない録画）。
 #   <動き> は drive/profiles.yaml（spin・spin5・stops・accel・curve・slalom・reverse。drive/drive_test.py <target> --list）。
@@ -32,6 +36,7 @@ target=${1:?gazebo・red・blue・white のどれか}; profile=${2:?動き}; bag
 echo "== bag: $bag"
 tag=${bag//\//_}   # /tmp のログの名前（bag 名に check/ などの下のディレクトリを書いてもよい）
 case $target in gazebo) source=gazebo;; red|blue|white) source=real;; *) echo "target は gazebo・red・blue・white のどれか"; exit 1;; esac
+if [ "$profile" = manual ] && [ "$target" = gazebo ]; then echo "manual は実機用（red・blue・white）"; exit 1; fi
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(dirname "$here")   # localization_tools
 LOC=${LOC:-test}; GZ=20261002
@@ -113,8 +118,13 @@ else
   echo "== start recording"
   cbg "ros2 bag record -o $BAGS/$bag $topics > /tmp/record_$tag.log 2>&1"
   sleep 1   # 録画が購読し終えるまで（最初のメッセージまで約 0.1 s）
-  echo "== drive（推定・whill_driver を確かめ、計画を表示して Enter で走り出す。止めるときは Ctrl-C かジョイスティック）"
-  cit "$DT $profile 2>&1 | tee /tmp/drive_$tag.log; exit \${PIPESTATUS[0]}"
+  if [ "$profile" = manual ]; then
+    echo "== manual（速度指令は送らない。終えるときは Enter か Ctrl-C）"
+  else
+    echo "== drive（推定・whill_driver を確かめ、計画を表示して Enter で走り出す。止めるときは Ctrl-C かジョイスティック）"
+  fi
+  # tee -i：Ctrl-C で tee が先に終わると、止めた後の表示がログに残らない
+  cit "$DT $profile 2>&1 | tee -i /tmp/drive_$tag.log; exit \${PIPESTATUS[0]}"
   status=$?
 fi
 

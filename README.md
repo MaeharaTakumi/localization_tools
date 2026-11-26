@@ -49,12 +49,18 @@ NDT の R を「真値 + ノイズ」で求める `calibrate_ndt_noise.py`（202
 ```bash
 drive/run_test.sh gazebo <動き> [<bag 名> [launch の追加引数]]   # ホストかコンテナの中
 drive/run_test.sh <red|blue|white> <動き> [<bag 名>]              # 実機。端末から（確認がある）
+drive/run_test.sh <red|blue|white> manual [<bag 名>]              # 実機。速度指令を送らず録画だけ（手で動かす）
 python3 drive/drive_test.py <gazebo|red|blue|white> --list               # 動きの一覧
 python3 drive/drive_test.py <gazebo|red|blue|white> <動き> --simulate    # 計算した軌跡（ROS 不要）
 ```
 
 コンテナの中では `drive`（bag 名を省くと `<target>_<動き>_<日時>`）・`drive_list`・`bags_list [gazebo|real]` のコマンドでも呼べる（localizer_docker の `src/aliases.txt`）。
 
+- **`manual`（実機用。2026-11-26 から）**：速度指令を送らず（指令の publisher を作らない）、録画だけする。車椅子はジョイスティックなど手で動かし、
+  Enter か Ctrl-C で終える（コンテナの中では `drive blue manual`）。始めに、自己位置推定の姿勢（`/tf` の map → base）が届いているかと、publish する
+  ノードが無い録画のトピック（指令と `/initialpose` は除く）を表示するだけで、欠けていても録画は続ける。録画するトピックと置き場所は他の動きと同じ。
+  `_phases.txt` は `manual`（録画の始め）と `stop`。ジョイスティックで走らせると `cmd_vel` は録画に入らないので、パラメータ推定には使えない。
+  `gazebo manual` は実行しない。何も届かなかった録画は、一覧の日時が 2262 年になる。
 - **動き**（`profiles.yaml`）：`spin`（その場で左右 1 周 + 3 秒前進）、`spin5`（左に 5 周 → 右に 5 周 + 3 秒前進）、`stops`（13 か所で止まる）、
   `accel`（加減速・停止、8.5 m）、`curve`（半径 0.75 m の 8 の字）、`slalom`（波長 2.5 m）、`reverse`（後退・S 字・前後の切り替え）。
   速さは上限に対する割合。直進は距離、旋回は角度、円は半径で決めるので、上限を変えても形・大きさは同じ。

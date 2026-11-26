@@ -2,6 +2,7 @@
 """テスト走行（Gazebo・実機共通）：profiles.yaml の動きを、config/<target>.yaml の上限・トピックで走らせる.
 
   python3 drive_test.py <target> <動き> [--yes] [--phases <出力>]   走らせる（自己位置推定のコンテナで）
+  python3 drive_test.py <target> manual [--phases <出力>]           速度指令を送らない（実機を手で動かして録画する）
   python3 drive_test.py <target> <動き> --simulate                  計算した軌跡の表示だけ（ROS 不要）
   python3 drive_test.py <target> --list                             動きの一覧
   python3 drive_test.py <target> --record-topics                    録画するトピック（run_test.sh が使う）
@@ -18,6 +19,8 @@
   - ジョイスティックが倒された（実機。whill_driver も手での操作を優先する）
   - 1 区間が max_segment_time を超えた、Ctrl-C
 confirm: true（実機）なら、計画を表示して Enter を押すまで走らない（何か入力して Enter なら取りやめ。--yes で省く）。
+manual（動きのファイルには無い。実機用）は指令の publisher を作らず、Enter か Ctrl-C（SIGTERM）まで待つ。始めに自己位置推定の姿勢が
+届いているかと、publish するノードが無い録画のトピックを表示する（欠けていても録画は続ける）。<phases> は manual と stop。
 動作の開始時刻を <phases>（既定 /tmp/drive_phases.txt）に「<区間の名前> <時刻 [s]>」で書く（最後は stop。止まる区間は
 stop_<label>_start / _end）。時刻は Gazebo は sim time、実機は ROS の時刻（壁時計）。
 """
@@ -31,6 +34,9 @@ import yaml
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)   # localization_tools
+
+MANUAL = 'manual'   # 速度指令を送らない（手で動かす）。動きのファイルには書かない
+MANUAL_DESCRIPTION = '手で動かして録画（速度指令は送らない。Enter か Ctrl-C で終える。実機用）'
 
 
 def load_yaml(path):
@@ -199,7 +205,53 @@ def yaw_of(q):
     return math.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z))
 
 
+def record_manual(node, cfg, fb_name, phases_path):
+    """manual：指令は送らず、Enter か Ctrl-C まで待つ（録画は run_test.sh がしている）。区間は manual と stop."""
+    import select
+    import time as _time
+
+    import rclpy
+
+    # 指令と /initialpose は、手で動かすときは publish するノードが無いのがふつうなので調べない
+    topics = [t for t in cfg.get('record_topics', []) if t not in (cfg['command']['topic'], '/initialpose')]
+    phases = []
+    watch_stdin = True
+    reported = False
+    t_start = _time.monotonic()
+    print('速度指令は送らない（録画だけ）。手で動かし、終えるときは Enter か Ctrl-C。', flush=True)
+    try:
+        while True:
+            rclpy.spin_once(node, timeout_sec=0.1)
+            if not phases and node.now() > 0.0:
+                phases.append((MANUAL, node.now()))
+            if not reported:
+                fresh = node.pose is not None and _time.monotonic() - node.pose_mono <= cfg['feedback_timeout']
+                missing = [t for t in topics if node.count_publishers(t) == 0]
+                if (fresh and not missing) or _time.monotonic() - t_start > 5.0:
+                    reported = True
+                    print(f"自己位置推定の姿勢（{fb_name}）：{'届いている' if fresh else '届いていない（録画は続ける）'}")
+                    if missing:
+                        print(f"publish するノードが無いトピック（録画は続ける）：{', '.join(missing)}")
+                    print('録画中', flush=True)
+            if watch_stdin and select.select([sys.stdin], [], [], 0)[0]:
+                if sys.stdin.readline():
+                    break
+                watch_stdin = False   # 入力が閉じている（端末でない）。Ctrl-C・SIGTERM で終える
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if phases:
+            phases.append(('stop', node.now()))
+        with open(phases_path, 'w') as f:
+            f.writelines(f'{n} {t:.3f}\n' for n, t in phases)
+        node.destroy_node()
+        rclpy.shutdown()
+    print(f'録画を終える（{_time.monotonic() - t_start:.1f} s）', flush=True)
+    return 0
+
+
 def run(cfg, segs, name, args):
+    """segs（速度指令の区間の列）を走らせる。segs が None なら manual（指令を送らない）."""
     import time as _time
 
     import rclpy
@@ -227,7 +279,8 @@ def run(cfg, segs, name, args):
             else:
                 from geometry_msgs.msg import Twist as CmdType
             self.cmd_type = CmdType
-            self.pub = self.create_publisher(CmdType, cmd_cfg['topic'], 10)
+            # manual は指令の publisher を作らない
+            self.pub = None if segs is None else self.create_publisher(CmdType, cmd_cfg['topic'], 10)
             self.pose = None        # (x, y, yaw) 車体
             self.pose_time = None   # 受け取った時刻（このノードの時計）
             self.pose_mono = None   # 受け取った時刻（壁時計。sim time の時計が止まっても古さを測れるように）
@@ -299,6 +352,8 @@ def run(cfg, segs, name, args):
     signal.signal(signal.SIGTERM, on_term)
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     node = Driver()
+    if segs is None:
+        return record_manual(node, cfg, fb_name, args.phases)
     dt = 1.0 / float(cmd_cfg.get('rate', 50.0))
     phases = []
     reason = None
@@ -431,16 +486,23 @@ def main():
     if args.list or not args.profile:
         for k, p in profiles.items():
             print(f"{k:<10} {p.get('description', '')}")
+        print(f'{MANUAL:<10} {MANUAL_DESCRIPTION}')
         return 0
-    segs = build(cfg, profiles, args.profile)
+    segs = None if args.profile == MANUAL else build(cfg, profiles, args.profile)
     if args.describe:
         lim = cfg['limits']
         who = f"車椅子 {cfg['target']}。" if cfg['target'] != 'gazebo' else ''
+        if segs is None:
+            print(f'{who}{MANUAL_DESCRIPTION}')
+            return 0
         print(f"{who}{profiles[args.profile].get('description', '')}。上限 v {lim['v_max']}・後退 {lim['v_reverse_max']} m/s・"
               f"omega {lim['w_max']} rad/s")
         return 0
     if args.simulate:
-        print(plan_report(cfg, segs, args.profile))
+        if segs is None:
+            print(f'{MANUAL}：{MANUAL_DESCRIPTION}')
+        else:
+            print(plan_report(cfg, segs, args.profile))
         return 0
     return run(cfg, segs, args.profile, args)
 
