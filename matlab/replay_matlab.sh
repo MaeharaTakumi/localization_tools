@@ -6,7 +6,7 @@
 # 流れ：MATLAB を起動し、購読ができたら（READY_FILE）録画を再生する。新しい組が STOP_IDLE 秒来なくなったら MATLAB が止まり、
 # DataPlotter・myplotResult・myplotPointCloudVideo で図と動画を作る（出力のフォルダの result）。
 # 環境変数：REPO（whill_common_matlab のフォルダ）、CHECK（動かす MATLAB のスクリプト。既定 check_cr_debug_plot.m。
-#   SIP 版（ブランチ cr_debug_sip）は check_sip.m）、MATLAB（matlab の実行ファイル）、MAP（動画の地図。ホストのパス）、
+#   SIP 版（ブランチ cr_debug_sip）は check_sip.m）、MATLAB（matlab の実行ファイル）、MAP（動画とフィットネススコアの地図。ホストのパス）、
 #   STOP_IDLE（既定 5）、RATE（再生の速さ。実機の録画だけ）、PARAMS（推定器のパラメータの上書き。eval/replay_outputs.py の PARAMS）、
 #   GET_NEW_TF（1 なら CR_debug の getNewTf を true にする。MATLAB にそのまま渡る。check_cr_debug_plot.m・check_sip.m が読む）
 # 実機の録画は、ホストの net.core.rmem_max・rmem_default が 208 kB のままだと点群が半分ほど落ちる。8 MB にしておく（dev_log.md の 66・67）。

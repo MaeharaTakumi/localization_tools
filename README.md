@@ -193,7 +193,8 @@ python3 plot/plot_cr_debug_pairs.py /root/ros2_ws/fig/matlab_outputs/cr_debug.ma
 1 行ずつ書くテキスト。姿勢が無ければ nan。rviz2 と比べるのに使う）。終わりに、`Plant.Stamp` − 今の ROS の時刻（最新の TF なので正）と、
 `LIDAR_pose.Stamp` が `Plant.Stamp` と同じ周期の数（`GET_NEW_TF=1` なら全部）も表示する（`rows` の 13・14 列目）。
 
-main.m と同じ流れ（Estimate2・Control2・DataLogger。指令は配信しない）で記録し、図と動画（`TEST_OUT_DIR/result`。地図は `MAP`）まで作るのは
+main.m と同じ流れ（Estimate2・Control2・DataLogger。指令は配信しない）で記録し、図と動画（`TEST_OUT_DIR/result`。地図は `MAP`。
+`MAP` があればフィットネススコアの図 `fitness_score` も描く）まで作るのは
 `matlab/check_cr_debug_plot.m`。録画の再生・MATLAB・図と動画を 1 回で行うのは `matlab/replay_matlab.sh`（ホストで実行。MATLAB を先に起動して
 購読ができてから `RECORD=0` の `replay_outputs.py` で再生し、新しい組が `STOP_IDLE`（既定 5）秒できなくなったら止まって図と動画を作る）：
 

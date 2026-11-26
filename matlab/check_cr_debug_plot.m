@@ -11,7 +11,7 @@
 %   STOP_IDLE  姿勢の付いた新しい点群（stamp が前と違う点群）が来なくなってからこの秒数で止める（0 なら TEST_DURATION まで）
 %   READY_FILE 購読を作ったらこのファイルを作る（replay_matlab.sh が再生を始める合図）
 %   GET_NEW_TF 1 なら main.m の getNewTf を true にする（LIDAR_pose も最新の TF。既定 0）
-% 記録は TEST_OUT_DIR の userLocal_tmp.mat・userLocal.mat、図と動画は TEST_OUT_DIR/result（MAP が空なら地図なしの動画）。
+% 記録は TEST_OUT_DIR の userLocal_tmp.mat・userLocal.mat、図と動画は TEST_OUT_DIR/result（MAP が空なら地図なしの動画で、フィットネススコアの図は描かない）。
 repo = getenv("REPO");
 addpath(repo)
 setenv("RMW_IMPLEMENTATION", "rmw_fastrtps_cpp")
@@ -74,7 +74,7 @@ end
 dlog.stop();
 fprintf("cycles: %d\n", cnt);
 plotter.DataPlotter(outDir, cfg)
-plotter.myplotResult(outDir, cfg)
+plotter.myplotResult(outDir, cfg, getenv("MAP"))
 plotter.myplotPointCloudVideo(outDir, getenv("MAP"))
 disp(dir(fullfile(outDir, "result", "jpeg")))
 
