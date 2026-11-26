@@ -3,8 +3,8 @@
 
   python3 plot_cr_debug_pairs.py <check_cr_debug.m の結果の .mat> <出力 png>
 
-(1) 軌跡：MATLAB の周期ごとの Plant（今の時刻の /tf map -> base、後輪間中心）と、姿勢の付いた新しい点群の LIDAR_pose
-    （点群の stamp の時刻の /tf と取付、LiDAR）。(2) 姿勢の付いた新しい点群の間隔（7 列目の周期の間）。
+(1) 軌跡：MATLAB の周期ごとの Plant（最新の /tf map -> base、後輪間中心。2026-11-19〜11-26 の結果は今の時刻）と、姿勢の付いた
+    新しい点群の LIDAR_pose（点群の stamp の時刻の /tf と取付、LiDAR。getNewTf が true なら最新）。(2) 姿勢の付いた新しい点群の間隔（7 列目の周期の間）。
     題に、点群はあるが TF が 1 つも引けず姿勢の無い周期（11 列目）の数。
 2026-11-19 から 7・11・12 列目は check_cr_debug.m が data から求める（それより前は LIDAR_new・LIDAR_waiting・LIDAR_latest_tf）。
 2026-10-26 の 68 より前の結果（10 列）は /localization/base_pose・vlp16_pose を購読していたころのもの。

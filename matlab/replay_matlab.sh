@@ -5,18 +5,21 @@
 #   replay_matlab.sh <bag> <出力のフォルダ> <環境の名前（red・blue・white）> <地図（コンテナのパス）>   実機の録画
 # 流れ：MATLAB を起動し、購読ができたら（READY_FILE）録画を再生する。新しい組が STOP_IDLE 秒来なくなったら MATLAB が止まり、
 # DataPlotter・myplotResult・myplotPointCloudVideo で図と動画を作る（出力のフォルダの result）。
-# 環境変数：REPO（whill_common_matlab のフォルダ）、MATLAB（matlab の実行ファイル）、MAP（動画の地図。ホストのパス）、
-#   STOP_IDLE（既定 5）、RATE（再生の速さ。実機の録画だけ）、PARAMS（推定器のパラメータの上書き。eval/replay_outputs.py の PARAMS）
+# 環境変数：REPO（whill_common_matlab のフォルダ）、CHECK（動かす MATLAB のスクリプト。既定 check_cr_debug_plot.m。
+#   SIP 版（ブランチ cr_debug_sip）は check_sip.m）、MATLAB（matlab の実行ファイル）、MAP（動画の地図。ホストのパス）、
+#   STOP_IDLE（既定 5）、RATE（再生の速さ。実機の録画だけ）、PARAMS（推定器のパラメータの上書き。eval/replay_outputs.py の PARAMS）、
+#   GET_NEW_TF（1 なら CR_debug の getNewTf を true にする。MATLAB にそのまま渡る。check_cr_debug_plot.m・check_sip.m が読む）
 # 実機の録画は、ホストの net.core.rmem_max・rmem_default が 208 kB のままだと点群が半分ほど落ちる。8 MB にしておく（dev_log.md の 66・67）。
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 ws=$(cd "$here/../../.." && pwd)    # localization_workspace（Docker/localization）
 LOC=${LOC:-test}
 REPO=${REPO:-$ws/src/whill_common_matlab-main _ndtDebug}
+CHECK=${CHECK:-check_cr_debug_plot.m}
 MATLAB=${MATLAB:-/usr/local/MATLAB/R2026a/bin/matlab}
 STOP_IDLE=${STOP_IDLE:-5}
 if [ $# -ne 2 ] && [ $# -ne 4 ]; then
-  sed -n '2,10p' "$0"; exit 1
+  sed -n '2,11p' "$0"; exit 1
 fi
 bag=$1
 out=$(mkdir -p "$2" && cd "$2" && pwd)
@@ -40,7 +43,7 @@ rm -f "$ready"
 # MATLAB：再生の長さ + 地図の読み込みと起動の余裕まで（新しい組が来なくなれば STOP_IDLE で先に止まる）
 REPO="$REPO" TEST_OUT_DIR="$out" MAP="$MAP" MODE=$mode COLOR=$color SIM_TIME=$sim_time STOP_IDLE=$STOP_IDLE \
   TEST_DURATION=$(python3 -c "print(int($duration + 90))") READY_FILE="$ready" \
-  "$MATLAB" -batch "run('$here/check_cr_debug_plot.m')" > "$out/matlab.log" 2>&1 &
+  "$MATLAB" -batch "run('$here/$CHECK')" > "$out/matlab.log" 2>&1 &
 matlab_pid=$!
 for _ in $(seq 180); do
   [ -e "$ready" ] && break
@@ -54,5 +57,5 @@ docker exec -e PARAMS="${PARAMS:-}" $LOC bash -ic "cd /root/ros2_ws/localization
 echo "replay finished; waiting for MATLAB (plots and video)"
 wait $matlab_pid || { echo "MATLAB failed (see $out/matlab.log)"; exit 1; }
 rm -f "$ready"
-grep -E "cycles:|Video saved" "$out/matlab.log" || true
+grep -E "cycles:|Video saved|time \\[ms\\]|command v" "$out/matlab.log" || true
 echo "figures: $out/result"

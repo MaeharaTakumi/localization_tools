@@ -10,6 +10,7 @@
 %   SIM_TIME   1 なら ROS の時刻を /clock にする（録画の再生。MODE 2 は常に /clock）
 %   STOP_IDLE  姿勢の付いた新しい点群（stamp が前と違う点群）が来なくなってからこの秒数で止める（0 なら TEST_DURATION まで）
 %   READY_FILE 購読を作ったらこのファイルを作る（replay_matlab.sh が再生を始める合図）
+%   GET_NEW_TF 1 なら main.m の getNewTf を true にする（LIDAR_pose も最新の TF。既定 0）
 % 記録は TEST_OUT_DIR の userLocal_tmp.mat・userLocal.mat、図と動画は TEST_OUT_DIR/result（MAP が空なら地図なしの動画）。
 repo = getenv("REPO");
 addpath(repo)
@@ -26,7 +27,7 @@ vehicleInfo.color = color;
 vehicleInfo.sensor = logical([1 0 0 0 1 0]);   % LiDAR, Matching（/tf の Plant と LIDAR_pose，/localization_debug）
 vehicleInfo.base_sensor = 1;
 cfg = struct("modeNumber", mode, "isParallel", false, "RID", 99, "rosNamespace", "matlab_cr_debug_plot", ...
-    "vehicleInfo", vehicleInfo, "useSimTime", envNumber("SIM_TIME", 0) == 1);
+    "vehicleInfo", vehicleInfo, "useSimTime", envNumber("SIM_TIME", 0) == 1, "getNewTf", envNumber("GET_NEW_TF", 0) == 1);
 
 comm = bridge.CR_debug.ROS2CommManager(cfg, mode);
 comm.generateSensorSubscribers();

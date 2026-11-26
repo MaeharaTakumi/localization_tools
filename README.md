@@ -35,7 +35,7 @@ NDT の R を「真値 + ノイズ」で求める `calibrate_ndt_noise.py`（202
 | `calibration/` | **パラメータ推定**：`run_calibration.sh`（推定用の動きで走って、続けて推定する。コマンド `calibration`）、`motion.py`（推定用の動き）、`calibrate.py`（R・倍率・取付をまとめて推定。`run_calibration.sh` が呼ぶ）、`calibrate_noise.py`（観測ノイズ R）、`calibrate_mount_scale.py`（LiDAR の取付とオドメトリの倍率）、図は `plot_noise.py`・`plot_mount_scale.py`。設定は `param/motion.yaml`（推定用の動き）と `param/calibrate.yaml`（各プログラムのオプションの既定値。`params.py` が読む） |
 | `eval/` | `replay_outputs.py`（録画を再生して推定器を動かし、出力を録る）、`bag_info.py`（録画の情報ファイル・一覧）、`bag_paths.py`（録画の置き場所） |
 | `plot/` | `plot_drive_paths.py`（走行の軌跡）、`plot_matlab_outputs.py`（MATLAB が `/tf` から引く値）、`plot_prior_posterior.py`（RViz の点群に使う姿勢の違い）、`plot_cr_debug_pairs.py`（MATLAB の CR_debug が受け取った組）、`rerender_results.sh`（今のツールで描ける `results/` の図を描き直す。`OUT` で出力先、`T0` でツールの場所） |
-| `matlab/` | MATLAB（whill_common_matlab の CR_debug）の確認。`replay_matlab.sh`・`replay_tf_interpolation.sh`・`replay_cr_debug_rviz.sh` はホストで実行 |
+| `matlab/` | MATLAB（whill_common_matlab の CR_debug と SIP 版）の確認。`replay_matlab.sh`・`replay_tf_interpolation.sh`・`replay_cr_debug_rviz.sh` はホストで実行 |
 | `rviz/` | rviz2 が引く TF の確認：`replay_rviz_tf.sh`（再生しながら rviz2 の tf2 の出し入れを記録して比べる。コンテナの中で実行）、`tf_hook.cpp`（`LD_PRELOAD` のフック）、`check_rviz_tf_interpolation.py`（記録と tf2 の決まりを比べる・図）、`compare_rviz_cr_debug.py`（同じ再生の CR_debug の値と点群ごとに比べる・図） |
 | `common/` | **共通部品**（各スクリプトは `common` などを `sys.path` に入れて import する）：`env_files.py`（localization_bringup の `param/<env>/` を読む・写して書き換える。`make_env`・`node_params`）、`bag_io.py`（`read_bag`・`phases_of`・`stamp_sec`・`stamp_ns`・`mount_from_tf_static`）、`pose_math.py`（姿勢と 4x4 行列）、`plot_style.py`（色・線幅・`setup`・`style`・`box_on`・`capitalize_labels`・`widths_back_to_front`）、`gazebo_model.py`（Gazebo の車輪の半径と間隔、URDF の取付） |
 | `record_rviz.sh` | **RViz の画面の録画（ホストで実行）** |
@@ -180,9 +180,12 @@ python3 plot/plot_cr_debug_pairs.py /root/ros2_ws/fig/matlab_outputs/cr_debug.ma
 ```
 
 `check_cr_debug.m` の環境変数（省略可）：`MODE`・`COLOR`・`SIM_TIME`（`check_cr_debug_plot.m` と同じ。実機の録画は `MODE=3 SIM_TIME=1`）、
-`READY_FILE`（購読を作ったら作る）、`STOP_IDLE`（姿勢の付いた新しい点群が来なくなってからこの秒数で止める）、`TEST_LIDAR_THRESHOLD`、
+`READY_FILE`（購読を作ったら作る）、`STOP_IDLE`（姿勢の付いた新しい点群が来なくなってからこの秒数で止める）、
+`GET_NEW_TF`（1 なら SensorFetcher の `getNewTf` を true にして `LIDAR_pose` も最新の TF にする。既定 0。`check_cr_debug_plot.m`・`check_sip.m`・
+`replay_matlab.sh` も同じ）、
 `TEST_POSES`（点群のある周期ごとに `getSensorData` の前・後の CLOCK_MONOTONIC [ns]、点群の stamp の sec・nanosec、`LIDAR_pose` の X Y Z Roll Pitch Yaw Stamp を
-1 行ずつ書くテキスト。姿勢が無ければ nan。rviz2 と比べるのに使う）。
+1 行ずつ書くテキスト。姿勢が無ければ nan。rviz2 と比べるのに使う）。終わりに、`Plant.Stamp` − 今の ROS の時刻（最新の TF なので正）と、
+`LIDAR_pose.Stamp` が `Plant.Stamp` と同じ周期の数（`GET_NEW_TF=1` なら全部）も表示する（`rows` の 13・14 列目）。
 
 main.m と同じ流れ（Estimate2・Control2・DataLogger。指令は配信しない）で記録し、図と動画（`TEST_OUT_DIR/result`。地図は `MAP`）まで作るのは
 `matlab/check_cr_debug_plot.m`。録画の再生・MATLAB・図と動画を 1 回で行うのは `matlab/replay_matlab.sh`（ホストで実行。MATLAB を先に起動して
@@ -191,6 +194,19 @@ main.m と同じ流れ（Estimate2・Control2・DataLogger。指令は配信し�
 ```bash
 matlab/replay_matlab.sh /root/ros2_ws/bags/gazebo/gazebo_spin5_20261016_111637 ../../results/matlab_outputs/replay_gazebo_spin5
 matlab/replay_matlab.sh /root/ros2_ws/bags/real/blue_spin5_20261016_160557 ../../results/matlab_outputs/replay_blue_spin5 blue /root/ros2_ws/map/10build_4F_C_20260414.pcd
+```
+
+whill_common_matlab の SIP 版（`src/whill_common_matlab-main _sip`、ブランチ `cr_debug_sip`。WheelchairSIP の推定器 Estimate2・制御器 Control3・図
+myplotResult）は `matlab/check_sip.m` で動かす（ホスト、`-batch`。A* の後の Enter は待たない）。`replay_matlab.sh` に `CHECK=check_sip.m` と `REPO` を
+付けると録画の再生と一緒に動かす（指令は配信しない）。`RID=11 SEND_CMD=1` で動いている Gazebo と自己位置推定に指令を送る（閉ループ。終わりに 0 を送る）。
+`+tracker` の MEX が R2024b で作ったものなので、MATLAB は R2024b にする。終わりに周期の数・姿勢の来た周期・A* の周期・障害物を追跡した周期・
+1 周期の障害物の数・MCMPC の周期・計算時間・指令の範囲を表示する：
+
+```bash
+CHECK=check_sip.m REPO="$PWD/../whill_common_matlab-main _sip" MATLAB=/usr/local/MATLAB/R2024b/bin/matlab \
+  matlab/replay_matlab.sh /root/ros2_ws/bags/gazebo/gazebo_slalom_20261016_112007 ../../results/sip/replay_slalom
+REPO="$PWD/../whill_common_matlab-main _sip" RID=11 SEND_CMD=1 TEST_DURATION=120 TEST_OUT_DIR=../../results/sip/gazebo_closed_loop \
+  /usr/local/MATLAB/R2024b/bin/matlab -batch "run('$PWD/matlab/check_sip.m')"
 ```
 
 `ros2tf` の `getTransform(tftree, 親, 子, stamp)`（CR_debug が点群の stamp で引くのと同じ呼び方）が前後の TF の線形補間（位置は線形、回転は最短経路の
